@@ -1,0 +1,15 @@
+{
+  "name": "hokkaido-golf",
+  "private": true,
+  "workspaces": ["packages/*", "apps/*"],
+  "scripts": {
+    "dev:api": "npm run dev -w @golf/api",
+    "dev:web": "npm run dev -w @golf/web",
+    "db:migrate": "npm run db:migrate -w @golf/api",
+    "db:seed": "npm run db:seed -w @golf/api",
+    "test": "npm test -w @golf/shared && npm test -w @golf/api",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "build": "npm run build -w @golf/web"
+  },
+  "engines": { "node": ">=20" }
+}

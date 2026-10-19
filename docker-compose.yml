@@ -1,0 +1,12 @@
+# 로컬 개발용 PostgreSQL. `docker compose up -d` 후 npm run db:migrate && npm run db:seed
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: golf
+      POSTGRES_PASSWORD: golf
+      POSTGRES_DB: golf
+    ports: ["5432:5432"]
+    volumes: [dbdata:/var/lib/postgresql/data]
+volumes:
+  dbdata:
