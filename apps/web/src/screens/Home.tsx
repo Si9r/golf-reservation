@@ -9,7 +9,6 @@ import { fShort, searchPkgs, upcomingDepartures } from "../logic";
 import { Anno, Img, PeopleInput, Q, ScreenTag, StageTag, useStage } from "../components/ui";
 import { DatePeopleSheet, PkgCard, TypeBadge } from "../components/booking";
 import { AiSheet } from "./AiSheet";
-import { Footer } from "../components/Shell";
 
 export default function Home() {
   const { t, n, L } = useT();
@@ -89,7 +88,7 @@ export default function Home() {
                 )}
               </div>
             </div>
-            <PeopleInput label={t("people")} value={people} onChange={(v) => patch({ people: v })} anno={<Anno n={4} t="인원 (V-02): 1~30명, 바꾸면 결과 수 즉시 갱신" />} />
+            <PeopleInput label={t("people")} value={people} onChange={(v) => patch({ people: v })} anno={<Anno n={4} t="인원 (V-02): 1~20명, 바꾸면 결과 수 즉시 갱신" />} />
             <div className="relative grid gap-2">
               <Anno n={5} t="조건 결과 수 + 패키지 보기 (T-01): 출발일을 고르기 전에는 비활성 + M-127, 0개여도 이동" />
               <p className="text-center text-[13.5px] font-semibold text-ink-2" aria-live="polite">{date ? t("M-111", { n: results.length }) : <span className="text-warn">{t("M-127")}</span>}</p>
@@ -176,7 +175,6 @@ export default function Home() {
         )}
         <div className="mt-6 flex flex-wrap gap-2"><Q id="Q-02" t="패키지 상세 구성" /><Q id="Q-08" t="가격·통화" /></div>
       </div>
-      <Footer />
       <DatePeopleSheet open={sheet} onClose={() => setSheet(false)} date={date} people={people} onDone={(d, n2) => { patch({ date: d, people: n2 }); setSheet(false); }} />
       <AiSheet open={ai} onClose={() => setAi(false)} />
     </>

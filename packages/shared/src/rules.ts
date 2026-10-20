@@ -28,13 +28,15 @@ export const isBookableDate = (p: SaleRule, d: string, today: string, status: De
 export const seatsLeft = (capacity: number, bookedCount: number, heldPeople: number) => Math.max(0, capacity - bookedCount - heldPeople);
 
 export type DepState = "unavailable" | "go" | "enough" | "need";
-/** L-04 출발 확정 현황. 판정 전 20명 이상은 상태가 아니라 표시 '인원 충족' */
+/** L-04 출발 확정 현황. 판정 전 20명 이상은 상태가 아니라 표시 '인원 충족'.
+ * 정원 20 = 최소 출발 인원 20이라 '인원 충족'이면 정원도 다 참 → full 로 '잔여 0석' 대신 '마감' 표시 */
 export const departureView = (o: { bookedCount: number; seats: number; status: DepartureStatus; people: number; minPeople?: number }) => {
   const min = o.minPeople ?? SETTINGS.MIN_DEPARTURE;
   const sum = o.bookedCount + o.people;
   const state: DepState = o.people > o.seats ? "unavailable" : o.status === "GO" ? "go" : sum >= min ? "enough" : "need";
   const msg = { unavailable: "M-120", go: "M-123", enough: "M-125", need: "M-122" }[state];
-  return { booked: o.bookedCount, sum, seats: o.seats, need: Math.max(0, min - sum), seatsAfter: Math.max(0, o.seats - o.people), state, msg };
+  const seatsAfter = Math.max(0, o.seats - o.people);
+  return { booked: o.bookedCount, sum, seats: o.seats, need: Math.max(0, min - sum), seatsAfter, full: state !== "unavailable" && seatsAfter === 0, state, msg };
 };
 
 /** 객실 구성 (화면설계 v2 피드백 5): 2인 1실 기본, 1인실 인원은 인원과 홀짝이 같음 */

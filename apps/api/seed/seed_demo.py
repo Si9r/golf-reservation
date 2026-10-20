@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from app import settings as S
 from app.db import run, tx
 from app.services.departures import generate_departures
 
@@ -22,9 +23,9 @@ def seed_demo(fake_booked: bool = True) -> int:
                 cols = list(r)
                 run(c, f"INSERT IGNORE INTO {table} ({','.join(cols)}) VALUES ({','.join(':' + k for k in cols)})", **r)
         made = generate_departures(c)
-        if fake_booked:  # 예약이 없는 출발편에만 예시 인원 (0~24명, 일부는 거의 마감)
-            run(c, """UPDATE departure d SET booked_count = IF(CRC32(id) % 9 = 0, 27 + CRC32(id) % 4, CRC32(id) % 25)
-                      WHERE NOT EXISTS (SELECT 1 FROM booking b WHERE b.departure_id = d.id)""")
+        if fake_booked:  # 예약이 없는 출발편에만 예시 인원 (0~17명, 일부는 18~20명으로 거의 마감). 정원도 지금 기준(BUS_SEATS)으로
+            run(c, """UPDATE departure d SET capacity = :cap, booked_count = IF(CRC32(id) % 9 = 0, 18 + (CRC32(id) DIV 9) % 3, CRC32(id) % 18)
+                      WHERE NOT EXISTS (SELECT 1 FROM booking b WHERE b.departure_id = d.id)""", cap=S.BUS_SEATS)
     return made
 
 

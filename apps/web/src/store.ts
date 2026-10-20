@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { PKGS, SET, serviceArea, type Lang, type Place } from "./data";
 import { mapsLangDiffers } from "./gmaps";
-import { addDays, booked, departuresIn, judgeDate, monthsAhead, todayISO, tripEnd, type Extra, type SearchFilters } from "./logic";
+import { addDays, booked, departuresIn, judgeDate, monthsAhead, stopTimeRange, todayISO, tripEnd, type Extra, type SearchFilters } from "./logic";
 
 // ---------- 앱 설정 (언어·테마·프로토타입 도구) ----------
 export type Theme = "system" | "light" | "dark";
@@ -85,7 +85,8 @@ export interface Info {
   email: string;
   companions: string[];
   later: boolean;
-  agree: { terms: boolean; privacy: boolean; cancel: boolean };
+  // 예약 화면 동의 2개 (V-25): 취소 규정 · 합승 안내. 이용약관·개인정보는 본 사이트 회원가입 때 동의 (운영사 확정)
+  agree: { cancel: boolean; shared: boolean };
 }
 export interface Draft {
   q: string; // 검색어 (S-01·S-02 공유)
@@ -100,6 +101,8 @@ export interface Draft {
   drop: Place | null;
   dropSame: boolean; // 하차도 승차와 같은 곳 (기본 체크)
   pickMemo: string;
+  pickTime: string | null; // 희망 승차 시간 'HH:MM' (booking_stop.desired_time, 참고용)
+  dropTime: string | null; // 희망 하차 시간 (하차가 승차와 같은 곳이어도 따로 받음)
   info: Info | null;
   holdUntil: number | null; // 좌석 임시확보 만료 (seat_hold.expires_at)
   holdPeople: number;
@@ -119,6 +122,8 @@ const blankDraft = (): Draft => ({
   drop: null,
   dropSame: true,
   pickMemo: "",
+  pickTime: null,
+  dropTime: null,
   info: null,
   holdUntil: null,
   holdPeople: 0,
@@ -138,13 +143,13 @@ export const useDraft = create<DraftState>()(
         const s = get();
         if (s.pkgId === id) return;
         const p = PKGS.find((x) => x.id === id)!;
-        set({ pkgId: id, dep: null, opt: p.opts[0] ?? null, pick: null, drop: null, dropSame: true, pickMemo: "", holdUntil: null, holdPeople: 0, singles: null });
+        set({ pkgId: id, dep: null, opt: p.opts[0] ?? null, pick: null, drop: null, dropSame: true, pickMemo: "", pickTime: null, dropTime: null, holdUntil: null, holdPeople: 0, singles: null });
       },
     }),
-    { name: "golf-draft", version: 2, migrate: () => blankDraft() as DraftState, storage: createJSONStorage(() => sessionStorage) },
+    { name: "golf-draft", version: 3, migrate: () => blankDraft() as DraftState, storage: createJSONStorage(() => sessionStorage) },
   ),
 );
-// 로고 탭 확인 후 초기화 (M-101, C-06)
+// 서비스명 탭 확인 후 초기화 (M-101, C-06)
 export const fullReset = () => useDraft.setState({ ...blankDraft() });
 // 좌석 임시확보 해제 (뒤로 가기·만료)
 export const releaseHold = () => useDraft.setState({ holdUntil: null, holdPeople: 0 });
@@ -164,6 +169,8 @@ export interface Booking {
   pick: Place | null;
   drop: Place | null;
   pickMemo: string;
+  pickTime?: string; // 희망 승하차 시간 (booking_stop.desired_time). 운영이 확정한 시간은 pickupTime
+  dropTime?: string;
   unit: number;
   singles?: number; // 1인실 이용 인원 (객실 구성)
   total: number;
@@ -215,7 +222,7 @@ const seedBookings = (): { bookings: Booking[]; extra: Extra } => {
   const info = (n: number, later = false): Info => ({
     nameKo: DEMO_USER.nameKo, nameEn: DEMO_USER.nameEn, cc: DEMO_USER.cc, phone: DEMO_USER.phone, email: DEMO_USER.email,
     companions: later ? [] : ["PARK MINSEO", "CHOI YUNA", "KANG DOHYUN", "LIM SEOJIN", "YOON JIHO", "HAN SOYEON", "OH JUNSEO", "SEO HAEUN", "JUNG WOOJIN", "BAE YERIN", "KWON TAEYANG"].slice(0, n - 1),
-    later, agree: { terms: true, privacy: true, cancel: true },
+    later, agree: { cancel: true, shared: true },
   });
   const sapSt: Place = { name: { ko: "JR 삿포로역 남쪽 출구", ja: "JR札幌駅 南口" }, kind: "station", area: "SAPPORO", lat: 43.0675, lng: 141.3508 };
   const odori: Place = { name: { ko: "삿포로 TV타워 옆 버스정류장", ja: "さっぽろテレビ塔横バス停" }, kind: "spot", area: "SAPPORO", lat: 43.0611, lng: 141.3564 };
@@ -227,19 +234,24 @@ const seedBookings = (): { bookings: Booking[]; extra: Extra } => {
   };
   const out: Booking[] = [];
   const extra: Extra = {};
+  // 희망 시간: 승차는 고를 수 있는 가장 늦은 시간, 하차는 가장 이른 시간 (TRAVEL 대략값 기준)
+  const times = (pid: number, pick: Place, drop: Place) => {
+    const p = PKGS.find((x) => x.id === pid)!;
+    return { pickTime: stopTimeRange(p, "pick", pick)?.options.at(-1), dropTime: stopTimeRange(p, "drop", drop)?.options[0] };
+  };
   const up = nextDep(1, 1);
   if (up) {
-    out.push({ no: no(up, 1), pkgId: 1, dep: up, people: 4, opt: "mitsui", pick: odori, drop: sapSt, pickMemo: "TV타워 1층 출입구 앞", unit: 69800, total: 279200, currency: "JPY", info: info(4, true), status: "CONFIRMED", createdAt: addDays(t, -2), lang: "ko" });
+    out.push({ no: no(up, 1), pkgId: 1, dep: up, people: 4, opt: "mitsui", pick: odori, drop: sapSt, pickMemo: "TV타워 1층 출입구 앞", ...times(1, odori, sapSt), unit: 69800, total: 279200, currency: "JPY", info: info(4, true), status: "CONFIRMED", createdAt: addDays(t, -2), lang: "ko" });
     extra[`1|${up}`] = 4;
   }
   const up2 = nextDep(7, 2);
   if (up2) {
-    out.push({ no: no(up2, 1), pkgId: 7, dep: up2, people: 2, opt: "std", pick: sapSt, drop: sapSt, pickMemo: "", unit: 45800, total: 91600, currency: "JPY", info: info(2), status: "USER_CANCEL", cancelBy: "USER", refundStatus: "REQUESTED", canceledAt: addDays(t, -1), createdAt: addDays(t, -6), lang: "ko" });
+    out.push({ no: no(up2, 1), pkgId: 7, dep: up2, people: 2, opt: "std", pick: sapSt, drop: sapSt, pickMemo: "", ...times(7, sapSt, sapSt), unit: 45800, total: 91600, currency: "JPY", info: info(2), status: "USER_CANCEL", cancelBy: "USER", refundStatus: "REQUESTED", canceledAt: addDays(t, -1), createdAt: addDays(t, -6), lang: "ko" });
   }
   const past = addDays(t, -24);
-  out.push({ no: no(past, 3), pkgId: 7, dep: past, people: 12, opt: "std", pick: sapSt, drop: sapSt, pickMemo: "", unit: 45800, total: 549600, currency: "JPY", info: info(12), status: "DONE", depStatus: "DONE", createdAt: addDays(t, -60), lang: "ko" });
+  out.push({ no: no(past, 3), pkgId: 7, dep: past, people: 12, opt: "std", pick: sapSt, drop: sapSt, pickMemo: "", ...times(7, sapSt, sapSt), unit: 45800, total: 549600, currency: "JPY", info: info(12), status: "DONE", depStatus: "DONE", createdAt: addDays(t, -60), lang: "ko" });
   const can = addDays(t, -9);
-  out.push({ no: no(can, 2), pkgId: 3, dep: can, people: 2, opt: null, pick: sapSt, drop: sapSt, pickMemo: "", unit: 16900, total: 33800, currency: "JPY", info: info(2), status: "OP_CANCEL", depStatus: "CANCEL", cancelBy: "OP", refundStatus: "DONE", canceledAt: addDays(can, -3), createdAt: addDays(t, -30), lang: "ko" });
+  out.push({ no: no(can, 2), pkgId: 3, dep: can, people: 2, opt: null, pick: sapSt, drop: sapSt, pickMemo: "", ...times(3, sapSt, sapSt), unit: 16900, total: 33800, currency: "JPY", info: info(2), status: "OP_CANCEL", depStatus: "CANCEL", cancelBy: "OP", refundStatus: "DONE", canceledAt: addDays(can, -3), createdAt: addDays(t, -30), lang: "ko" });
   return { bookings: out, extra };
 };
 export const useDb = create<DbState>()(
@@ -260,7 +272,7 @@ export const useDb = create<DbState>()(
       clear: () => set({ bookings: [], extra: {}, seeded: true }),
       seed: () => set({ ...seedBookings(), seeded: true }),
     }),
-    { name: "golf-db", version: 2, migrate: () => ({ bookings: [], extra: {}, seeded: false }) as unknown as DbState },
+    { name: "golf-db", version: 3, migrate: () => ({ bookings: [], extra: {}, seeded: false }) as unknown as DbState },
   ),
 );
 

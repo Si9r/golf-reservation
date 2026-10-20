@@ -5,17 +5,22 @@ export type L2 = { ko: string; ja: string };
 export type Zone = "SAPPORO" | "KITAHIROSHIMA" | "CHITOSE";
 export type Area = Zone | "ENIWA" | "TOMAKOMAI" | "OTARU" | "JOZANKEI" | "NOBORIBETSU" | "OTHER" | "MAP";
 
+// 서비스 이름 (임시, 운영사 확정 전). 헤더 왼쪽에 표시
+export const SERVICE_NAME = "TRAVENDER Golf";
+// 본 사이트 이용약관 주소. 서버 공개 설정 API(GET /api/golf/settings/public)의 terms.terms 와 같은 값 (화면 API 연결 전이라 상수로)
+export const TERMS_URL = "https://travender-hokkaido.com/terms";
+
 export const SET = {
   MIN_PEOPLE: 1,
-  MAX_PEOPLE: 30,
+  MAX_PEOPLE: 20, // 한 예약도 출발편 정원을 넘을 수 없음 (운영사 확정)
   DEFAULT_PEOPLE: 2,
   MIN_DEPARTURE: 20, // 최소 출발 인원 (Q-03 확정)
-  BUS_SEATS: 30, // 버스 정원 (F-031)
-  JUDGE_DAYS: 3, // 출발 판정일 = 출발 3일 전 (예시, Q-15)
+  BUS_SEATS: 20, // 출발편 정원 = 버스 1대 (F-031, 운영사 확정)
+  JUDGE_DAYS: 7, // 출발 판정일 = 출발 7일 전 (운영사 확정). 동반자 명단 마감과 같은 날
   HOLD_MINUTES: 10, // 결제 중 잔여석 확보 시간 (v0.2 S-10)
   SEASON_FROM: "04-20", // 홋카이도 골프 시즌 (예시) - 11/16~4/19 휴장 (v1.3 CLOSED_SEASON)
   SEASON_TO: "11-15",
-  CLOSED_FROM: "11-16", // 휴장기 CLOSED_SEASON (상세설계 v1.3 설정값)
+  CLOSED_FROM: "11-16", // 휴장기 CLOSED_SEASON, 모든 골프장 공통 (운영사 확정)
   CLOSED_TO: "04-19",
   SINGLE_ADD: 12000, // 1인실 추가 요금 (1명당, 예시 · Q-02)
   COMPANION_DUE_DAYS: 7, // 동반자 명단 마감 = 출발 7일 전
@@ -25,6 +30,14 @@ export const SET = {
   SUPPORT_TEL: "+81-11-200-4812", // 예시 번호 (Q-20 미수령)
   SUPPORT_MAIL: "golf@travender-hokkaido.com", // 예시 주소
   SUPPORT_HOURS: "10:00-17:00",
+  // 희망 승하차 시간 (V-12, 운영사 확정). 서버 apps/api/app/settings.py 와 같은 값
+  STOP_TIME_FIRST: "06:00", // 가장 이른 승차·하차
+  STOP_TIME_LAST: "21:00", // 가장 늦은 승차·하차
+  STOP_TIME_STEP_MIN: 30, // 30분 단위
+  PICK_MARGIN_MIN: 30, // 승차: 첫 티오프 − 이동 시간 − 이 여유 (가장 늦은 승차)
+  PICK_EARLIEST_BEFORE_TEE_MIN: 150, // 승차: 첫 티오프 − 2시간 30분부터 (가장 이른 승차, 12:30 → 10:00). 합승이라 일찍 타면 골프장에서 대기
+  ROUND_HOURS: 5, // 라운드 종료 예정 = 티오프 + 5시간
+  NO_ROUND_DROP_FROM: "11:00", // 마지막 날 라운드가 없을 때 하차 기준 (체크아웃 후, 일정표와 같음)
 };
 
 const U = (id: string, w = 960) => `https://images.unsplash.com/${id}?auto=format&fit=crop&w=${w}&q=70`;
@@ -286,7 +299,8 @@ export const PLACES: Place[] = [
   { name: { ko: "노보리베쓰 온천", ja: "登別温泉" }, kind: "spot", area: "NOBORIBETSU", lat: 42.496, lng: 141.145 },
 ];
 
-// 지역 → 골프장 지역 이동 시간(분). Google 경로를 못 받을 때만 쓰는 대략값
+// 지역 → 골프장 지역 이동 시간(분). Google 경로를 못 받을 때만 쓰는 대략값.
+// 서버 apps/api/app/settings.py TRAVEL_MIN 과 같은 값 (서버는 이 표로 희망 시간 범위를 검사, 둘을 같이 고칠 것)
 export const TRAVEL: Record<Zone, Partial<Record<Area, number>>> = {
   SAPPORO: { SAPPORO: 40, KITAHIROSHIMA: 40, ENIWA: 40, CHITOSE: 60, TOMAKOMAI: 70 },
   KITAHIROSHIMA: { SAPPORO: 40, KITAHIROSHIMA: 15, ENIWA: 20, CHITOSE: 30, TOMAKOMAI: 45 },

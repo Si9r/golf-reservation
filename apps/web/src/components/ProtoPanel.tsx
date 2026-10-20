@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Blueprint } from "@phosphor-icons/react";
 import { useApp, useAuth, useDb, useDraft, useToast, type Theme } from "../store";
 import { PKGS } from "../data";
-import { firstAvailable } from "../logic";
+import { firstAvailable, stopTimeRange } from "../logic";
 import { Sheet } from "./ui";
 
 // 프로토타입 전용 도구 (실서비스 제외). 설계서 번호 보기, MVP 단계 미리보기, 오류·결제 결과 데모
@@ -54,6 +54,12 @@ export function ProtoPanel() {
       const pl = { name: { ko: "JR 삿포로역 남쪽 출구", ja: "JR札幌駅 南口" }, kind: "station" as const, area: "SAPPORO" as const, lat: 43.0675, lng: 141.3508 };
       useDraft.setState({ pick: s.pick ?? pl, drop: s.drop ?? pl, dropSame: true });
     }
+    const st0 = useDraft.getState();
+    if ((to.includes("review") || to.includes("info") || to.includes("pay")) && (!st0.pickTime || !st0.dropTime)) {
+      // 희망 시간: 승차는 고를 수 있는 가장 늦은 시간, 하차는 가장 이른 시간 (TRAVEL 대략값 기준)
+      const p = PKGS.find((x) => x.id === st0.pkgId)!;
+      useDraft.setState({ pickTime: st0.pickTime ?? stopTimeRange(p, "pick", st0.pick)?.options.at(-1) ?? null, dropTime: st0.dropTime ?? stopTimeRange(p, "drop", st0.dropSame ? st0.pick : st0.drop)?.options[0] ?? null });
+    }
     if (to.includes("pay") && !useAuth.getState().user) login();
     if (to.includes("pay")) {
       const u = useAuth.getState().user!;
@@ -61,7 +67,7 @@ export function ProtoPanel() {
       useDraft.setState({
         holdUntil: Date.now() + 10 * 60000,
         holdPeople: st.people,
-        info: st.info ?? { nameKo: u.nameKo, nameEn: u.nameEn, cc: u.cc, phone: u.phone, email: u.email, companions: [], later: true, agree: { terms: true, privacy: true, cancel: true } },
+        info: st.info ?? { nameKo: u.nameKo, nameEn: u.nameEn, cc: u.cc, phone: u.phone, email: u.email, companions: [], later: true, agree: { cancel: true, shared: true } },
       });
     }
     go(to);

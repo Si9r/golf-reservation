@@ -11,7 +11,7 @@ export function useFlow(need: { place?: boolean; login?: boolean; info?: boolean
   let redirect: string | null = null;
   if (!p) redirect = "/golf/packages";
   else if (!d.dep) redirect = `/golf/packages/${p.id}`;
-  else if (need.place && (!d.pick || !d.drop)) redirect = "/golf/book/place";
+  else if (need.place && (!d.pick || !d.drop || !d.pickTime || !d.dropTime)) redirect = "/golf/book/place"; // 장소 + 희망 시간 (V-12)
   else if (need.login && !user) redirect = `/login?next=${encodeURIComponent(loc.pathname)}`;
   else if (need.info && !d.info) redirect = "/golf/book/info";
   return { d, p: p as Pkg, redirect, user };

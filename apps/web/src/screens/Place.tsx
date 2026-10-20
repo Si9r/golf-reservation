@@ -4,12 +4,12 @@ import { motion } from "motion/react";
 import { Airplane, ArrowLeft, Bed, Buildings, Bus, CheckCircle, Clock, GoogleLogo, MagnifyingGlass, MapPin, Train, WarningCircle, X } from "@phosphor-icons/react";
 import { AREA_NAME, PLACES, SET, ZONES_STRICT, courseOf, serviceArea, type Place as P, type PlaceKind } from "../data";
 import { useT } from "../i18n";
-import { nearestKnown, norm, pickupWindow, placeZone, stayHotel, zoneAt } from "../logic";
+import { nearestKnown, norm, placeZone, stayHotel, stopTimeRange, zoneAt, type StopRange } from "../logic";
 import { Anno, BottomBar, Q, ScreenTag, Steps } from "../components/ui";
 import { DriveChip, MapView, type MapMarker } from "../components/GoogleMap";
 import { useDrive, useMaps, type LL } from "../gmaps";
 import { useFlow } from "./flow";
-import { useApp } from "../store";
+import { useApp, type Draft } from "../store";
 
 const KIND_ICON: Record<PlaceKind, typeof Bed> = { hotel: Bed, station: Train, airport: Airplane, spot: Buildings, map: MapPin };
 // 5 자주 고르는 곳 (설정 POPULAR_PLACES): 삿포로역·오도리·스스키노·TV타워 + 시내 밖 예시(공항·오타루). 데이터에 고정 → Google 요금 없음
@@ -100,7 +100,27 @@ export default function Place() {
   const firstCourse = days.length ? courseOf(days[0]!.course) : null;
   const lastRound = p ? p.days[p.days.length - 1] : null;
   const lastAt: { at: LL; name: string } | null = !p ? null : lastRound ? { at: courseOf(lastRound.course), name: n(courseOf(lastRound.course).name) } : hotel ? { at: hotel, name: n(hotel.name) } : firstCourse ? { at: firstCourse, name: n(firstCourse.name) } : null;
-  const pickDrive = useDrive(d.pick, firstCourse);
+  // 희망 시간 범위 (V-12): 승차 → 첫날 골프장, 마지막 날 골프장 → 하차. 이동 시간은 Google 경로 결과, 없으면 TRAVEL 대략값
+  const day1Course = p?.days[0] ? courseOf(p.days[0].course) : null;
+  const lastDayRound = p ? p.days[p.days.length - 1] : null;
+  const lastDayCourse = lastDayRound ? courseOf(lastDayRound.course) : null;
+  const dropPlace = d.dropSame ? d.pick : d.drop;
+  const pickLeg = useDrive(d.pick, day1Course);
+  const dropLeg = useDrive(lastDayCourse, dropPlace);
+  const gmin = (x: typeof pickLeg) => (x.drive?.source === "google" ? x.drive.min : null);
+  const pickRange = p ? stopTimeRange(p, "pick", d.pick, gmin(pickLeg)) : null;
+  const dropRange = p ? stopTimeRange(p, "drop", dropPlace, gmin(dropLeg)) : null;
+  // 장소·일정이 바뀌어 고른 시간이 범위 밖이 되면 선택을 지움 (경로 시간을 받는 중에는 기다림)
+  const pickKey = pickRange ? pickRange.options.join() : "";
+  const dropKey = dropRange ? dropRange.options.join() : "";
+  useEffect(() => {
+    if (pickLeg.loading || dropLeg.loading) return;
+    const out: Partial<Draft> = {};
+    if (d.pickTime && !pickRange?.options.includes(d.pickTime)) out.pickTime = null;
+    if (d.dropTime && !dropRange?.options.includes(d.dropTime)) out.dropTime = null;
+    if (Object.keys(out).length) d.patch(out);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pickKey, dropKey, d.pickTime, d.dropTime, pickLeg.loading, dropLeg.loading]);
 
   const markers = useMemo<MapMarker[]>(() => {
     if (!p) return [];
@@ -192,14 +212,19 @@ export default function Place() {
     setPreview(null);
   };
 
-  const pw = pickupWindow(p, d.pick, pickDrive.drive?.min);
-  const done = !!d.pick && !!(d.dropSame ? d.pick : d.drop);
+  const done = !!d.pick && !!(d.dropSame ? d.pick : d.drop) && !!d.pickTime && !!d.dropTime; // 희망 시간도 승차·하차 모두 필수
   const back = () => nav(d.editReturn ? "/golf/book/review" : p.opts.length ? "/golf/book/hotel" : `/golf/packages/${p.id}`);
   const pv = preview?.place;
   const pvOk = pv ? !!placeZone(pv) : false;
   const center = preview ? preview.at : cur ? { lat: cur.lat, lng: cur.lng } : null;
   const noResult = q.trim().length >= 2 && !sugLoading && sugs.length === 0 && local.length === 0;
   const dropShown = d.dropSame ? d.pick : d.drop;
+  const tabRange = tab === "pick" ? pickRange : dropRange;
+  const tabTime = tab === "pick" ? d.pickTime : d.dropTime;
+  const tabPlace = tab === "pick" ? d.pick : dropShown;
+  const rangeText = (k: "pick" | "drop", r: StopRange | null) =>
+    !r ? null : !r.options.length ? t("rangeNone") : k === "pick" && r.base?.kind === "tee" ? t("rangePickTee", { tee: r.base.tee, from: r.from, to: r.to }) : k === "drop" && r.base?.kind === "end" ? t("rangeDropEnd", { end: r.base.end, from: r.from }) : t("rangeAny", { from: r.from, to: r.to });
+  const withTime = (name: string, time: string | null) => (time ? `${name} · ${t("wishAt", { t: time })}` : name);
 
   return (
     <div className="page step">
@@ -353,6 +378,21 @@ export default function Place() {
         </div>
       )}
 
+      {/* 10 희망 승차·하차 시간 (탭마다 따로, 하차가 승차와 같은 곳이어도 따로) */}
+      <section className="relative mt-4 card grid gap-2 p-4">
+        <Anno n={10} t="희망 시간 (booking_stop.desired_time, V-12): 승차·하차 모두 필수, 30분 단위. 승차 첫날 티오프 − 2시간 30분(06:00 이후) ~ 첫날 티오프 − 이동 − 30분 + 합승 대기 안내 / 하차 마지막 라운드(티오프+5시간) + 이동 ~ 21:00. 범위 밖이 되면 선택 지움. 참고용" />
+        <label className="field">
+          <span className="label">{tab === "pick" ? t("wishPick") : t("wishDrop")}</span>
+          {tabRange && <span className={`text-[13px] ${tabRange.options.length ? "text-ink-2" : "font-semibold text-bad"}`}>{rangeText(tab, tabRange)}</span>}
+          <select className="input" value={tabTime ?? ""} disabled={!tabRange?.options.length} onChange={(e) => d.patch(tab === "pick" ? { pickTime: e.target.value || null } : { dropTime: e.target.value || null })}>
+            <option value="">{tabPlace ? t("wishNone") : t("wishPlaceFirst")}</option>
+            {tabRange?.options.map((x) => <option key={x} value={x}>{x}</option>)}
+          </select>
+        </label>
+        {tab === "pick" && pickRange?.base && pickRange.options.length > 0 && <p className="flex gap-1.5 text-[13px] text-ink-2"><Clock size={16} className="mt-0.5 flex-none text-brand" />{t("pickWait")}</p>}
+        <p className="help">{t("wishNote")}</p>
+      </section>
+
       {/* 지정한 장소 + 예상 이동 시간 + 7 메모 */}
       <section className="relative mt-5 card divide-y divide-line">
         {(["pick", "drop"] as const).map((k) => {
@@ -364,6 +404,7 @@ export default function Place() {
                 {pl ? (
                   <>
                     <b className="block text-[14.5px] leading-snug">{n(pl.name)}{k === "drop" && d.dropSame && <span className="font-normal text-muted"> ({t("sameAsPick")})</span>}</b>
+                    {(k === "pick" ? d.pickTime : d.dropTime) && <span className="block text-[13px] font-semibold text-brand">{t("wishAt", { t: (k === "pick" ? d.pickTime : d.dropTime)! })}</span>}
                     <span className="text-[12.5px] text-muted">{pl.addr ?? n(AREA_NAME[placeZone(pl) ?? pl.area])}</span>
                   </>
                 ) : (
@@ -391,7 +432,6 @@ export default function Place() {
               <input className="input min-h-[44px]" placeholder={t("memoPh")} value={d.pickMemo} maxLength={SET.MEMO_MAX} onChange={(e) => d.patch({ pickMemo: e.target.value.slice(0, SET.MEMO_MAX) })} />
               <span className="help text-right num">{d.pickMemo.length}/{SET.MEMO_MAX}</span>
             </label>
-            {pw && <p className="flex items-center gap-1.5 text-[13px] text-ink-2"><Clock size={16} className="text-brand" />{t("eta", { a: pw.from, b: pw.to })} <Q id="Q-23" t="승하차 시간 확정 주체" /></p>}
           </div>
         )}
       </section>
@@ -402,16 +442,16 @@ export default function Place() {
         <Bus size={22} weight="duotone" className="mt-0.5 flex-none text-brand" />
         <div className="text-[13.5px]">
           <b className="block">{t("M-142")}</b>
-          <span className="text-ink-2">{L === "ko" ? "버스 정원 30명, 골프백 적재 가능. 합승 버스는 같은 출발편 그룹의 승차 장소를 차례로 들러요." : "バス定員30名、ゴルフバッグ積載可。相乗りバスは同じ出発便の各グループの乗車場所を順に回ります。"}</span> <Q id="Q-23" t="합승 시 경유 방식" />
+          <span className="text-ink-2">{L === "ko" ? `버스 정원 ${SET.BUS_SEATS}명, 골프백 적재 가능. 합승 버스는 같은 출발편 그룹의 승차 장소를 차례로 들러요.` : `バス定員${SET.BUS_SEATS}名、ゴルフバッグ積載可。相乗りバスは同じ出発便の各グループの乗車場所を順に回ります。`}</span> <Q id="Q-23" t="합승 시 경유 방식" />
         </div>
       </section>
       <p className="mt-2 text-[12px] text-muted">{!anno ? null : serviceArea.wide ? "SERVICE_AREA: 넓은 범위 (기타히로시마·치토세·공항 포함, 확인 필요)" : `SERVICE_AREA: 삿포로 중심 반경 ${ZONES_STRICT[0].r / 1000}km (상세설계 설정값)`}</p>
 
       <BottomBar>
-        <span className="absolute -top-3 left-3"><Anno n={9} t="하단 다음: 승차·하차 모두 지정되면 활성 → S-08 (T-10) / 범위 밖 → 그대로 (T-31)" /></span>
+        <span className="absolute -top-3 left-3"><Anno n={9} t="하단 다음: 승차·하차 장소와 희망 시간이 모두 지정되면 활성 → S-08 (T-10) / 범위 밖 → 그대로 (T-31)" /></span>
         <div className="min-w-0 flex-1 text-[12.5px] leading-tight text-muted">
-          <p className="truncate">{t("pick")} · {d.pick ? n(d.pick.name) : "-"}</p>
-          <p className="truncate">{t("drop")} · {dropShown ? n(dropShown.name) : "-"}</p>
+          <p className="truncate">{t("pick")} · {d.pick ? withTime(n(d.pick.name), d.pickTime) : "-"}</p>
+          <p className="truncate">{t("drop")} · {dropShown ? withTime(n(dropShown.name), d.dropTime) : "-"}</p>
         </div>
         <button className="btn btn-primary min-w-[140px]" disabled={!done} onClick={() => { if (d.dropSame) d.patch({ drop: d.pick }); nav("/golf/book/review"); }}>{d.editReturn ? t("editBack") : t("next")}</button>
       </BottomBar>

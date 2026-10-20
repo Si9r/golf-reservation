@@ -1,7 +1,7 @@
 import { useRef, useState, type MutableRefObject, type ReactNode } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { ArrowLeft, CaretRight, WarningCircle } from "@phosphor-icons/react";
-import { SET } from "../data";
+import { ArrowLeft, ArrowSquareOut, CaretRight, WarningCircle } from "@phosphor-icons/react";
+import { SET, TERMS_URL } from "../data";
 import { useT, type Key } from "../i18n";
 import { useDb, useDraft, useToast, type Info } from "../store";
 import { depView, totalPrice, yen } from "../logic";
@@ -9,6 +9,9 @@ import { Anno, BottomBar, Collapse, PriceBlock, Q, ScreenTag, Sheet, Steps } fro
 import { useFlow } from "./flow";
 
 // 입력 검사 (상세설계 '입력 검사' V-20~V-25). 검사 시점: 칸에서 벗어날 때 + '다음'을 누를 때
+// 동의 항목 (V-25, 운영사 확정): 이 서비스에만 해당하는 취소 규정 · 합승 안내 2개. 이용약관·개인정보는 본 사이트 회원가입 때 동의
+const AGREE = ["cancel", "shared"] as const;
+const AGREE_LABEL = { cancel: "agreeCancel", shared: "agreeShared" } as const;
 export const V21 = /^[A-Z][A-Z ]*[A-Z]$/; // 영문 대문자와 공백만, 2~60자, 앞뒤 공백 없음
 const V22 = /^\+?[0-9][0-9 -]{7,}$/; // 국가번호 포함 숫자·공백·하이픈 8자 이상
 const V23 = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -22,12 +25,12 @@ export default function InfoForm() {
   const { d, p, redirect, user } = useFlow({ place: true, login: true });
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [tried, setTried] = useState(false);
-  const [terms, setTerms] = useState<null | "terms" | "privacy" | "cancel">(null);
+  const [terms, setTerms] = useState<null | (typeof AGREE)[number]>(null);
   const refs = useRef<Record<string, HTMLElement | null>>({});
   if (redirect) return <Navigate to={redirect} replace />;
 
   // 회원 정보로 채움 (동반자는 기본 '나중에 입력')
-  const f: Info = d.info ?? { nameKo: user!.nameKo, nameEn: user!.nameEn, cc: user!.cc, phone: user!.phone, email: user!.email, companions: [], later: true, agree: { terms: false, privacy: false, cancel: false } };
+  const f: Info = d.info ?? { nameKo: user!.nameKo, nameEn: user!.nameEn, cc: user!.cc, phone: user!.phone, email: user!.email, companions: [], later: true, agree: { cancel: false, shared: false } };
   const compN = d.people - 1;
   const comps = Array.from({ length: compN }, (_, i) => f.companions[i] ?? "");
   const set = (p: Partial<Info>) => useDraft.getState().patch({ info: { ...f, ...p } });
@@ -40,7 +43,7 @@ export default function InfoForm() {
     phone: V22.test(`${f.cc} ${f.phone}`.trim()) && V22.test(f.phone) ? null : f.phone ? t("M-163") : t("M-161"), // V-22
     email: V23.test(f.email.trim()) ? null : f.email ? t("M-164") : t("M-161"), // V-23
     comps: f.later || compN === 0 || comps.every((c) => validEn(c)) ? null : t("M-162"), // V-24
-    agree: f.agree.terms && f.agree.privacy && f.agree.cancel ? null : t("M-165"), // V-25
+    agree: AGREE.every((k) => f.agree[k]) ? null : t("M-165"), // V-25
   };
   const show = (k: string) => (tried || touched[k] ? errs[k] : null);
   const ok = Object.values(errs).every((e) => !e);
@@ -63,7 +66,7 @@ export default function InfoForm() {
     d.patch({ info: { ...f, nameEn: f.nameEn.trim(), companions: f.later ? [] : comps.map((c) => c.trim()) }, holdUntil: Date.now() + SET.HOLD_MINUTES * 60000, holdPeople: d.people });
     nav("/golf/book/pay"); // T-15
   };
-  const allAgree = f.agree.terms && f.agree.privacy && f.agree.cancel;
+  const allAgree = AGREE.every((k) => f.agree[k]);
   const total = totalPrice(p, d.opt, d.people, d.singles).total;
 
   return (
@@ -130,26 +133,29 @@ export default function InfoForm() {
       )}
 
       <section ref={(el) => { refs.current.agree = el; }} className="relative mt-4 card grid gap-1 p-5">
-        <Anno n={6} t="약관 동의 4개 (V-25, TERMS_URL): 전체 동의 / 이용약관 / 개인정보 / 인원 미달 취소·환불 규정 (모두 필수)" />
+        <Anno n={6} t="동의 2개 (V-25): 전체 동의 / 취소 규정 / 합승 안내 (모두 필수). 이용약관·개인정보는 본 사이트 기준 → 아래 링크 (TERMS_URL)" />
         <h2 className="mb-1 text-[16px] font-bold">{t("termsT")}</h2>
         <label className="flex min-h-[48px] items-center gap-3 border-b border-line pb-2 text-[15px] font-bold">
-          <input type="checkbox" className="check" checked={allAgree} onChange={(e) => set({ agree: { terms: e.target.checked, privacy: e.target.checked, cancel: e.target.checked } })} />
+          <input type="checkbox" className="check" checked={allAgree} onChange={(e) => set({ agree: { cancel: e.target.checked, shared: e.target.checked } })} />
           {t("agreeAll")}
         </label>
-        {(["terms", "privacy", "cancel"] as const).map((k) => (
+        {AGREE.map((k) => (
           <div key={k} className="flex min-h-[44px] items-center gap-3">
             <label className="flex flex-1 items-center gap-3 text-[14px]">
               <input type="checkbox" className="check" checked={f.agree[k]} onChange={(e) => set({ agree: { ...f.agree, [k]: e.target.checked } })} />
-              {t(({ terms: "agreeTerms", privacy: "agreePriv", cancel: "agreeCancel" } as const)[k])}
+              {t(AGREE_LABEL[k])}
             </label>
             <button className="flex items-center text-[13px] font-semibold text-muted underline underline-offset-2" onClick={() => setTerms(k)}>{t("view")}<CaretRight size={12} /></button>
           </div>
         ))}
         {show("agree") && <p className="err mt-1">{show("agree")}</p>}
+        <a className="mt-2 inline-flex items-center gap-1 text-[12px] text-muted underline underline-offset-2" href={TERMS_URL} target="_blank" rel="noreferrer">
+          {t("siteTerms")} <ArrowSquareOut size={12} />
+        </a>
       </section>
 
-      <Sheet open={!!terms} onClose={() => setTerms(null)} title={terms ? t(({ terms: "agreeTerms", privacy: "agreePriv", cancel: "agreeCancel" } as const)[terms]) : ""}>
-        <p className="mb-3 text-[13px] text-muted">{t("termsBody")}</p>
+      <Sheet open={!!terms} onClose={() => setTerms(null)} title={terms ? t(AGREE_LABEL[terms]) : ""}>
+        {terms === "cancel" && <p className="mb-3 text-[13px] text-muted">{t("termsBody")}</p>}
         <ul className="grid list-disc gap-2 pl-5 text-[14px] text-ink-2">{terms && list(`terms_${terms}` as Key).map((x) => <li key={x}>{x}</li>)}</ul>
         {terms && <button className="btn btn-primary mt-5 w-full" onClick={() => { set({ agree: { ...f.agree, [terms]: true } }); setTerms(null); }}>{t("agreeOne")}</button>}
       </Sheet>

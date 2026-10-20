@@ -10,17 +10,20 @@ def test_closed_season():  # 휴장기 11/16~4/19
 
 def test_bookable_date():  # L-01
     assert is_sale_date(PKG, "2026-10-23") and not is_sale_date(PKG, "2026-10-22")
-    assert is_bookable_date(PKG, "2026-10-23", "2026-10-19")
-    assert not is_bookable_date(PKG, "2026-10-23", "2026-10-20")  # 판정일 당일
-    assert not is_bookable_date(PKG, "2026-10-23", "2026-10-19", "CANCEL")
+    # 판정일 = 출발 7일 전. 10-30 출발 → 판정일 10-23
+    assert is_bookable_date(PKG, "2026-10-30", "2026-10-19")
+    assert is_bookable_date(PKG, "2026-10-30", "2026-10-22")
+    assert not is_bookable_date(PKG, "2026-10-30", "2026-10-23")  # 판정일 당일
+    assert not is_bookable_date(PKG, "2026-10-23", "2026-10-19")  # 판정일 10-16 지남
+    assert not is_bookable_date(PKG, "2026-10-30", "2026-10-19", "CANCEL")
 
 
 def test_seats_and_view():  # L-02, L-04
-    assert seats_left(30, 20, 4) == 6
-    assert departure_view(18, 12, "OPEN", 2)["state"] == "enough"
-    assert departure_view(10, 20, "OPEN", 2)["need"] == 8
-    assert departure_view(25, 5, "OPEN", 6)["state"] == "unavailable"
-    assert departure_view(22, 8, "GO", 2)["state"] == "go"
+    assert seats_left(20, 12, 4) == 4  # 정원 20
+    assert departure_view(18, 2, "OPEN", 2) == {"booked": 18, "sum": 20, "seats": 2, "need": 0, "seatsAfter": 0, "full": True, "state": "enough", "msg": "M-125"}
+    assert departure_view(10, 10, "OPEN", 2)["need"] == 8 and departure_view(10, 10, "OPEN", 2)["full"] is False
+    assert departure_view(15, 5, "OPEN", 6)["state"] == "unavailable" and departure_view(15, 5, "OPEN", 6)["full"] is False
+    assert departure_view(18, 2, "GO", 1)["state"] == "go"
 
 
 def test_rooms_and_quote():  # L-05 객실 구성

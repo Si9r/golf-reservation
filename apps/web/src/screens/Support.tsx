@@ -4,7 +4,6 @@ import { SET } from "../data";
 import { useT } from "../i18n";
 import { useAuth, useDb } from "../store";
 import { Anno, Collapse, Q, ScreenTag } from "../components/ui";
-import { Footer } from "../components/Shell";
 
 // 일본 시간 기준 운영 중인지 (설정 SUPPORT.hours 10:00-17:00)
 const openNowJST = () => {
@@ -71,7 +70,6 @@ export default function Support() {
           </div>
         </section>
       </div>
-      <Footer />
     </>
   );
 }

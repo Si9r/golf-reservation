@@ -1,4 +1,4 @@
-"""견적(L-05) · 좌석 임시확보(L-07) · 예약 확정(L-08, L-09) · 조회 · 동반자 · 고객 취소(L-14)"""
+"""견적(L-05) · 좌석 임시확보(L-07) · 예약 확정(L-08, L-09) · 조회 · 동반자 · 고객 취소(L-14, API-16, API-19)"""
 from __future__ import annotations
 
 import json
@@ -17,6 +17,7 @@ from ..rules import add_days, booking_no, in_area, is_bookable_date, quote
 from .catalog import DEP_SQL, dep_seats, sale_rule, stay_info
 
 NAME_EN = re.compile(r"[A-Z][A-Z ]{1,59}")
+HHMM = re.compile(r"([01]\d|2[0-3]):[0-5]\d")
 
 
 def _pkg_of_dep(c: Connection, dep_id: str) -> dict | None:
@@ -83,6 +84,9 @@ def _validate(req: dict, people: int) -> None:
     for i, s in enumerate(req["stops"]):
         if len(s.get("memo") or "") > S.MEMO_MAX:
             f.append({"field": f"stops.{i}.memo", "rule": "V-11"})
+        t = s.get("desiredTime") or ""
+        if not HHMM.fullmatch(t) or _min(t) % S.STOP_TIME_STEP_MIN:  # V-12 희망 시간: 승차·하차 모두 필수, 30분 단위
+            f.append({"field": f"stops.{i}.desiredTime", "rule": "V-12"})
     if f:
         fail("E-VALID", f)
 
@@ -100,6 +104,46 @@ def check_area(c: Connection, lat: float, lng: float) -> dict:
     return {"inArea": _area_of(c, {"lat": lat, "lng": lng}) is not None}
 
 
+def _min(t: str) -> int:
+    h, m = t.split(":")[:2]
+    return int(h) * 60 + int(m)
+
+
+def _travel(area_id: str, course_area: str | None) -> int:
+    return S.TRAVEL_MIN.get(area_id, {}).get(course_area or "", S.TRAVEL_DEFAULT_MIN)
+
+
+def stop_time_range(days: list[dict], kind: str, area_id: str) -> tuple[int, int]:
+    """V-12 희망 승하차 시간으로 고를 수 있는 범위 (0시부터 분, 양 끝 포함, 30분 단위).
+    화면 apps/web/src/logic.ts stopTimeRange 와 같은 계산 (화면은 Google 경로 시간이 있으면 그것을 씀).
+    days: package_day 를 day_no 순으로 (tee_time · depart_time · course_area). area_id: 승하차 장소의 service_area.id
+    - 승차(첫날): (첫날 티오프 − 2시간 30분, 06:00보다 이르면 06:00) ~ (첫날 티오프 − 이동 − 30분 여유)를 30분 단위로 내림.
+      첫날 라운드가 없으면 06:00 ~ 첫 출발 시각 − 30분
+    - 하차(마지막 날): (마지막 라운드 티오프 + 5시간 + 이동)을 30분 단위로 올림 ~ 21:00. 라운드가 없으면 NO_ROUND_DROP_FROM
+    이동 시간은 지역별 대략값 표(settings.TRAVEL_MIN). 시작이 끝보다 늦으면 고를 수 있는 시간이 없음"""
+    lo, hi, step = _min(S.STOP_TIME_FIRST), _min(S.STOP_TIME_LAST), S.STOP_TIME_STEP_MIN
+    if kind == "PICK":
+        d = days[0]
+        if d["tee_time"]:
+            lo = max(lo, -(-(_min(d["tee_time"]) - S.PICK_EARLIEST_BEFORE_TEE_MIN) // step) * step)
+            to = _min(d["tee_time"]) - _travel(area_id, d["course_area"]) - S.PICK_MARGIN_MIN
+        elif d["depart_time"]:
+            to = _min(d["depart_time"]) - S.PICK_MARGIN_MIN
+        else:
+            to = hi
+        return lo, min(hi, to // step * step)
+    d = days[-1]
+    frm = _min(d["tee_time"]) + S.ROUND_HOURS * 60 + _travel(area_id, d["course_area"]) if d["tee_time"] else _min(S.NO_ROUND_DROP_FROM)
+    return max(lo, -(-frm // step) * step), hi
+
+
+def _days_of_dep(c: Connection, dep_id: str) -> list[dict]:
+    return rows(c, """SELECT pd.day_no, pd.tee_time, pd.depart_time, gc.area course_area
+                      FROM departure d JOIN package_day pd ON pd.package_id = d.package_id
+                      LEFT JOIN golf_course gc ON gc.id = pd.course_id
+                      WHERE d.id = :id ORDER BY pd.day_no""", id=dep_id)
+
+
 def create_booking(m: Member, req: dict) -> dict:
     """L-08 (API-10): 결제 확인 → 출발편 잠금 → 확보 확인 → 예약 저장 → 확인서 메일"""
     with conn() as c:
@@ -112,6 +156,14 @@ def create_booking(m: Member, req: dict) -> dict:
         for s in req["stops"]:
             area = _area_of(c, s) or fail("E-AREA", [{"field": f"stops.{s['kind']}", "rule": "L-06"}])
             stops.append({**s, "areaId": area})
+        days = _days_of_dep(c, hold["departure_id"])
+        out = []
+        for i, s in enumerate(stops):  # V-12 범위: 패키지 일정으로 정한 범위 안인지
+            lo, hi = stop_time_range(days, s["kind"], s["areaId"])
+            if not lo <= _min(s["desiredTime"]) <= hi:
+                out.append({"field": f"stops.{i}.desiredTime", "rule": "V-12-range"})
+        if out:
+            fail("E-VALID", out)
         q = make_quote(c, hold["departure_id"], req.get("optionId"), people, req.get("singles"))
 
     # 1) 결제 확인 (메인 사이트)
@@ -140,9 +192,10 @@ def create_booking(m: Member, req: dict) -> dict:
                 no=no, m=m.memberId, d=d["id"], o=req.get("optionId"), n=people, s=(q["rooms"] or {}).get("singles", 0),
                 u=q["unitPrice"], t=q["total"], pay=req["paymentId"], lang=req["lang"])
             for s in stops:
-                run(c, """INSERT INTO booking_stop (booking_no, kind, place_name, place_id, address, lat, lng, area_id, memo)
-                          VALUES (:no, :k, :n, :pid, :a, :lat, :lng, :area, :memo)""",
-                    no=no, k=s["kind"], n=s["placeName"], pid=s.get("placeId"), a=s.get("address"), lat=s["lat"], lng=s["lng"], area=s["areaId"], memo=s.get("memo"))
+                run(c, """INSERT INTO booking_stop (booking_no, kind, place_name, place_id, address, lat, lng, area_id, memo, desired_time)
+                          VALUES (:no, :k, :n, :pid, :a, :lat, :lng, :area, :memo, :dt)""",
+                    no=no, k=s["kind"], n=s["placeName"], pid=s.get("placeId"), a=s.get("address"), lat=s["lat"], lng=s["lng"], area=s["areaId"],
+                    memo=s.get("memo"), dt=s["desiredTime"])
             r = req["rep"]
             run(c, """INSERT INTO booking_member (booking_no, seq, is_rep, name_ko, name_en, country_code, phone, email)
                       VALUES (:no, 1, 1, :nl, :ne, :cc, :ph, :em)""",
@@ -181,7 +234,8 @@ def get_booking(m: Member, no: str) -> dict:
         if b["member_id"] != m.memberId:
             fail("E-FORBID")
         d = one(c, DEP_SQL + " WHERE d.id = :id", id=b["departure_id"])
-        stops = rows(c, """SELECT kind, place_name placeName, place_id placeId, address, lat, lng, memo, stop_order stopOrder, pickup_time pickupTime
+        stops = rows(c, """SELECT kind, place_name placeName, place_id placeId, address, lat, lng, memo, desired_time desiredTime,
+                                  stop_order stopOrder, pickup_time pickupTime
                            FROM booking_stop WHERE booking_no = :no ORDER BY kind DESC""", no=no)
         members = rows(c, """SELECT seq, is_rep isRep, name_ko nameLocal, name_en nameEn, country_code countryCode, phone, email
                              FROM booking_member WHERE booking_no = :no ORDER BY seq""", no=no)
@@ -213,15 +267,25 @@ def save_companions(m: Member, no: str, companions: list[dict]) -> dict:
     return {"saved": len(companions)}
 
 
+def _booking_for_cancel(c: Connection, no: str) -> dict:
+    return one(c, "SELECT status, departure_id, people, payment_id, total_price FROM booking WHERE no = :no FOR UPDATE", no=no) or fail("E-NOTFOUND")
+
+
+def _cancel_confirmed(c: Connection, no: str, b: dict, note: str | None) -> None:
+    """L-14: CONFIRMED 예약을 고객 취소로. 출발편 잠금 → 예약 상태·취소 정보 → 출발편 인원 되돌림 (API-16, API-19 공통)"""
+    _lock_departure(c, b["departure_id"])
+    run(c, "UPDATE booking SET status='USER_CANCEL', cancel_by='USER', cancel_note=:n, canceled_at=UTC_TIMESTAMP(3) WHERE no=:no",
+        n=note[:200] if note else None, no=no)
+    run(c, "UPDATE departure SET booked_count = booked_count - :p WHERE id = :id", p=b["people"], id=b["departure_id"])
+
+
 def cancel_by_user(no: str, note: str) -> dict:
-    """L-14 (API-16): 고객 취소 — 고객센터 담당자가 호출"""
+    """L-14 (API-16): 고객 취소 — 고객센터 담당자가 호출. 본 사이트 연동(API-19) 전 임시·운영 예비용"""
     with tx() as c:
-        b = one(c, "SELECT status, departure_id, people, payment_id, total_price FROM booking WHERE no = :no FOR UPDATE", no=no) or fail("E-NOTFOUND")
+        b = _booking_for_cancel(c, no)
         if b["status"] != "CONFIRMED":
             fail("E-STATE")
-        _lock_departure(c, b["departure_id"])
-        run(c, "UPDATE booking SET status='USER_CANCEL', cancel_by='USER', cancel_note=:n, canceled_at=UTC_TIMESTAMP(3) WHERE no=:no", n=note[:200], no=no)
-        run(c, "UPDATE departure SET booked_count = booked_count - :p WHERE id = :id", p=b["people"], id=b["departure_id"])
+        _cancel_confirmed(c, no, b, note)
     # L-15 환불 요청 (금액·수수료는 메인 사이트 규정 → 결제 전액을 넘기고 메인 사이트가 계산한다고 가정, 확인 필요)
     rf = payment.refund(b["payment_id"], b["total_price"], "user-cancel")
     with tx() as c:
@@ -230,3 +294,22 @@ def cancel_by_user(no: str, note: str) -> dict:
         if rep:
             notify(c, no, rep["email"], "USER_CANCEL")
     return {"status": "USER_CANCEL", "refundStatus": "REQUESTED"}
+
+
+def cancel_from_site(no: str, refund_id: str, refund_status: str, note: str | None) -> dict:
+    """API-19: 본 사이트가 처리한 고객 취소·환불 결과를 받음. 환불은 본 사이트가 이미 했으므로 payment.refund 를 부르지 않음
+    - CONFIRMED: 고객 취소(L-14) + 환불 정보 저장 + USER_CANCEL 메일
+    - USER_CANCEL: 환불 진행 상황(refund_id · refund_status)만 갱신
+    - OP_CANCEL(운행 취소) · DONE(여행 완료): E-STATE"""
+    with tx() as c:
+        b = _booking_for_cancel(c, no)
+        if b["status"] not in ("CONFIRMED", "USER_CANCEL"):
+            fail("E-STATE")
+        first = b["status"] == "CONFIRMED"
+        if first:
+            _cancel_confirmed(c, no, b, note)
+        run(c, "UPDATE booking SET refund_id=:r, refund_status=:s WHERE no=:no", r=refund_id, s=refund_status, no=no)
+        rep = one(c, "SELECT email FROM booking_member WHERE booking_no=:no AND seq=1", no=no) if first else None
+        if rep:
+            notify(c, no, rep["email"], "USER_CANCEL")
+    return {"status": "USER_CANCEL", "refundStatus": refund_status}

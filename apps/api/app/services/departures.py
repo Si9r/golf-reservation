@@ -34,7 +34,7 @@ def _item(p: dict, d: dict, people: int, today: str) -> dict:
     return {"id": d["id"], "date": d["dep_date"], "booked": d["booked_count"], "minPeople": d["min_people"], "seatsLeft": seats,
             "status": d["status"], "judgeDate": d["judge_date"],
             "selectable": is_bookable_date(sale_rule(p), d["dep_date"], today, d["status"]) and seats >= people,
-            "view": {"state": v["state"], "msg": v["msg"], "need": v["need"]}}
+            "view": {"state": v["state"], "msg": v["msg"], "need": v["need"], "full": v["full"]}}
 
 
 def list_departures(c: Connection, pkg: dict, month: str, people: int) -> list[dict]:

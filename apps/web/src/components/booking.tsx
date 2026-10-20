@@ -119,7 +119,7 @@ export function DatePeopleSheet({ open, onClose, date, people, onDone }: { open:
         {count !== null && <p className="mt-1 text-[13.5px] font-bold text-brand">{t("M-111", { n: count })}</p>}
       </div>
       <div className="mt-4">
-        <PeopleInput label={t("people")} value={n} onChange={setN} anno={<Anno n="S-01 #4" t="인원 (V-02, 1~30명)" />} />
+        <PeopleInput label={t("people")} value={n} onChange={setN} anno={<Anno n="S-01 #4" t="인원 (V-02, 1~20명)" />} />
       </div>
     </Sheet>
   );

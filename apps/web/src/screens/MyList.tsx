@@ -6,7 +6,6 @@ import { useT } from "../i18n";
 import { useAuth, useDb, viewOf } from "../store";
 import { fShort } from "../logic";
 import { Anno, ScreenTag } from "../components/ui";
-import { Footer } from "../components/Shell";
 
 // 화면 라벨 → 배지 색
 export const LABEL_CLASS: Record<string, string> = { OPEN: "wait", ENOUGH: "ok", GO: "ok", USER_CANCEL: "mute", OP_CANCEL: "bad", DONE: "mute" };
@@ -57,7 +56,6 @@ export default function MyList() {
           </div>
         )}
       </div>
-      <Footer />
     </>
   );
 }

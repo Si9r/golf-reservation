@@ -109,7 +109,7 @@ function DetailInner({ p }: { p: Pkg }) {
                 <span className="min-w-0 flex-1">
                   <b className="num block text-[15px]">{fShort(x, L)}</b>
                   <span className={`block text-[12.5px] ${enough && !off ? "font-semibold text-ok" : "text-muted"}`}>
-                    {full ? t("full") : off ? t("depShort", { n: d.people }) : enough ? t("depEnough", { b: dv.booked }) : t("depNow", { b: dv.booked })}
+                    {full ? t("depEnough", { b: dv.booked }) : off ? t("depShort", { n: d.people }) : enough ? t("depEnough", { b: dv.booked }) : t("depNow", { b: dv.booked })}
                   </span>
                 </span>
                 <span className={`num text-[13px] font-semibold ${off ? "text-muted" : "text-ink-2"}`}>{full ? t("full") : t("seatsLeft", { s: dv.seats })}</span>
@@ -301,12 +301,13 @@ function DetailInner({ p }: { p: Pkg }) {
   );
 }
 
-// L-04 상태 문구 (판정 전에는 20명 이상이어도 '인원 충족', 출발 확정은 판정일 B-01)
+// L-04 상태 문구 (판정 전에는 20명 이상이어도 '인원 충족', 출발 확정은 판정일 B-01).
+// 정원 20 = 최소 출발 20명이라 인원 충족이면 정원도 다 참 → '잔여 0석' 대신 '정원이 다 찼어요' / '마감'으로
 export function DepStateText({ v, dep, go, showErr }: { v: ReturnType<typeof depView>; dep: string; go?: boolean; showErr?: boolean }) {
   const { t, L } = useT();
   if (v.state === "unavailable") return showErr ? <p className="err text-[12.5px]">{t("M-120", { s: v.seats, n: v.sum - v.booked })}</p> : null;
-  if (go) return <p className="text-[12.5px] font-semibold text-ok">{t("M-123", { s: v.seatsAfter })}</p>;
-  if (v.state === "enough") return <p className="text-[12.5px] font-semibold text-ok">{t("M-125", { d: fShort(judgeDate(dep), L) })} · {t("seatsLeft", { s: v.seatsAfter })}</p>;
+  if (go) return <p className="text-[12.5px] font-semibold text-ok">{v.seatsAfter ? t("M-123", { s: v.seatsAfter }) : t("goFull")}</p>;
+  if (v.state === "enough") return <p className="text-[12.5px] font-semibold text-ok">{v.seatsAfter ? `${t("M-125", { d: fShort(judgeDate(dep), L) })} · ${t("seatsLeft", { s: v.seatsAfter })}` : t("depFull", { m: SET.BUS_SEATS, d: fShort(judgeDate(dep), L) })}</p>;
   return <p className="text-[12.5px] font-semibold text-ink-2">{t("M-122", { n: v.need })} · {t("seatsLeft", { s: v.seatsAfter })}</p>;
 }
 
@@ -343,7 +344,7 @@ export function Meter({ now, add }: { now: number; add: number }) {
     <div className="meter" role="img" aria-label={`${now + add}/${SET.BUS_SEATS}`}>
       <motion.div className="fill" initial={{ width: 0 }} animate={{ width: pct(now) }} transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }} />
       <motion.div className="add" initial={false} animate={{ left: pct(now), width: pct(Math.min(add, SET.BUS_SEATS - now)) }} transition={{ duration: 0.5 }} />
-      <div className="goal" style={{ left: pct(SET.MIN_DEPARTURE) }} />
+      <div className="goal" style={{ left: `min(${pct(SET.MIN_DEPARTURE)}, calc(100% - 2px))` }} />
     </div>
   );
 }

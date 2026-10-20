@@ -29,7 +29,7 @@ export interface PackageDetailRes extends PackageListItem {
   options: HotelOptionDto[];
 }
 
-export interface DepartureItem { id: string; date: string; booked: number; minPeople: number; seatsLeft: number; status: DepartureStatus; judgeDate: string; selectable: boolean; view: { state: DepState; msg: string; need: number } }
+export interface DepartureItem { id: string; date: string; booked: number; minPeople: number; seatsLeft: number; status: DepartureStatus; judgeDate: string; selectable: boolean; view: { state: DepState; msg: string; need: number; full: boolean } }
 export interface DepartureListRes { items: DepartureItem[] }
 export interface CalendarRes { items: { date: string; count: number }[] }
 
@@ -39,7 +39,8 @@ export interface QuoteRes { unitPrice: number; optionDiff: number; people: numbe
 export interface HoldReq { departureId: string; people: number }
 export interface HoldRes { holdId: number; expiresAt: string }
 
-export interface StopInput { kind: StopKind; placeName: string; placeId?: string | null; address?: string | null; lat: number; lng: number; memo?: string | null }
+// desiredTime: 'HH:MM' 희망 승하차 시간 (참고용, 30분 단위). PICK·DROP 모두 필수 (V-12), 패키지 일정으로 정한 범위 밖이면 V-12-range
+export interface StopInput { kind: StopKind; placeName: string; placeId?: string | null; address?: string | null; lat: number; lng: number; memo?: string | null; desiredTime: string }
 export interface RepInput { nameLocal: string; nameEn: string; countryCode: string; phone: string; email: string }
 export interface BookingCreateReq {
   holdId: number;

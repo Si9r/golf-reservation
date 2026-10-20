@@ -13,20 +13,22 @@ describe("L-01 출발일", () => {
   it("요일·시즌·판정일", () => {
     expect(isSaleDate(pkg, "2026-10-23")).toBe(true); // 금
     expect(isSaleDate(pkg, "2026-10-22")).toBe(false); // 목
-    // 판정일(출발 3일 전) = 10-20. 오늘이 10-20이면 이미 판정일 → 예약 불가
-    expect(isBookableDate(pkg, "2026-10-23", "2026-10-19")).toBe(true);
-    expect(isBookableDate(pkg, "2026-10-23", "2026-10-20")).toBe(false);
-    expect(isBookableDate(pkg, "2026-10-23", "2026-10-19", "CANCEL")).toBe(false);
+    // 판정일(출발 7일 전): 10-30 출발 → 10-23. 오늘이 10-23이면 이미 판정일 → 예약 불가
+    expect(isBookableDate(pkg, "2026-10-30", "2026-10-19")).toBe(true);
+    expect(isBookableDate(pkg, "2026-10-30", "2026-10-22")).toBe(true);
+    expect(isBookableDate(pkg, "2026-10-30", "2026-10-23")).toBe(false);
+    expect(isBookableDate(pkg, "2026-10-23", "2026-10-19")).toBe(false); // 판정일 10-16 지남
+    expect(isBookableDate(pkg, "2026-10-30", "2026-10-19", "CANCEL")).toBe(false);
   });
 });
 
 describe("L-02 · L-04", () => {
-  it("잔여석은 확보 인원까지 뺌", () => expect(seatsLeft(30, 20, 4)).toBe(6));
-  it("판정 전 20명 이상은 '인원 충족'(상태는 OPEN)", () => {
-    expect(departureView({ bookedCount: 18, seats: 12, status: "OPEN", people: 2 }).state).toBe("enough");
-    expect(departureView({ bookedCount: 10, seats: 20, status: "OPEN", people: 2 })).toMatchObject({ state: "need", need: 8 });
-    expect(departureView({ bookedCount: 25, seats: 5, status: "OPEN", people: 6 }).state).toBe("unavailable");
-    expect(departureView({ bookedCount: 22, seats: 8, status: "GO", people: 2 }).state).toBe("go");
+  it("잔여석은 확보 인원까지 뺌 (정원 20)", () => expect(seatsLeft(20, 12, 4)).toBe(4));
+  it("판정 전 20명 이상은 '인원 충족'(상태는 OPEN), 정원 20이라 마감(full)도 같이", () => {
+    expect(departureView({ bookedCount: 18, seats: 2, status: "OPEN", people: 2 })).toMatchObject({ state: "enough", seatsAfter: 0, full: true });
+    expect(departureView({ bookedCount: 10, seats: 10, status: "OPEN", people: 2 })).toMatchObject({ state: "need", need: 8, full: false });
+    expect(departureView({ bookedCount: 15, seats: 5, status: "OPEN", people: 6 })).toMatchObject({ state: "unavailable", full: false });
+    expect(departureView({ bookedCount: 18, seats: 2, status: "GO", people: 1 }).state).toBe("go");
   });
 });
 

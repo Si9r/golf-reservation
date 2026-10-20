@@ -69,10 +69,13 @@ _MSG = {"unavailable": "M-120", "go": "M-123", "enough": "M-125", "need": "M-122
 
 
 def departure_view(booked: int, seats: int, status: str, people: int, min_people: int = S.MIN_DEPARTURE) -> dict:
-    """L-04 출발 확정 현황. 판정 전 20명 이상은 상태가 아니라 표시 '인원 충족'"""
+    """L-04 출발 확정 현황. 판정 전 20명 이상은 상태가 아니라 표시 '인원 충족'.
+    정원 20 = 최소 출발 인원 20이라 '인원 충족'이면 정원도 다 참 → full 로 알려 '잔여 0석' 대신 '마감'으로 표시"""
     total = booked + people
     state: DepState = "unavailable" if people > seats else "go" if status == "GO" else "enough" if total >= min_people else "need"
-    return {"booked": booked, "sum": total, "seats": seats, "need": max(0, min_people - total), "seatsAfter": max(0, seats - people), "state": state, "msg": _MSG[state]}
+    after = max(0, seats - people)
+    return {"booked": booked, "sum": total, "seats": seats, "need": max(0, min_people - total), "seatsAfter": after,
+            "full": state != "unavailable" and after == 0, "state": state, "msg": _MSG[state]}
 
 
 def rooms_of(people: int, singles: int | None = None) -> dict:

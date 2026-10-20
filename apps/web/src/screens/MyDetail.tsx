@@ -11,7 +11,6 @@ import { useDrive } from "../gmaps";
 import { ItinList, Meter } from "./Detail";
 import { LABEL_CLASS } from "./MyList";
 import { validEn } from "./InfoForm";
-import { Footer } from "../components/Shell";
 
 export default function MyDetail() {
   const { no } = useParams();
@@ -76,7 +75,7 @@ export default function MyDetail() {
               <Meter now={v.booked} add={0} />
               <div className="flex justify-between text-[12.5px] text-ink-2">
                 <span className="num">{t("depNow", { b: v.booked })}</span>
-                <span className="num">{t("seatsLeft", { s: SET.BUS_SEATS - v.booked })} · {t("judge", { d: fShort(judgeDate(b.dep), L) })}</span>
+                <span className="num">{SET.BUS_SEATS - v.booked > 0 ? t("seatsLeft", { s: SET.BUS_SEATS - v.booked }) : t("full")} · {t("judge", { d: fShort(judgeDate(b.dep), L) })}</span>
               </div>
             </div>
           )}
@@ -102,14 +101,14 @@ export default function MyDetail() {
 
         {/* 2 승하차 */}
         <section className="relative mt-6">
-          <Anno n={2} t="승하차 (booking_stop): 장소명, 메모, 승차 시간(출발 확정 후 운영 등록 API-17, M-205), 하차일, 지도 앱 열기(I-03), 두 지점 지도" />
+          <Anno n={2} t="승하차 (booking_stop): 장소명 · 희망 시간(desired_time), 메모, 승차 시간(출발 확정 후 운영 등록 API-17, M-205), 하차일, 지도 앱 열기(I-03), 두 지점 지도" />
           <h2 className="sec-title mb-3 flex items-center gap-2"><Bus size={20} className="text-brand" />{t("busT")}</h2>
           <div className="card divide-y divide-line">
             {([["pick", b.pick], ["drop", b.drop]] as const).map(([k, pl]) => (
               <div key={k} className="flex items-start gap-3 px-4 py-3">
                 <span className={`badge ${k === "pick" ? "brand" : "wait"}`}>{k === "pick" ? t("pick") : t("drop")}</span>
                 <span className="min-w-0 flex-1 text-[14px]">
-                  <b className="block">{pl ? n(pl.name) : "-"}</b>
+                  <b className="block">{pl ? n(pl.name) : "-"}{(k === "pick" ? b.pickTime : b.dropTime) && <span className="font-semibold text-brand"> · {t("wishAt", { t: (k === "pick" ? b.pickTime : b.dropTime)! })}</span>}</b>
                   {pl?.addr && <span className="block text-[12.5px] text-muted">{pl.addr}</span>}
                   {k === "pick" && b.pickMemo && <span className="block text-ink-2">{b.pickMemo}</span>}
                   <span className="text-[12.5px]">
@@ -216,7 +215,6 @@ export default function MyDetail() {
           <button className="btn btn-primary mt-3 w-full" onClick={() => nav("/golf/support")}><Headset size={20} /> {t("supportBtn")}</button>
         </section>
       </div>
-      <Footer />
 
       <Sheet open={doc} onClose={() => setDoc(false)} title={t("docT")} wide footer={<button className="btn btn-ghost w-full" onClick={() => window.print()}><Printer size={18} /> {t("print")}</button>}>
         <div className="printable grid gap-3 text-[14px]">

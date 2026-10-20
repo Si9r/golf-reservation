@@ -11,6 +11,7 @@ class Env(BaseSettings):
 
     DATABASE_URL: str = "mysql+pymysql://golf:golf@localhost:3306/golf?charset=utf8mb4"
     ADMIN_KEY: str = ""
+    SITE_KEY: str = ""  # 본 사이트가 부르는 API(API-19) 키 (헤더 X-Site-Key). 비어 있으면 모두 거부
     AUTH_PROVIDER: str = "mock"
     PAYMENT_PROVIDER: str = "mock"
     MAIL_PROVIDER: str = "console"

@@ -4,6 +4,7 @@ import os
 os.environ["DATABASE_URL"] = os.environ.get("TEST_DATABASE_URL", "mysql+pymysql://golf:golf@localhost:3306/golf_test?charset=utf8mb4")
 os.environ["FIXED_TODAY"] = "2026-10-19"
 os.environ["ADMIN_KEY"] = "test-admin"
+os.environ["SITE_KEY"] = "test-site"
 
 import pytest  # noqa: E402
 from alembic import command  # noqa: E402

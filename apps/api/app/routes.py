@@ -1,6 +1,7 @@
 """API 경로 (상세설계 v1.3 'API' 시트). 모두 /api/golf 아래"""
 from __future__ import annotations
 
+import secrets
 from dataclasses import asdict
 from typing import Annotated, Literal
 
@@ -11,7 +12,7 @@ from .adapters.auth import Member, auth
 from .config import env
 from .db import conn, one, rows
 from .errors import fail
-from .schemas import BookingReq, CancelReq, CompanionsReq, HoldReq, PlacePoint, QuoteReq
+from .schemas import BookingReq, CancelReq, CompanionsReq, HoldReq, PlacePoint, QuoteReq, SiteCancelReq
 from .services import booking as B
 from .services.catalog import get_package, search_packages
 from .services.departures import calendar, list_departures
@@ -28,6 +29,12 @@ def member(req: Request) -> Member:
 
 def admin(x_admin_key: Annotated[str | None, Header()] = None) -> None:
     if not env.ADMIN_KEY or x_admin_key != env.ADMIN_KEY:
+        fail("E-AUTH")
+
+
+def site(x_site_key: Annotated[str | None, Header()] = None) -> None:
+    # TODO: 본 사이트 → 이 서비스 호출의 실제 인증 방식(서명·IP 제한 등)은 결제 연동 협의 때 정함. 지금은 공유 키 비교
+    if not env.SITE_KEY or not x_site_key or not secrets.compare_digest(x_site_key, env.SITE_KEY):
         fail("E-AUTH")
 
 
@@ -141,13 +148,21 @@ def admin_import():
     fail("E-STATE")
 
 
-# API-16 고객 취소 (L-14)
+# API-16 고객 취소 (L-14). 본 사이트 연동(API-19) 전 임시·운영 예비용 (고객센터가 운영 키로 취소, 환불도 이쪽에서 요청)
 @router.post("/admin/bookings/{no}/cancel", dependencies=[Depends(admin)])
 def admin_cancel(no: str, b: CancelReq):
     return B.cancel_by_user(no, b.cancelNote)
 
 
-# API-17 승차 시간 등록 (L-16): 승차 시간 확정 주체(Q-23) 정해지면 구현
+# API-17 승차 시간 등록 (L-16): 승차 시간 확정 주체(Q-23) 정해지면 구현.
+# 정차 순서(stop_order)·실제 시간(pickup_time)은 손님 희망 시간(booking_stop.desired_time)을 참고해 정함
 @router.put("/admin/departures/{dep_id}/stops", dependencies=[Depends(admin)])
 def admin_stops(dep_id: str):
     fail("E-STATE")
+
+
+# ---- 본 사이트 → 이 서비스 (키 X-Site-Key) ----
+# API-19 고객 취소·환불 결과 받기: 고객 사정 취소·환불은 본 사이트가 처리하고 결과를 알려 줌 (L-14)
+@router.post("/site/bookings/{no}/cancel", dependencies=[Depends(site)])
+def site_cancel(no: str, b: SiteCancelReq):
+    return B.cancel_from_site(no, b.refundId, b.refundStatus, b.note)

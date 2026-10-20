@@ -76,8 +76,8 @@ const hash = (s: string) => {
 // 다른 그룹의 예약 인원 (예시 데이터, 결정적)
 export const baseBooked = (pkgId: number, d: string) => {
   const h = hash(`${pkgId}|${d}`);
-  if ((h >> 7) % 9 === 0) return 27 + (h % 4); // 거의 마감
-  return h % 25;
+  if ((h >> 7) % 9 === 0) return 18 + (h % 3); // 거의 마감 (18~20명, 정원 20)
+  return h % 18; // 0~17명 (서버 seed_demo 와 같은 범위)
 };
 export type Extra = Record<string, number>;
 export const booked = (pkgId: number, d: string, extra: Extra) => Math.min(SET.BUS_SEATS, baseBooked(pkgId, d) + (extra[`${pkgId}|${d}`] ?? 0));
@@ -192,6 +192,48 @@ export const nearestKnown = (lat: number, lng: number): Place | null => {
 };
 export const placeZone = (p: Place | null) => (p ? zoneAt(p.lat, p.lng) : null);
 export const areaLabel = (a: Area, L: Lang) => AREA_NAME[a][L];
+
+// ---------- 희망 승하차 시간 (V-12) ----------
+const toMin = (t: string) => {
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+};
+const fmtMin = (x: number) => `${pad(Math.floor(x / 60))}:${pad(x % 60)}`;
+const travelOf = (z: Zone, area: Area, driveMin?: number | null) => driveMin ?? TRAVEL[z][area] ?? 60;
+export interface StopRange {
+  from: string;
+  to: string;
+  options: string[]; // 고를 수 있는 시간 (30분 단위). 비어 있으면 일정상 고를 수 없음
+  base: { kind: "tee"; tee: string } | { kind: "end"; end: string } | null; // 범위 안내 문구용 (첫날 티오프 / 마지막 라운드 종료 예정)
+}
+// 고를 수 있는 희망 시간 범위. 서버 services/booking.py stop_time_range 와 같은 계산
+// 승차(첫날): (첫날 티오프 − 2시간 30분, 06:00보다 이르면 06:00)을 올림 ~ (첫날 티오프 − 이동 − 30분)을 내림
+// 하차(마지막 날): (마지막 라운드 티오프 + 5시간 + 이동)을 올림 ~ 21:00
+// driveMin: Google 경로 시간(분). 없으면 TRAVEL 대략값 (서버도 TRAVEL 대략값으로 검사)
+export const stopTimeRange = (p: Pkg, kind: "pick" | "drop", place: Place | null, driveMin?: number | null): StopRange | null => {
+  const z = placeZone(place);
+  if (!z) return null;
+  const step = SET.STOP_TIME_STEP_MIN;
+  let lo = toMin(SET.STOP_TIME_FIRST);
+  let hi = toMin(SET.STOP_TIME_LAST);
+  let base: StopRange["base"] = null;
+  if (kind === "pick") {
+    const r = p.days[0]; // 첫날 라운드가 없으면 (프로토타입 데이터에는 첫 출발 시각이 없어) 끝은 21:00
+    if (r) {
+      lo = Math.max(lo, Math.ceil((toMin(r.tee) - SET.PICK_EARLIEST_BEFORE_TEE_MIN) / step) * step);
+      hi = Math.min(hi, Math.floor((toMin(r.tee) - travelOf(z, courseOf(r.course).area, driveMin) - SET.PICK_MARGIN_MIN) / step) * step);
+      base = { kind: "tee", tee: r.tee };
+    }
+  } else {
+    const r = p.days[p.days.length - 1];
+    const end = r ? toMin(r.tee) + SET.ROUND_HOURS * 60 : null;
+    lo = Math.max(lo, Math.ceil(((end ?? toMin(SET.NO_ROUND_DROP_FROM)) + (r ? travelOf(z, courseOf(r.course).area, driveMin) : 0)) / step) * step);
+    if (end !== null) base = { kind: "end", end: fmtMin(end) };
+  }
+  const options: string[] = [];
+  for (let x = lo; x <= hi; x += step) options.push(fmtMin(x));
+  return { from: fmtMin(lo), to: fmtMin(hi), options, base };
+};
 
 // 예상 승차 시간 = 첫 티오프 − 체크인 30분 − 이동 − 여유 10분 (F-063, 확정은 출발 확정 후)
 export const pickupWindow = (p: Pkg, pick: Place | null, driveMin?: number | null) => {

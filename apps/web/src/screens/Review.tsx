@@ -43,8 +43,8 @@ export default function Review() {
     { k: t("rowPeople"), v: t("peopleN", { n: d.people }), to: `/golf/packages/${p.id}` },
     { k: t("rowHotel"), v: hotel ? `${n(hotel.name)}${opt ? ` · ${n(opt.sub)}` : ""}` : opt?.none ? `${n(opt.name)} · ${n(opt.sub)}` : t("noHotel"), to: p.opts.length ? "/golf/book/hotel" : undefined },
     ...(price.rooms ? [{ k: t("rowRooms"), v: t(price.rooms.singles ? "roomsSum" : "roomsSum0", { t: price.rooms.twins, s: price.rooms.singles }), to: "/golf/book/hotel" }] : []),
-    { k: t("rowPick"), v: n(d.pick!.name) + (d.pickMemo ? ` · ${d.pickMemo}` : ""), to: "/golf/book/place" },
-    { k: t("rowDrop"), v: drop ? n(drop.name) + (d.dropSame ? ` (${t("sameAsPick")})` : "") : "-", to: "/golf/book/place" },
+    { k: t("rowPick"), v: `${n(d.pick!.name)} · ${t("wishAt", { t: d.pickTime! })}` + (d.pickMemo ? ` · ${d.pickMemo}` : ""), to: "/golf/book/place" },
+    { k: t("rowDrop"), v: drop ? n(drop.name) + (d.dropSame ? ` (${t("sameAsPick")})` : "") + ` · ${t("wishAt", { t: d.dropTime! })}` : "-", to: "/golf/book/place" },
   ];
   const itin = itinerary(p, d.opt, d.pick, drop);
   const go = () => nav(user ? "/golf/book/info" : `/login?next=${encodeURIComponent("/golf/book/info")}`); // T-14
@@ -68,7 +68,7 @@ export default function Review() {
 
       {/* 1 예약 내용 요약 */}
       <section className="relative card divide-y divide-line">
-        <Anno n={1} t="예약 내용 요약 (패키지·출발일·인원·호텔·승차·하차) + 항목별 '변경' → S-03/S-05/S-06 → S-08 복귀 (T-28)" />
+        <Anno n={1} t="예약 내용 요약 (패키지·출발일·인원·호텔·승차·하차 + 희망 시간) + 항목별 '변경' → S-03/S-05/S-06 → S-08 복귀 (T-28)" />
         {rows.map((r) => (
           <div key={r.k} className="flex items-start gap-3 px-4 py-3">
             <span className="w-14 flex-none pt-px text-[13px] font-semibold text-muted">{r.k}</span>
@@ -103,7 +103,6 @@ export default function Review() {
         <Anno n={3} t="최소 출발 인원 안내 (M-150, departure.judge_date)" />
         <h2 className="mb-1 flex items-center gap-2 text-[15px] font-bold text-warn"><UsersThree size={20} weight="fill" /> {t("minT")}</h2>
         <p className="text-[14px] leading-relaxed text-ink">{t("M-150", { m: SET.MIN_DEPARTURE, d: fDate(judgeDate(dep), L) })}</p>
-        <p className="mt-1.5"><Q id="Q-17" t="판정 시점(출발 3일 전은 예시)" /></p>
       </section>
 
       {/* 4 출발 확정 현황 */}

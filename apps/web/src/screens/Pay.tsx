@@ -69,6 +69,8 @@ export default function Pay() {
         pick: d.pick,
         drop,
         pickMemo: d.pickMemo,
+        pickTime: d.pickTime ?? undefined,
+        dropTime: d.dropTime ?? undefined,
         unit,
         singles: price.rooms?.singles,
         total,
