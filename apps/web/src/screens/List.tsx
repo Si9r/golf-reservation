@@ -102,7 +102,7 @@ export default function List() {
       {load.error && <ErrorBanner onRetry={load.retry} />}
 
       {load.loading ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">{[0, 1, 2].map((i) => <CardSkeleton key={i} />)}</div>
+        <div className="grid gap-4 lg:grid-cols-3">{[0, 1, 2].map((i) => <CardSkeleton key={i} />)}</div>
       ) : load.error ? null : rows.length === 0 ? (
         <div className="relative grid place-items-center gap-3 rounded-[20px] border border-dashed border-line-strong px-6 py-14 text-center">
           <Anno n={11} t="결과 없음 (M-113)" />
@@ -114,7 +114,7 @@ export default function List() {
           </div>
         </div>
       ) : (
-        <div className="relative grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="relative grid gap-4 lg:grid-cols-3">
           <Anno n={9} t="패키지 카드: 유형·이름·기간·라운드·호텔 여부·숙소 이름·위치·가장 빠른 출발일·잔여석·1인 가격~ (T-03)" />
           {rows.map(({ p, d, seats }, i) => (
             <div key={p.id} className="relative">

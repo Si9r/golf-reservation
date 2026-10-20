@@ -218,7 +218,7 @@ function DetailInner({ p }: { p: Pkg }) {
           <section className="relative">
             <Anno n={7} t="골프장 정보: 이름, 홀 수, 캐디, 평점, 지역, 구글 지도 링크 (I-03)" />
             <h2 className="sec-title mb-3">{t("courseInfo")}</h2>
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid gap-3 lg:grid-cols-2">
               {courses.map((c) => (
                 <div key={c.id} className="card overflow-hidden">
                   <div className="flex items-stretch">

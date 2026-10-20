@@ -58,9 +58,7 @@
 }
 
 @theme {
-  /* N-001: PC 전용 배치 없이 모바일 화면을 PC에서도 그대로 (lg 배치 끔) */
-  --breakpoint-lg: 9999px;
-  --breakpoint-xl: 9999px;
+  /* N-001: 모바일 화면이 기본. lg(1024px) 이상에서만 PC 배치(헤더 메뉴·2단·여러 열)로 넓힘 */
   --font-sans: "Noto Sans KR", "Noto Sans JP", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
   --font-num: "Inter Variable", "Noto Sans KR", system-ui, sans-serif;
   --color-bg: var(--bg);
