@@ -1,10 +1,10 @@
+import { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { AnimatePresence, motion } from "motion/react";
-import { ArrowLeft, ArrowSquareOut, Bed, Minus, Plus, Star } from "@phosphor-icons/react";
+import { ArrowSquareOut, Bed, CaretDown, Minus, Plus, Star } from "@phosphor-icons/react";
 import { SET, type Hotel, type Pkg } from "../data";
 import { useT } from "../i18n";
-import { coursesOf, fShort, hasHotelStep, optionOf, roomsOf, stayHotel, totalPrice, yen, yenDiff } from "../logic";
-import { Anno, BottomBar, PriceBlock, Q, ScreenTag, Steps } from "../components/ui";
+import { coursesOf, distM, fShort, hasHotelStep, optionOf, roomsOf, stayHotel, totalPrice, yen, yenDiff } from "../logic";
+import { Anno, BottomBar, gmapLink, PriceBlock, Q, ScreenTag, StepHead } from "../components/ui";
 import { DriveChip, MapView } from "../components/GoogleMap";
 import { useFlow } from "./flow";
 import { useSeatGuard } from "../api/seatCheck";
@@ -14,6 +14,7 @@ export default function HotelOption() {
   const nav = useNavigate();
   const { d, p, redirect } = useFlow();
   const guard = useSeatGuard();
+  const [folded, setFolded] = useState(false); // 고른 옵션을 한 번 더 누르면 접힘
   if (redirect) return <Navigate to={redirect} replace />;
   if (!hasHotelStep(p)) return <Navigate to="/golf/book/place" replace />; // 당일 패키지만 건너뜀 (팀 테스트 10/23 B-03)
   const fixed = p.opts.length === 0; // 호텔 옵션이 없는(호텔이 정해진) 패키지: 호텔은 보여 주기만, 객실 구성은 고를 수 있게
@@ -25,12 +26,10 @@ export default function HotelOption() {
   const back = () => nav(d.editReturn ? "/golf/book/review" : `/golf/packages/${p.id}`);
   const next = () => guard(() => nav(d.editReturn ? "/golf/book/review" : "/golf/book/place")); // T-08, B-01 잔여석 다시 확인
   return (
-    <div className="page step">
+    <div className="page step narrow">
       <ScreenTag id="S-05" name="호텔 옵션 선택" refs="FN-09, FN-11 · API-02 · T-08, T-28" />
-      <div className="mb-1 flex items-center gap-3">
-        <button className="grid h-10 w-10 flex-none place-items-center rounded-full hover:bg-surface-2" onClick={back} aria-label={t("back")}><ArrowLeft size={20} weight="bold" /></button>
-        <div className="flex-1"><Steps at={1} hasHotel /></div>
-      </div>
+      <StepHead at={1} hasHotel onBack={back} />
+      <div className="step-body">
       <section className="relative mb-5">
         <Anno n="S-05" t="제목·선택 요약 (패키지·출발일·인원)" />
         <h1 className="text-[22px] font-bold leading-snug">{t("s05T")}</h1>
@@ -41,7 +40,7 @@ export default function HotelOption() {
           <Anno n={1} t="호텔이 정해진 패키지 (옵션 없음): '이 패키지의 숙박 호텔' 카드(호텔명·객실 타입·위치·지도), 선택할 수 없음 (팀 테스트 10/23 B-03)" />
           <h2 className="flex items-center gap-2 text-[15px] font-bold">{t("fixedHotelT")} <span className="chip gray">{t("fixedBadge")}</span></h2>
           <p className="text-[13px] text-muted">{t("fixedHotelNote")}</p>
-          <HotelCard p={p} hotel={hotel} />
+          <HotelCard p={p} h={hotel} />
         </section>
       )}
       {!fixed && <section className="relative grid gap-2.5" role="radiogroup" aria-label={t("s05T")}>
@@ -49,18 +48,48 @@ export default function HotelOption() {
         {p.opts.map((id, i) => {
           const o = optionOf(id)!;
           const h = stayHotel(p, id);
+          const sel = opt === id;
+          const canOpen = !!h && !o.none;
+          const show = sel && canOpen && !folded; // 고른 옵션만 펼침 (처음엔 기본 옵션이 펼친 상태). 고른 카드를 다시 누르면 접기·펼치기
           return (
-            <button key={id} role="radio" aria-checked={opt === id} className="opt items-start py-4" onClick={() => d.patch({ opt: id })}>
-              <span className="radio mt-0.5" />
-              <span className="min-w-0 flex-1">
-                <b className="block text-[15.5px]">{n(o.name)}{!o.hotel && !o.none && h ? <span className="font-normal text-ink-2"> · {n(h.name)}</span> : null}</b>
-                <span className="block text-[13px] text-muted">{n(o.sub)}</span>
-                {h?.rating && o.hotel && (
-                  <span className="mt-1 flex items-center gap-1 text-[12.5px] text-ink-2"><Star size={12} weight="fill" className="text-[#F59E0B]" /><span className="num">{h.rating}</span> · {n(h.near)}</span>
-                )}
-              </span>
-              <span className={`num flex-none text-[14px] font-bold ${o.add === 0 || i === 0 ? "text-ink-2" : o.add > 0 ? "text-ink" : "text-ok"}`}>{i === 0 && o.add === 0 ? t("base") : yenDiff(o.add)}</span>
-            </button>
+            <div key={id} className={`overflow-hidden rounded-xl border-[1.5px] transition-colors ${sel ? "border-brand bg-brand-soft" : "border-line-strong bg-surface"}`}>
+              <button
+                role="radio"
+                aria-checked={sel}
+                className="flex w-full items-start gap-3 px-4 py-4 text-left"
+                aria-expanded={canOpen ? show : undefined}
+                onClick={(e) => {
+                  if (sel) { setFolded((x) => !x); return; }
+                  d.patch({ opt: id });
+                  setFolded(false);
+                  const box = e.currentTarget.parentElement;
+                  window.setTimeout(() => box?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 320); // 펼쳐진 내용이 화면 밖이면 아래로 따라 내려감
+                }}
+              >
+                <span className="radio mt-0.5" />
+                <span className="min-w-0 flex-1">
+                  <b className="block text-[15.5px]">{n(o.name)}{!o.hotel && !o.none && h ? <span className="font-normal text-ink-2"> · {n(h.name)}</span> : null}</b>
+                  <span className="block text-[13px] text-muted">{n(o.sub)}</span>
+                  {h?.rating && o.hotel && (
+                    <span className="mt-1 flex items-center gap-1 text-[12.5px] text-ink-2"><Star size={12} weight="fill" className="text-[#F59E0B]" /><span className="num">{h.rating}</span> · {n(h.near)}</span>
+                  )}
+                </span>
+                <span className="flex flex-none flex-col items-end gap-1.5">
+                  <span className={`num flex-none text-[14px] font-bold ${o.add === 0 || i === 0 ? "text-ink-2" : o.add > 0 ? "text-ink" : "text-ok"}`}>{i === 0 && o.add === 0 ? t("base") : yenDiff(o.add)}</span>
+                  {canOpen && <CaretDown size={16} weight="bold" className={`text-muted transition-transform duration-300 ${show ? "rotate-180" : ""}`} aria-hidden />}
+                </span>
+              </button>
+              {/* 펼침: 높이 0 → 내용 높이로 부드럽게 (grid-template-rows 0fr → 1fr) */}
+              <div className="grid transition-[grid-template-rows] duration-300 ease-out" style={{ gridTemplateRows: show ? "1fr" : "0fr" }}>
+                <div className="min-h-0 overflow-hidden">
+                  {h && !o.none && (
+                    <div className="px-4 pb-4">
+                      <HotelCard p={p} h={h} room={!o.hotel && !o.none ? n(o.sub) : undefined} map={sel} mapKey={`${id}-map`} />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           );
         })}
         <p className="flex flex-wrap items-center gap-2 text-[12.5px] text-muted">{t("M-130")} <Q id="Q-02" t="옵션 구성·1인실 요금 (패키지 데이터)" /></p>
@@ -82,22 +111,10 @@ export default function HotelOption() {
           <p className="mt-2 text-[12.5px] leading-relaxed text-muted">{t("M-131", { p: yen(SET.SINGLE_ADD) })}</p>
         </section>
       )}
-      {!fixed && (
-        <section className="relative mt-5">
-          <Anno n={2} t="선택 호텔 지도 (I-01) + TRAVENDER 호텔 페이지 링크 + 호텔 → 골프장 이동 시간" />
-          <AnimatePresence mode="wait">
-            {hotel ? (
-              <motion.div key={hotel.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-                <HotelCard p={p} hotel={hotel} />
-              </motion.div>
-            ) : (
-              <motion.p key="none" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="rounded-2xl bg-surface-2 p-4 text-[14px] text-ink-2">{t("noHotelNote")}</motion.p>
-            )}
-          </AnimatePresence>
-        </section>
-      )}
-      <BottomBar>
-        <span className="absolute -top-3 left-3"><Anno n={3} t="하단: 총액(1인실 추가 포함) + 다음: 항상 활성 (기본 옵션 선택됨) → S-06 (T-08) / 변경 중 → S-08" /></span>
+      {!hotel && <p className="mt-5 rounded-2xl bg-surface-2 p-4 text-[14px] text-ink-2">{t("noHotelNote")}</p>}
+      </div>
+      <BottomBar width="narrow">
+        <span className="absolute -top-3 left-3"><Anno n={3} t="하단: 총액(1인실 추가 포함) + 다음: 항상 활성 (기본 옵션 선택됨) → 잔여석 다시 확인(B-01) → S-06 (T-08) / 변경 중 → S-08" /></span>
         <PriceBlock main={yen(price.total)} sub={`${t("totalL", { n: d.people })}${price.singleAdd ? ` · ${t("lineSingle", { p: yen(SET.SINGLE_ADD), n: rooms.singles })}` : ""}`} />
         <button className="btn btn-primary min-w-[140px]" onClick={next}>{d.editReturn ? t("editBack") : t("next")}</button>
       </BottomBar>
@@ -105,28 +122,33 @@ export default function HotelOption() {
   );
 }
 
-// 호텔 카드: 지도 + 호텔명·객실 타입·위치 + 골프장까지 이동 시간 + TRAVENDER 호텔 페이지
-function HotelCard({ p, hotel }: { p: Pkg; hotel: Hotel }) {
+// 호텔 카드: 지도(호텔을 가운데, 가장 먼 골프장까지 보이게) + 호텔명·객실 타입·위치 + 골프장까지 이동 시간 + 지도 앱·TRAVENDER 호텔 페이지
+function HotelCard({ p, h, room, map = true, mapKey }: { p: Pkg; h: Hotel; room?: string; map?: boolean; mapKey?: string }) {
   const { t, n } = useT();
   return (
-    <div className="card overflow-hidden">
-      <MapView
-        markers={[{ lat: hotel.lat, lng: hotel.lng, title: n(hotel.name), kind: "hotel", glyph: "H" }, ...coursesOf(p).map((c, i) => ({ lat: c.lat, lng: c.lng, title: n(c.name), kind: "golf" as const, glyph: String(i + 1) }))]}
-        focusKey={hotel.id}
-        label={n(hotel.name)}
-        className="aspect-[16/9] rounded-none"
-      />
+    <div className="overflow-hidden rounded-xl border border-line bg-surface">
+      {map && (
+        <MapView
+          markers={[{ lat: h.lat, lng: h.lng, title: n(h.name), kind: "hotel", glyph: "H" }, ...coursesOf(p).map((c, k) => ({ lat: c.lat, lng: c.lng, title: n(c.name), kind: "golf" as const, glyph: String(k + 1) }))]}
+          focusKey={mapKey ?? `${h.id}-map`}
+          center={{ lat: h.lat, lng: h.lng }} // 호텔을 가운데로. 확대는 가장 먼 골프장까지 보이게
+          zoom={(() => { const far = Math.max(0, ...coursesOf(p).map((c) => distM(h, c))); return far > 30000 ? 9 : far > 15000 ? 10 : far > 7000 ? 11 : 12; })()}
+          label={n(h.name)}
+          className="aspect-[16/9] rounded-none"
+        />
+      )}
       <div className="grid gap-1 p-4">
-        <b className="text-[15px]">{n(hotel.name)}</b>
-        <p className="text-[13px] text-muted">{n(hotel.room)} · {n(hotel.near)}</p>
+        <b className="text-[15px]">{n(h.name)}</b>
+        <p className="text-[13px] text-muted">{room ?? n(h.room)} · {n(h.near)}</p>
         <div className="mt-1.5 flex flex-wrap gap-1.5">
-          {coursesOf(p).map((c, i) => (
-            <DriveChip key={c.id} from={hotel} to={c} label={`${i + 1}. ${n(c.name)}`} />
+          {coursesOf(p).map((c, k) => (
+            <DriveChip key={c.id} from={h} to={c} label={`${k + 1}. ${n(c.name)}`} />
           ))}
         </div>
-        {hotel.area === "SAPPORO" && (
-          <a className="link mt-1 inline-flex items-center gap-1 text-[13px]" href="https://travender-hokkaido.com/hotels" target="_blank" rel="noreferrer">{t("hotelPage")} <ArrowSquareOut size={14} /></a>
-        )}
+        <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+          <a className="link inline-flex items-center gap-1 text-[13px]" href={gmapLink(h.en ?? n(h.name))} target="_blank" rel="noreferrer">{t("openApp")} <ArrowSquareOut size={14} /></a>
+          {h.area === "SAPPORO" && <a className="link inline-flex items-center gap-1 text-[13px]" href="https://travender-hokkaido.com/hotels" target="_blank" rel="noreferrer">{t("hotelPage")} <ArrowSquareOut size={14} /></a>}
+        </div>
       </div>
     </div>
   );

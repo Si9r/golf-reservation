@@ -98,6 +98,12 @@ body {
   overflow-wrap: break-word;
 }
 body.ja { font-family: "Noto Sans JP", "Noto Sans KR", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif; }
+/* 한국어는 단어(띄어쓰기) 단위로 줄바꿈 ('여유|로워요'처럼 단어 중간에서 끊기지 않게). 일본어는 띄어쓰기가 없어 기본 줄바꿈 + 금칙 처리 */
+html[lang="ko"] body { word-break: keep-all; }
+/* 일본어: 문절(文節) 단위로 줄바꿈 ('ありま|せん', 'バ|ス'처럼 낱말 중간에서 끊기지 않게). Chrome·Edge 119+, 그 밖의 브라우저는 기본 줄바꿈 + 금칙 처리 */
+html[lang="ja"] body { line-break: strict; word-break: auto-phrase; }
+/* 마지막 줄에 단어 하나만 남지 않게 줄을 고르게 나눔 ('아침이 / 여유로워요' → '아침이 여유로워요'를 함께 내림). 지원 안 하는 브라우저는 기존 줄바꿈 */
+p, li, h1, h2, h3, b { text-wrap: pretty; }
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; }
@@ -115,7 +121,8 @@ button:disabled { cursor: not-allowed; }
 .page.flush-top { padding-top: 0; }
 @media (min-width: 1024px) {
   .page.wide { max-width: 1200px; padding: 28px 24px 120px; }
-  .page.step { max-width: 760px; padding: 24px 24px 140px; }
+  .page.step { max-width: 1160px; padding: 24px 24px 140px; } /* 예약 단계 화면: PC에서 넓게 (원래 760px) */
+  .page.step.narrow .step-body { max-width: 832px; margin: 0 auto; } /* 한 줄 배치 단계(호텔·승하차 PC): 진행 단계 줄은 다른 단계와 같은 위치, 본문만 좁게 */
 }
 
 /* ---------- 카드·면 ---------- */
@@ -217,6 +224,8 @@ button:disabled { cursor: not-allowed; }
 .hscroll { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
 .hscroll::-webkit-scrollbar { display: none; }
 .hscroll > * { scroll-snap-align: start; flex: none; }
+@media (pointer: fine) { .hscroll { cursor: grab; } }
+.hscroll.dragging { cursor: grabbing; scroll-snap-type: none; user-select: none; }
 
 /* ---------- 지도 ---------- */
 .gm-host { width: 100%; height: 100%; }

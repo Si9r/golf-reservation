@@ -52,8 +52,68 @@ function Pages() {
   );
 }
 
+// PC 가로 목록(.hscroll: 칩·월 탭·카드 줄): 마우스로 잡고 좌우로 끌기 + 휠로 좌우 이동. 끌었으면 손을 뗄 때 클릭은 무시
+function useHScrollMouse() {
+  useEffect(() => {
+    let el: HTMLElement | null = null;
+    let startX = 0;
+    let startL = 0;
+    let moved = false;
+    const canScroll = (t: HTMLElement) => t.scrollWidth > t.clientWidth + 1;
+    const down = (e: PointerEvent) => {
+      if (e.pointerType !== "mouse" || e.button !== 0) return;
+      const t = (e.target as Element).closest<HTMLElement>(".hscroll");
+      if (!t || !canScroll(t)) return;
+      el = t;
+      startX = e.clientX;
+      startL = t.scrollLeft;
+      moved = false;
+    };
+    const move = (e: PointerEvent) => {
+      if (!el) return;
+      const dx = e.clientX - startX;
+      if (!moved && Math.abs(dx) > 5) {
+        moved = true;
+        el.classList.add("dragging");
+      }
+      if (moved) el.scrollLeft = startL - dx;
+    };
+    const up = () => {
+      if (!el) return;
+      el.classList.remove("dragging");
+      if (moved) {
+        const stop = (ev: Event) => { ev.stopPropagation(); ev.preventDefault(); };
+        window.addEventListener("click", stop, { capture: true, once: true });
+        window.setTimeout(() => window.removeEventListener("click", stop, { capture: true }), 0);
+      }
+      el = null;
+    };
+    const wheel = (e: WheelEvent) => {
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      const t = (e.target as Element).closest<HTMLElement>(".hscroll");
+      if (!t || !canScroll(t)) return;
+      const atStart = t.scrollLeft <= 0 && e.deltaY < 0;
+      const atEnd = t.scrollLeft + t.clientWidth >= t.scrollWidth - 1 && e.deltaY > 0;
+      if (atStart || atEnd) return; // 끝에 닿으면 화면을 위아래로
+      t.scrollLeft += e.deltaY;
+      e.preventDefault();
+    };
+    document.addEventListener("pointerdown", down);
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    document.addEventListener("wheel", wheel, { passive: false });
+    return () => {
+      document.removeEventListener("pointerdown", down);
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      document.removeEventListener("wheel", wheel);
+    };
+  }, []);
+}
+
 export default function App() {
   const { lang, theme } = useApp();
+  useHScrollMouse();
   const { seeded, seed } = useDb();
   useEffect(() => {
     if (!seeded) seed();

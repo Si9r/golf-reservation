@@ -36,6 +36,7 @@ export function MapView({
   focusKey,
   center,
   path,
+  greedy,
 }: {
   markers: MapMarker[];
   path?: LL[]; // 승차 → 일정 → 하차를 잇는 점선 (피드백 1)
@@ -47,6 +48,7 @@ export function MapView({
   zoom?: number;
   focusKey?: string; // 이 값이 바뀔 때만 화면을 마커에 맞춤
   center?: LL | null; // 주면 마커 전체 대신 이 지점으로 이동
+  greedy?: boolean; // 한 손가락으로 이동·확대 (화면 전체를 지도가 쓰는 모바일 승하차)
 }) {
   const line = useRef<google.maps.Polyline | null>(null);
   const { L, t } = useT();
@@ -70,7 +72,7 @@ export function MapView({
       disableDefaultUI: true,
       zoomControl: true,
       fullscreenControl: true,
-      gestureHandling: "cooperative",
+      gestureHandling: greedy || window.matchMedia("(min-width: 1024px)").matches ? "greedy" : "cooperative", // PC는 휠로 바로 확대, 휴대폰은 화면 스크롤과 겹치지 않게 두 손가락
       clickableIcons: !!onPoi,
     });
     m.addListener("click", (e: google.maps.MapMouseEvent | google.maps.IconMouseEvent) => {

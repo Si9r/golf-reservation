@@ -16,8 +16,9 @@ from ..errors import fail
 from ..rules import add_days, booking_no, booking_tab, in_area, is_bookable_date, quote
 from .catalog import DEP_SQL, dep_seats, sale_rule, stay_info
 
-# V-21·V-24 영문 이름: 성과 이름을 모두 (영문 대문자 단어 2개 이상, 단어 사이 공백 1칸, 60자 이하). 소문자는 대문자로 바꿔 검사 (팀 테스트 10/23)
-NAME_EN = re.compile(r"[A-Z]+( [A-Z]+)+")
+# V-21·V-24 영문 이름: 성과 이름을 모두 (영문 대문자 단어 2개 이상, 단어 사이 공백 1칸, 단어 안 하이픈·아포스트로피 허용, 60자 이하).
+# 소문자는 대문자로 바꿔 검사 (팀 테스트 10/23). 화면 apps/web/src/screens/InfoForm.tsx V21 과 같음
+NAME_EN = re.compile(r"[A-Z]+(?:['-][A-Z]+)*(?: [A-Z]+(?:['-][A-Z]+)*)+")
 NAME_EN_MAX = 60
 HHMM = re.compile(r"([01]\d|2[0-3]):[0-5]\d")
 
@@ -80,10 +81,11 @@ def _validate(req: dict, people: int) -> None:
         f.append({"field": "rep.phone", "rule": "V-22"})
     if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", r["email"]):
         f.append({"field": "rep.email", "rule": "V-23"})
-    if len(req["companions"]) > people - 1:
+    # V-24 동반자 영문 이름: 인원 − 1명 모두 필수 (팀 결정 10/23, 팀원 S-09 화면과 같게. 운영사 확인 필요)
+    if len(req["companions"]) != people - 1:
         f.append({"field": "companions", "rule": "V-24"})
     for i, x in enumerate(req["companions"]):
-        if x["nameEn"] and not valid_en(x["nameEn"]):
+        if not valid_en(x["nameEn"]):
             f.append({"field": f"companions.{i}.nameEn", "rule": "V-24"})
     for k in ("PICK", "DROP"):
         if sum(1 for s in req["stops"] if s["kind"] == k) != 1:
@@ -270,7 +272,7 @@ def save_companions(m: Member, no: str, companions: list[dict]) -> dict:
             fail("E-FORBID")
         if b["status"] != "CONFIRMED" or clock.today() > add_days(b["dep_date"], -S.COMPANION_DUE_DAYS):
             fail("E-DUE")
-        if len(companions) > b["people"] - 1 or any(x["nameEn"] and not valid_en(x["nameEn"]) for x in companions):
+        if len(companions) != b["people"] - 1 or any(not valid_en(x["nameEn"]) for x in companions):  # V-24: 모두 필수
             fail("E-VALID", [{"field": "companions", "rule": "V-24"}])
         for i in range(b["people"] - 1):
             name = (companions[i]["nameEn"].strip().upper() or None) if i < len(companions) else None

@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { CheckCircle, Minus, Plus, WarningCircle, X } from "@phosphor-icons/react";
+import { ArrowLeft, CheckCircle, Minus, Plus, WarningCircle, X } from "@phosphor-icons/react";
 import { useApp, useToast } from "../store";
 import { useT } from "../i18n";
 import { SET } from "../data";
@@ -147,38 +147,46 @@ export function PeopleInput({ value, onChange, error, max = SET.MAX_PEOPLE, labe
 
 // ---------- 예약 진행 단계 (C-04: 항상 6단계, 숙박 없는 당일 패키지만 2단계를 건너뜀 표시 — hasHotel = logic.ts hasHotelStep) ----------
 export function Steps({ at, hasHotel }: { at: number; hasHotel: boolean }) {
-  const { list, t } = useT();
-  const steps = list("steps");
-  const short = list("stepsShort");
+  const { list } = useT();
+  // 호텔 옵션이 없는 패키지는 호텔 단계를 아예 빼고 5단계로 보여 줌 (줄 높이는 모든 화면에서 같음)
+  const idx = list("steps").map((_, i) => i).filter((i) => hasHotel || i !== 1);
+  const steps = idx.map((i) => list("steps")[i]);
+  const short = idx.map((i) => list("stepsShort")[i]);
+  const cur = Math.max(0, idx.indexOf(at));
   return (
-    <div className="relative mb-4" aria-label={`${at + 1}/${steps.length} ${steps[at]}`}>
-      <Anno n="C-04" t="예약 진행 단계: 칸마다 단계 이름(패키지·호텔·승하차·확인·정보·결제), 현재 단계 굵게, 당일 패키지(숙박 없음)만 2단계 건너뜀 표시" />
+    <div className="relative" aria-label={`${cur + 1}/${steps.length} ${steps[cur]}`}>
+      <Anno n="C-04" t="예약 진행 단계: 칸마다 단계 이름(패키지·호텔·승하차·확인·정보·결제), 현재 단계 굵게, 호텔 옵션 없는 패키지는 호텔 단계 없이 5단계" />
       <div className="flex gap-1.5" aria-hidden="true">
-        {steps.map((s, i) => {
-          const skip = !hasHotel && i === 1;
-          return (
-            <div key={s} className="min-w-0 flex-1">
-              <div className={`h-[5px] overflow-hidden rounded-full ${skip ? "border border-dashed border-line-strong bg-transparent" : "bg-line"}`}>
-                {!skip && <motion.div className="h-full rounded-full bg-brand" initial={false} animate={{ width: i <= at ? "100%" : "0%" }} transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }} />}
-              </div>
-              <span className={`mt-1 block truncate text-center text-[11px] leading-tight ${i === at ? "font-bold text-brand" : skip ? "text-muted line-through" : i < at ? "text-ink-2" : "text-muted"}`}>{short[i]}</span>
+        {steps.map((s, i) => (
+          <div key={s} className="min-w-0 flex-1">
+            <div className="h-[5px] overflow-hidden rounded-full bg-line">
+              <motion.div className="h-full rounded-full bg-brand" initial={false} animate={{ width: i <= cur ? "100%" : "0%" }} transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }} />
             </div>
-          );
-        })}
+            <span className={`mt-1 block truncate text-center text-[11px] leading-tight ${i === cur ? "font-bold text-brand" : i < cur ? "text-ink-2" : "text-muted"}`}>{short[i]}</span>
+          </div>
+        ))}
       </div>
-      <p className="mt-1.5 text-[12.5px] text-muted">
-        <b className="num text-brand">{at + 1}/{steps.length}</b> {steps[at]}
-        {!hasHotel && at <= 2 && <span className="ml-1.5 text-[11.5px]">· {t("stepSkip")}</span>}
-      </p>
+    </div>
+  );
+}
+
+// 단계 화면 머리: ← 버튼 + 진행 단계 줄 (← 아이콘은 화면 왼쪽 끝에 맞추고 단계 줄과 가깝게)
+// PC는 모든 단계 화면에서 832px 가운데 → 한 줄 배치 화면의 본문과 일직선, 단계마다 위치 같음
+export function StepHead({ at, hasHotel, onBack, disabled, className = "" }: { at: number; hasHotel: boolean; onBack: () => void; disabled?: boolean; className?: string }) {
+  const { t } = useT();
+  return (
+    <div className={`mb-4 flex items-center gap-1.5 lg:mx-auto lg:max-w-[832px] ${className}`}>
+      <button className="-ml-2 grid h-9 w-9 flex-none -translate-y-[8px] place-items-center rounded-full hover:bg-surface-2" onClick={onBack} aria-label={t("back")} disabled={disabled}><ArrowLeft size={20} weight="bold" /></button>
+      <div className="flex-1"><Steps at={at} hasHotel={hasHotel} /></div>
     </div>
   );
 }
 
 // ---------- 하단 고정 버튼 (C-05) ----------
-export function BottomBar({ children, width = "step" }: { children: ReactNode; width?: "step" | "wide" }) {
+export function BottomBar({ children, width = "step", pcHidden }: { children: ReactNode; width?: "step" | "narrow" | "wide"; pcHidden?: boolean }) {
   return (
-    <div className="fixed inset-x-0 bottom-0 z-[45] border-t border-line bg-surface/95 backdrop-blur" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
-      <div className={`relative mx-auto flex max-w-[480px] items-center gap-3 px-4 py-3 ${width === "step" ? "lg:max-w-[760px] lg:px-6" : "lg:max-w-[1200px] lg:px-6"}`}>
+    <div className={`fixed inset-x-0 bottom-0 z-[45] border-t border-line bg-surface/95 backdrop-blur ${pcHidden ? "lg:hidden" : ""}`} style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+      <div className={`relative mx-auto flex max-w-[480px] items-center gap-3 px-4 py-3 ${width === "step" ? "lg:max-w-[1160px] lg:px-6" : width === "narrow" ? "lg:max-w-[880px] lg:px-6" : "lg:max-w-[1200px] lg:px-6"}`}>
         <Anno n="C-05" t="하단 고정 버튼: 활성 / 비활성 / 처리 중" />
         {children}
       </div>

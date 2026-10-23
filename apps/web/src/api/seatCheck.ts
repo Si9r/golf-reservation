@@ -7,6 +7,7 @@ import { useT } from "../i18n";
 import { depView, isDeparture } from "../logic";
 import { useDb, useDraft, useToast } from "../store";
 import { USE_API, api, apiPkgId } from "./client";
+import { refreshMonth } from "./sync";
 
 export type SeatCheck = "ok" | "changed" | "error";
 
@@ -45,6 +46,7 @@ export function useSeatGuard() {
     if (r === "error") return toast(t("M-900"), "bad");
     toast(t("M-128"), "bad");
     seatNotice = pkg.id;
+    if (USE_API) void refreshMonth(pkg.id, d.dep.slice(0, 7)); // API 모드: S-03 출발일 목록을 서버 값으로 새로 고침
     useDraft.getState().patch({ dep: null, editReturn: false, holdUntil: null, holdPeople: 0 });
     nav(`/golf/packages/${pkg.id}`);
   };

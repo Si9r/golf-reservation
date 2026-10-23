@@ -1,12 +1,12 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowLeft, Crown } from "@phosphor-icons/react";
+import { Crown } from "@phosphor-icons/react";
 import { hotelOf, pkgOf } from "../data";
 import { useT } from "../i18n";
 import { useDb, useDraft } from "../store";
 import { coursesOf, firstAvailable, fShort, rounds, seatsLeft, yen } from "../logic";
-import { Anno, Img, ScreenTag, StageTag, Steps } from "../components/ui";
+import { Anno, Img, ScreenTag, StageTag, StepHead } from "../components/ui";
 
 export default function Compare() {
   const { t, n, L } = useT();
@@ -34,10 +34,7 @@ export default function Compare() {
   return (
     <div className="page step">
       <ScreenTag id="S-04" name="패키지 비교 (2단계)" refs="FN-05 · API-01 · T-05" />
-      <div className="mb-1 flex items-center gap-3">
-        <button className="grid h-10 w-10 flex-none place-items-center rounded-full hover:bg-surface-2" onClick={() => nav("/golf/packages")} aria-label={t("back")}><ArrowLeft size={20} weight="bold" /></button>
-        <div className="flex-1"><Steps at={0} hasHotel /></div>
-      </div>
+      <StepHead at={0} hasHotel onBack={() => nav("/golf/packages")} />
       <div className="mb-4 flex items-center gap-2">
         <h1 className="text-[22px] font-bold">{t("cmpTitle")}</h1>
         <StageTag s={2} />

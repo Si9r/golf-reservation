@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { Bed, CaretLeft, CaretRight, Check, Plus, Snowflake } from "@phosphor-icons/react";
 import { motion } from "motion/react";
-import { PKGS, hotelOf, type Pkg } from "../data";
+import { PKGS, SET, hotelOf, type Pkg } from "../data";
 import { useT } from "../i18n";
 import { useDb } from "../store";
 import {
-  addMonths, daysInMonth, dow, dowNames, fMonth, fShort, inClosed, inSeason, judgeDate, monthInSeason, monthsAhead, pkgCountOn, rounds, todayISO, ymOf, yen,
+  addMonths, daysInMonth, dow, dowNames, fMonth, fShort, inClosed, inSeason, judgeDate, monthInSeason, monthsAhead, optionOf, pkgCountOn, roomsOf, rounds, stayHotel, todayISO, totalPrice, ymOf, yen, yenDiff,
 } from "../logic";
 import { Anno, Img, PeopleInput, Sheet } from "./ui";
+import { useCalendar } from "../api/sync";
 
 // ---------- 달력 ----------
 export function Calendar({ ym, onMonth, minYm, maxYm, cell, selected, onPick }: {
@@ -80,6 +81,7 @@ export function DatePeopleSheet({ open, onClose, date, people, onDone }: { open:
   const [d, setD] = useState<string | null>(date);
   const [n, setN] = useState(people);
   const [ym, setYm] = useState(date ? ymOf(date) : first);
+  useCalendar(ym, n); // API 모드: 날짜별 패키지 수를 서버에서 (API-04)
   useEffect(() => {
     if (open) {
       setD(date);
@@ -197,5 +199,35 @@ export function PkgCard({ p, date, d, seats, onOpen, cmp, onCmp, showCmp, i = 0 
         )}
       </div>
     </motion.article>
+  );
+}
+
+// ---------- 요금 내역 (확인 S-08 · 결제 S-10 공통): 0엔 항목까지 모두 보여 줌 ----------
+export function PriceDetail({ p, opt, people, singles }: { p: Pkg; opt: string | null; people: number; singles: number | null }) {
+  const { t, n } = useT();
+  const o = optionOf(opt);
+  const h = stayHotel(p, opt);
+  const price = totalPrice(p, opt, people, singles);
+  const r = price.rooms ?? (h ? roomsOf(people, singles) : null);
+  const add = o?.add ?? 0;
+  const Row = ({ k, sub, v, ok }: { k: string; sub?: string; v: string; ok?: boolean }) => (
+    <li className="flex justify-between gap-3">
+      <span className="min-w-0 text-ink-2">{k}{sub && <span className="block text-[12px] text-muted">{sub}</span>}</span>
+      <span className={`num flex-none font-semibold ${ok ? "text-ok" : ""}`}>{v}</span>
+    </li>
+  );
+  const incl = [t("pdGolf", { r: rounds(p) }), p.nights ? t("pdStay", { n: p.nights }) : null].filter(Boolean).join(" · ");
+  return (
+    <ul className="grid gap-2 text-[13.5px] lg:text-[14px]">
+      <Row k={t("lineBase", { p: yen(p.price), n: people })} sub={t("pdIncl", { s: incl })} v={yen(p.price * people)} />
+      {/* 호텔: 옵션이 있으면 고른 옵션과 차액(기본은 ¥0), 고정 호텔은 포함, 당일은 숙박 없음 ¥0 */}
+      {p.opts.length > 0 ? (
+        <Row k={`${t("rowHotel")} · ${n(o?.name ?? { ko: "-", ja: "-" })}`} sub={h ? `${n(h.name)} · ${o && !o.hotel ? n(o.sub) : n(h.room)}` : o ? n(o.sub) : undefined} v={add === 0 ? `${yen(0)} (${t("base")})` : `${yenDiff(add)} × ${people} = ${yenDiff(add * people)}`} />
+      ) : (
+        <Row k={`${t("rowHotel")} · ${h ? n(h.name) : t("noHotel")}`} v={`${yen(0)}${h ? ` (${t("included")})` : ""}`} />
+      )}
+      {r && <Row k={`${t("rowRooms")} · ${t(r.singles ? "roomsSum" : "roomsSum0", { t: r.twins, s: r.singles })}`} sub={r.singles ? t("lineSingle", { p: yen(SET.SINGLE_ADD), n: r.singles }) : t("pdNoSingle")} v={r.singles ? yen(r.singles * SET.SINGLE_ADD) : yen(0)} />}
+      <Row k={t("lineBus")} sub={t("pdBusSub")} v={`${yen(0)} (${t("included")})`} ok />
+    </ul>
   );
 }

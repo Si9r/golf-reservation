@@ -17,6 +17,10 @@ SAPPORO = {"lat": 43.0675, "lng": 141.3508}
 U = "/api/golf"
 
 
+COMP = ["PARK SEOYEON", "CHOI YUNA", "KANG DOHYUN", "LIM SEOJIN", "YOON JIHO", "HAN SOYEON"]
+HELD: dict[int, int] = {}  # holdId → 인원 (동반자 이름은 인원 − 1명 모두 필수, V-24)
+
+
 def body(hold_id, **over):
     b = {"holdId": hold_id, "optionId": "PKG-001-mitsui", "lang": "ko",
          "paymentId": "PAY-" + "".join(random.choices(string.ascii_lowercase, k=10)),
@@ -24,7 +28,7 @@ def body(hold_id, **over):
          "stops": [{"kind": "PICK", "placeName": "JR 삿포로역 남쪽 출구", **SAPPORO, "memo": "남쪽 출구 앞", "desiredTime": "10:30"},
                    {"kind": "DROP", "placeName": "JR 삿포로역 남쪽 출구", **SAPPORO, "desiredTime": "15:00"}],
          "rep": {"nameLocal": "이정훈", "nameEn": "lee junghoon", "countryCode": "+82", "phone": "10-1234-5678", "email": "a@example.com"},
-         "companions": []}
+         "companions": [{"nameEn": x} for x in COMP[: max(0, HELD.get(hold_id, 1) - 1)]]}
     b.update(over)
     return b
 
@@ -42,6 +46,7 @@ def db1(sql, **a):
 def hold(client, dep=DEP, people=2, h=A):
     r = client.post(U + "/holds", json={"departureId": dep, "people": people}, headers=h)
     assert r.status_code == 201, r.text
+    HELD[r.json()["holdId"]] = people
     return r.json()["holdId"]
 
 
@@ -329,7 +334,15 @@ def test_name_en_requires_full_name(client):  # V-21 대표자 · V-24 동반자
     no = r.json()["bookingNo"]
     assert client.get(U + f"/bookings/{no}", headers=A).json()["members"][0]["nameEn"] == "KIM MINJI"
     assert client.put(U + f"/bookings/{no}/companions", json={"companions": [{"nameEn": "PARK"}]}, headers=A).json()["error"] == "E-VALID"
-    assert client.put(U + f"/bookings/{no}/companions", json={"companions": [{"nameEn": "PARK SEOYEON"}]}, headers=A).status_code == 200
+    assert client.put(U + f"/bookings/{no}/companions", json={"companions": [{"nameEn": "O'BRIEN MIN-JI"}]}, headers=A).status_code == 200  # 하이픈·아포스트로피 허용
+    assert client.put(U + f"/bookings/{no}/companions", json={"companions": []}, headers=A).json()["error"] == "E-VALID"  # 동반자 이름은 모두 필수
+
+
+def test_companions_required(client):  # V-24: 동반자 이름이 인원 − 1명보다 적으면 거절
+    set_booked(SITE_DEP, 0)
+    hid = hold(client, SITE_DEP, 3)
+    r = client.post(U + "/bookings", json=body(hid, companions=[{"nameEn": "PARK SEOYEON"}]), headers=A).json()
+    assert r["error"] == "E-VALID" and {"field": "companions", "rule": "V-24"} in r["fields"]
 
 
 def test_booking_list_tab(client):  # S-12 탭: 고객 취소 → cancel
