@@ -91,7 +91,7 @@ export function toBooking(b: ApiBooking): Booking {
   return {
     no: b.no, pkgId, dep: b.departure.date, people: b.people, opt: optCode(b.optionId), pick: placeOf(pick), drop: placeOf(drop),
     pickMemo: pick?.memo ?? "", unit: b.unitPrice, singles: b.singles ?? undefined, total: b.total, currency: "JPY",
-    info: { nameKo: rep?.nameLocal ?? "", nameEn: rep?.nameEn ?? "", cc: rep?.countryCode ?? "+82", phone: rep?.phone ?? "", email: rep?.email ?? "", companions: comps, later: comps.length === 0, agree: { cancel: true, shared: true } },
+    info: { nameKo: rep?.nameLocal ?? "", nameEn: rep?.nameEn ?? "", cc: rep?.countryCode ?? "+82", phone: rep?.phone ?? "", email: rep?.email ?? "", companions: comps, agree: { cancel: true, shared: true } },
     status: b.status as Booking["status"], depStatus: b.departure.status as Booking["depStatus"], pickupTime: pick?.pickupTime ?? undefined, pickTime: pick?.desiredTime?.slice(0, 5) ?? undefined, dropTime: drop?.desiredTime?.slice(0, 5) ?? undefined,
     refundStatus: b.refundStatus ?? undefined, createdAt: String(b.createdAt).slice(0, 10), lang: b.lang,
   };

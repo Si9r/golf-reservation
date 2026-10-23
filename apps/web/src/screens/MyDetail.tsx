@@ -96,7 +96,7 @@ export default function MyDetail() {
         return;
       }
     }
-    update(b.no, { info: { ...b.info, later: false, companions: names } });
+    update(b.no, { info: { ...b.info, companions: names } });
     setComps(null);
     toast(t("M-206"));
   };
@@ -233,18 +233,12 @@ export default function MyDetail() {
             {/* 4 동반자 명단 (손님이 할 일 → 오른쪽 위) */}
             {b.people > 1 && (
               <section className="relative card border-[1.5px] p-4" style={{ borderColor: canEdit ? "var(--brand)" : undefined }}>
-                <Anno n={4} t="동반자 명단 (booking_member seq ≥ 2, V-24): 영문 성·이름, 살아 있는 예약만 출발 7일 전까지 수정 → API-13, M-206" />
+                <Anno n={4} t="동반자 이름 수정 (booking_member seq ≥ 2, V-24): 예약 때 모두 받으므로 오타 수정용. 영문 성·이름 모두 필수(빈 이름 저장 불가), 살아 있는 예약만 출발 7일 전까지 → API-13, M-206 (팀 결정 10/23)" />
                 <div className="mb-2 flex items-center justify-between gap-2">
-                  <h2 className="flex items-center gap-1.5 text-[15px] font-bold"><UsersThree size={18} className="text-brand" />{t("compT")} <span className="text-[13px] font-normal text-muted">{t("peopleN", { n: b.people - 1 })}</span></h2>
-                  {canEdit && !comps && b.info.companions.length > 0 && <button className="link text-[13.5px]" onClick={() => setComps(draft)}>{t("mdEdit")}</button>}
+                  <h2 className="flex items-center gap-1.5 text-[15px] font-bold"><UsersThree size={18} className="text-brand" />{t("compFixT")} <span className="text-[13px] font-normal text-muted">{t("peopleN", { n: b.people - 1 })}</span></h2>
+                  {canEdit && !comps && <button className="link text-[13.5px]" onClick={() => setComps(draft)}>{t("mdEdit")}</button>}
                 </div>
-                {canEdit && !comps && b.info.companions.length < b.people - 1 ? (
-                  // 아직 명단이 없으면 입력칸을 바로 펼치지 않고 안내 + 버튼 하나 (오른쪽이 너무 길어지지 않게)
-                  <div className="grid gap-2 rounded-xl bg-warn-soft p-3">
-                    <p className="text-[13.5px] font-semibold text-warn">{t("mdCompNeed", { n: b.people - 1 - b.info.companions.length })}</p>
-                    <button className="btn btn-primary btn-sm" onClick={() => setComps(draft)}>{t("mdCompInput")}</button>
-                  </div>
-                ) : canEdit && comps ? (
+                {canEdit && comps ? (
                   <div className="grid gap-2.5">
                     {draft.map((c, i) => (
                       <div key={i} className="field">
@@ -259,7 +253,7 @@ export default function MyDetail() {
                     ))}
                     {!draftOk && <p className="help">{t("M-162")}</p>}
                     <div className="flex gap-2">
-                      {comps && b.info.companions.length > 0 && <button className="btn btn-ghost btn-sm flex-1" onClick={() => setComps(null)}>{t("cancel")}</button>}
+                      <button className="btn btn-ghost btn-sm flex-1" onClick={() => setComps(null)}>{t("cancel")}</button>
                       <button className="btn btn-primary btn-sm flex-1" disabled={!draftOk} onClick={saveComps}>{t("compSave")}</button>
                     </div>
                   </div>

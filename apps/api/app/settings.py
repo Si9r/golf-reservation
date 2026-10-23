@@ -8,7 +8,7 @@ BUS_SEATS = 20  # 출발편 정원 = 버스 1대 (운영사 확정)
 MIN_DEPARTURE = 20  # 최소 출발 인원 (F-043)
 JUDGE_DAYS = 7  # 출발 n일 전 판정 (운영사 확정, TBD-05 / 질문 Q-17·Q-26). 동반자 명단 마감과 같은 날
 HOLD_MINUTES = 10  # 결제 중 좌석 확보 (TBD-14)
-COMPANION_DUE_DAYS = 7  # 동반자 명단 마감 (TBD-09 / 질문 Q-21)
+COMPANION_DUE_DAYS = 7  # 동반자 이름 수정 마감 (오타 수정용, 이름은 예약 때 모두 받음 — 팀 결정 10/23, TBD-09 / 질문 Q-21)
 CLOSED_SEASON = {"from": "11-16", "to": "04-19"}  # 휴장기, 모든 골프장 공통 (운영사 확정, TBD-16 / 질문 Q-24)
 SINGLE_ADD = 12000  # 1인실 추가 요금 1명당 (예시, 화면설계 v2). 패키지별 값이 있으면 그 값
 NEAR_PLACE_M = 350  # L-06

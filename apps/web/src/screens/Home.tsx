@@ -78,7 +78,7 @@ export default function Home() {
               {q && <button className="absolute right-2 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full text-muted" onClick={() => patch({ q: "" })} aria-label={t("close")}><X size={16} /></button>}
             </label>
             <div className="field relative">
-              <Anno n={3} t="출발일 (필수, CK-01): 날짜·인원 시트, 날짜마다 출발 패키지 수, 11/16~4/19 휴장 (M-110). 미선택이면 M-127" />
+              <Anno n={3} t="출발일 (필수, CK-01): 날짜·인원 시트, 날짜마다 출발 패키지 수, 11/16~4/19 휴장 (M-110). 미선택이면 homeDateHint" />
               <span className="label" id="date-l">{t("dateL")}</span>
               <div className="relative">
                 <button type="button" aria-labelledby="date-l" onClick={() => setSheet(true)} className="input flex items-center gap-2 pr-11 text-left">
@@ -93,7 +93,7 @@ export default function Home() {
             </div>
             <PeopleInput label={t("people")} value={people} onChange={(v) => patch({ people: v })} anno={<Anno n={4} t="인원 (V-02): 1~20명, 바꾸면 결과 수 즉시 갱신" />} />
             <div className="relative grid gap-2">
-              <Anno n={5} t="조건 결과 수 + 패키지 보기 (T-01): 출발일을 고르기 전에는 비활성 + M-127, 0개여도 이동" />
+              <Anno n={5} t="조건 결과 수 + 패키지 보기 (T-01): 출발일을 고르기 전에는 비활성 + homeDateHint, 0개여도 이동" />
               <p className="text-center text-[13.5px] font-semibold text-ink-2" aria-live="polite">{date ? t("M-111", { n: results.length }) : <span className="font-normal text-muted">{t("homeDateHint")}</span>}</p>
               <button className="btn btn-primary w-full" disabled={!date} onClick={() => nav("/golf/packages")}>{t("seeBtn")}</button>
             </div>

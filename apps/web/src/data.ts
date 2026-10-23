@@ -23,7 +23,7 @@ export const SET = {
   CLOSED_FROM: "11-16", // 휴장기 CLOSED_SEASON, 모든 골프장 공통 (운영사 확정)
   CLOSED_TO: "04-19",
   SINGLE_ADD: 12000, // 1인실 추가 요금 (1명당, 예시 · Q-02)
-  COMPANION_DUE_DAYS: 7, // 동반자 명단 마감 = 출발 7일 전
+  COMPANION_DUE_DAYS: 7, // 동반자 이름 수정 마감 = 출발 7일 전 (오타 수정용, 이름은 예약 때 모두 받음 — 팀 결정 10/23)
   NEAR_PLACE_M: 350, // 지도 탭 위치 근처의 알려진 장소 이름 사용 (L-06)
   MEMO_MAX: 100, // 만날 위치 메모 (V-11)
   SEARCH_MAX: 50, // 검색어 (V-01)

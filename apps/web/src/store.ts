@@ -90,7 +90,6 @@ export interface Info {
   phone: string;
   email: string;
   companions: string[];
-  later: boolean;
   en?: [string, string]; // 입력 중인 대표자 영문 [성, 이름] (보낼 때 nameEn = '성 이름')
   compEn?: [string, string][]; // 입력 중인 동반자 영문 [성, 이름] (보낼 때 companions)
   // 예약 화면 동의 2개 (V-25): 취소 규정 · 합승 안내. 이용약관·개인정보는 본 사이트 회원가입 때 동의 (운영사 확정)
@@ -235,10 +234,10 @@ interface DbState {
 }
 const seedBookings = (): { bookings: Booking[]; extra: Extra } => {
   const t = todayISO();
-  const info = (n: number, later = false): Info => ({
+  const info = (n: number): Info => ({
     nameKo: DEMO_USER.nameKo, nameEn: DEMO_USER.nameEn, cc: DEMO_USER.cc, phone: DEMO_USER.phone, email: DEMO_USER.email,
-    companions: later ? [] : ["PARK MINSEO", "CHOI YUNA", "KANG DOHYUN", "LIM SEOJIN", "YOON JIHO", "HAN SOYEON", "OH JUNSEO", "SEO HAEUN", "JUNG WOOJIN", "BAE YERIN", "KWON TAEYANG"].slice(0, n - 1),
-    later, agree: { cancel: true, shared: true },
+    companions: ["PARK MINSEO", "CHOI YUNA", "KANG DOHYUN", "LIM SEOJIN", "YOON JIHO", "HAN SOYEON", "OH JUNSEO", "SEO HAEUN", "JUNG WOOJIN", "BAE YERIN", "KWON TAEYANG"].slice(0, n - 1),
+    agree: { cancel: true, shared: true },
   });
   const sapSt: Place = { name: { ko: "JR 삿포로역 남쪽 출구", ja: "JR札幌駅 南口" }, kind: "station", area: "SAPPORO", lat: 43.0675, lng: 141.3508 };
   const odori: Place = { name: { ko: "삿포로 TV타워 옆 버스정류장", ja: "さっぽろテレビ塔横バス停" }, kind: "spot", area: "SAPPORO", lat: 43.0611, lng: 141.3564 };
@@ -257,7 +256,7 @@ const seedBookings = (): { bookings: Booking[]; extra: Extra } => {
   };
   const up = nextDep(1, 1);
   if (up) {
-    out.push({ no: no(up, 1), pkgId: 1, dep: up, people: 4, opt: "mitsui", pick: odori, drop: sapSt, pickMemo: "TV타워 1층 출입구 앞", ...times(1, odori, sapSt), unit: 69800, total: 279200, currency: "JPY", info: info(4, true), status: "CONFIRMED", createdAt: addDays(t, -2), lang: "ko" });
+    out.push({ no: no(up, 1), pkgId: 1, dep: up, people: 4, opt: "mitsui", pick: odori, drop: sapSt, pickMemo: "TV타워 1층 출입구 앞", ...times(1, odori, sapSt), unit: 69800, total: 279200, currency: "JPY", info: info(4), status: "CONFIRMED", createdAt: addDays(t, -2), lang: "ko" });
     extra[`1|${up}`] = 4;
   }
   const up2 = nextDep(7, 2);
@@ -288,7 +287,7 @@ export const useDb = create<DbState>()(
       clear: () => set({ bookings: [], extra: {}, seeded: true }),
       seed: () => set({ ...seedBookings(), seeded: true }),
     }),
-    { name: "golf-db", version: 3, migrate: () => ({ bookings: [], extra: {}, seeded: false }) as unknown as DbState },
+    { name: "golf-db", version: 4, migrate: () => ({ bookings: [], extra: {}, seeded: false }) as unknown as DbState },
   ),
 );
 

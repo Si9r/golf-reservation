@@ -42,7 +42,7 @@ export default function InfoForm() {
 
   // 회원 정보로 채움 (동반자는 기본 '나중에 입력')
   // 회원 정보로 채움. 영문 이름은 성·이름 두 칸, 동반자 명단은 필수 (나중에 입력 없음)
-  const f: Info = d.info ?? { nameKo: user!.nameKo, nameEn: user!.nameEn, cc: user!.cc, phone: user!.phone, email: user!.email, companions: [], later: false, agree: { cancel: false, shared: false } };
+  const f: Info = d.info ?? { nameKo: user!.nameKo, nameEn: user!.nameEn, cc: user!.cc, phone: user!.phone, email: user!.email, companions: [], agree: { cancel: false, shared: false } };
   const en: [string, string] = f.en ?? splitEn(f.nameEn);
   const compN = d.people - 1;
   const compEn: [string, string][] = Array.from({ length: compN }, (_, i) => f.compEn?.[i] ?? (f.companions[i] ? splitEn(f.companions[i]) : ["", ""]));
@@ -76,7 +76,7 @@ export default function InfoForm() {
       toast(t("M-120", { s: v.seats, n: d.people }), "bad");
       return;
     }
-    const info = { ...f, nameEn: joinEn(en), companions: compEn.map(joinEn), later: false };
+    const info = { ...f, nameEn: joinEn(en), companions: compEn.map(joinEn) };
     if (USE_API) {
       // API-08 좌석 임시확보 (서버가 출발편을 잠그고 잔여석 확인). 실패하면 E-SEAT → 서버 최신 잔여석으로 M-120
       if (busy || busyRef.current) return;

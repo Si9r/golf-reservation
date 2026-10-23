@@ -67,7 +67,7 @@ export function ProtoPanel() {
       useDraft.setState({
         holdUntil: Date.now() + 10 * 60000,
         holdPeople: st.people,
-        info: st.info ?? { nameKo: u.nameKo, nameEn: u.nameEn, cc: u.cc, phone: u.phone, email: u.email, companions: [], later: true, agree: { cancel: true, shared: true } },
+        info: st.info ?? { nameKo: u.nameKo, nameEn: u.nameEn, cc: u.cc, phone: u.phone, email: u.email, companions: ["PARK SEOYEON", "CHOI YUNA", "KANG DOHYUN", "LIM SEOJIN", "YOON JIHO", "HAN SOYEON", "OH JUNSEO", "SEO HAEUN", "JUNG WOOJIN", "BAE YERIN", "KWON TAEYANG", "LEE SUAH", "NAM GIWOO", "JANG HARIN", "SONG MINJAE", "YOO NARAE", "CHA EUNWOO", "GO HANA", "MOON JIHUN"].slice(0, Math.max(0, st.people - 1)), agree: { cancel: true, shared: true } },
       });
     }
     go(to);

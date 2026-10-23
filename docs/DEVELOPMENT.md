@@ -29,7 +29,8 @@
 | B-03 여행 완료 | `jobs` `complete_trips` | 완료 |
 | B-04 출발편 만들기 | `services/departures.py` `generate_departures` | 완료 |
 | B-05 상품 가져오기 / API-15 | — | 틀만 (상품 데이터 받은 뒤) |
-| B-06 명단 입력 요청, B-07 환불 확인 | — | 미착수 |
+| B-06 명단 입력 요청 | — | 없앰 (동반자 이름을 예약 때 모두 받음, 팀 결정 10/23) |
+| B-07 환불 확인 | — | 미착수 |
 | API-01 ~ 04, 06 ~ 14, 18, 19 | `routes.py` | 동작 (`/api/golf/docs`에서 확인) |
 | API-05 장소 검색 | — | 틀만 (지금은 화면이 Google을 직접 호출) |
 | V-01 ~ V-24 입력 검사 | `schemas.py`(pydantic) + `services/booking.py` `_validate` | 서버 쪽 완료 |
@@ -93,6 +94,10 @@
 | B-02 일정표(`logic.ts` `itinerary`): 2일차부터 승차·호텔 출발 = 그날 티오프 − 이동 − 30분(`PICK_MARGIN_MIN`), 30분 단위 내림. 이동은 받아 둔 Google 경로 시간(`gmaps.ts` `cachedDriveMin`), 없으면 `TRAVEL`. 첫날 승차·마지막 날 하차는 손님 희망 시간이 있으면 '희망 HH:MM' | 팀 테스트 10/23 ('호텔 없이' 승차가 티오프 1시간 전·호텔 출발이 50분 전 고정이라 늦거나 빠듯했고, 하차가 희망 시간과 달랐음). Google 시간은 다른 곳에서 한 번 받아 둔 뒤부터 반영 |
 | 동반자 영문 이름(인원 − 1명)을 예약 때 **모두 필수**로: S-09 '나중에 입력' 없음(팀원 KIM-TAEYEON 화면), 서버 V-24도 인원 − 1명 모두·형식 검사(예약 API-10, 명단 저장 API-13) | 팀 결정 (2026-10-23, 팀원 브랜치 합칠 때). 운영사 협의 중이던 항목이라 운영사 확인 필요 |
 | 영문 이름(V-21·V-24)에 단어 안 하이픈·아포스트로피 허용 (KIM MIN-JI, O'BRIEN SEAN). 성과 이름 모두 필수·60자 이하는 그대로. 화면은 성·이름 두 칸 입력 후 '성 이름'으로 합침 | 팀 결정 (2026-10-23). 여권 이름에 쓰일 수 있어 화면(팀원)과 서버 규칙을 맞춤 |
+| S-06 마무리: '뒤로'·진행 단계 기준을 `hasHotelStep(p)`로 (호텔이 정해진 패키지는 '뒤로'가 S-05, '호텔' 칸 건너뜀 표시 없음). '다음'에 잔여석 재확인 `useSeatGuard` (바뀌었으면 M-128 → S-03, API 모드는 `refreshMonth`). '희망 하차 시간 (선택)' 아래 안내 `dropTimeNote` ('도로 상황과 합승 인원에 따라 실제 하차 시간은 달라질 수 있어요') | 팀 결정 10/23 |
+| 병합 후 쓰이지 않는 문구 키 삭제 (한·일): M-127·M-129·M-184·M-200, dupStop, later, proceed, minT, statusT, depRange, depLine, lineOpt, optCount, optFoot, golfT, hotelT, compDone, cancelT, supportBtn, mapPicked, mapPickedArea, depGo, stepSkip, mdCompNeed, mdCompInput. 설계서 메시지 대응: M-127 → `homeDateHint`, M-129 → `mdEnoughT`·`mdEnoughD`(S-13)·`depFull`(S-03), M-200 → `mdOpenT`·`mdOpenD`(S-13), M-184 → `compFixInfo`(S-11) | 팀 결정 10/23 (설계서 메시지 문구를 실제 화면 문장으로 맞출 것) |
+| 동반자 영문 이름은 예약 때 모두 받고, '나중에 입력'과 관련 기능을 없앰: B-06 명단 입력 요청 메일·알림 종류 COMPANION은 만들지 않음(코드에 없었음), 화면 `Info.later` 삭제, S-11 안내를 '동반자 이름은 출발 7일 전까지 예약 상세에서 고칠 수 있어요'(`compFixInfo`)로 | 팀 결정 10/23 (나중에 받으면 마감까지 안 들어온 예약 처리가 복잡해짐). 운영사 확인은 따로 |
+| 동반자 명단 수정(API-13, S-13)은 '오타 수정용'으로 남김: 마감 출발 7일 전(`COMPANION_DUE_DAYS`) 그대로, 인원 − 1명 모두 필수·빈 이름 저장 불가(서버·화면). S-13 제목 '동반자 이름 수정 (출발 7일 전까지)' | 팀 결정 10/23 |
 
 ## 4. 답을 기다리는 것 (막히는 곳)
 
@@ -108,4 +113,4 @@
 | 승차 희망 시간 시작을 '첫 티오프 − 2시간 30분'으로 해도 되는지 (운영사 확정값은 06:00부터, 팀 결정으로 좁힘) | `settings.py` `PICK_EARLIEST_BEFORE_TEE_MIN` (화면 `data.ts`·`packages/shared` 같은 값) |
 | 서비스 이름 (지금 'TRAVENDER Golf'는 임시) | `apps/web/src/data.ts` `SERVICE_NAME` |
 | API-19 본 사이트 → 이 서비스 호출의 실제 인증 방식 (결제 연동 협의 때) | `routes.py` `site` (지금은 `X-Site-Key` 공유 키 비교) |
-| 판정일과 동반자 명단 마감이 같은 날(출발 7일 전) → 판정 결과 메일과 명단 마감 안내를 같은 날 보내도 되는지 | B-01 판정 메일, B-06 명단 입력 요청 (미착수) |
+| ~~판정일과 동반자 명단 마감이 같은 날 → 판정 메일과 명단 마감 안내를 같은 날 보내도 되는지~~ | 해결: 명단 입력 요청 메일(B-06)을 없앰 (동반자 이름은 예약 때 모두 받음, 팀 결정 10/23) |

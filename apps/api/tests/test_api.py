@@ -362,3 +362,14 @@ def test_quote_fixed_hotel_odd_people(client):  # B-03: 옵션 없는(호텔이 
     assert q["rooms"] == {"singles": 1, "twins": 1} and q["total"] == pkg["basePrice"] * 3 + pkg["singleAdd"]
     q = client.post(U + "/quotes", json={"departureId": dep, "people": 3, "singles": 3}).json()  # S-05에서 1인실 인원을 바꾸면
     assert q["rooms"] == {"singles": 3, "twins": 0} and q["total"] == pkg["basePrice"] * 3 + pkg["singleAdd"] * 3
+
+
+def test_companions_fix_no_empty(client):  # API-13 동반자 이름 수정(오타 수정용): 빈 이름은 저장 불가, 인원 − 1명 모두 필수
+    set_booked(SITE_DEP, 0)
+    no = client.post(U + "/bookings", json=body(hold(client, SITE_DEP, 3)), headers=A).json()["bookingNo"]
+    put = lambda names: client.put(U + f"/bookings/{no}/companions", json={"companions": [{"nameEn": x} for x in names]}, headers=A)  # noqa: E731
+    r = put(["PARK SEOYEON", ""]).json()
+    assert r["error"] == "E-VALID" and r["fields"] == [{"field": "companions", "rule": "V-24"}]
+    assert put(["PARK SEOYEON"]).json()["error"] == "E-VALID"
+    assert put(["PARK SEOYEON", "CHOI YUNA"]).status_code == 200
+    assert [m["nameEn"] for m in client.get(U + f"/bookings/{no}", headers=A).json()["members"][1:]] == ["PARK SEOYEON", "CHOI YUNA"]

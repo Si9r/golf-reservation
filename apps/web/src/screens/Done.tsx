@@ -32,7 +32,7 @@ export default function Done() {
     { icon: EnvelopeSimple, text: t("M-181", { e: b.info.email }) },
     { icon: CalendarCheck, text: t("M-182", { d: fDayLong(judgeDate(b.dep), L), m: SET.MIN_DEPARTURE }) },
     { icon: Bus, text: t("M-183") },
-    ...(b.info.later && b.people > 1 ? [{ icon: UsersThree, text: t("M-184") }] : []),
+    ...(b.people > 1 ? [{ icon: UsersThree, text: t("compFixInfo") }] : []), // 동반자 이름은 예약 때 모두 받음 → 고칠 수 있는 기간만 안내 (팀 결정 10/23)
   ];
   return (
     <div className="page step">
@@ -65,7 +65,7 @@ export default function Done() {
       </section>
 
       <section className="relative mt-4 grid gap-2.5 rounded-2xl bg-surface-2 p-4 text-[14px]">
-        <Anno n={3} t="다음 안내: 확인서 발송 주소(M-181), 판정일(M-182), 승차 시간 안내 예정(M-183), 동반자 명단 마감(M-184, 나중 입력 시)" />
+        <Anno n={3} t="다음 안내: 확인서 발송 주소(M-181), 판정일(M-182), 승차 시간 안내 예정(M-183), 동반자 이름 수정 안내(출발 7일 전까지 예약 상세에서)" />
         {nexts.map(({ icon: I, text }) => (
           <p key={text} className="flex gap-2"><I size={20} className="mt-0.5 flex-none text-brand" />{text}</p>
         ))}

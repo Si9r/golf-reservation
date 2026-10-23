@@ -4,13 +4,14 @@ import { motion } from "motion/react";
 import { Airplane, Bed, Buildings, Bus, CheckCircle, Clock, GoogleLogo, MagnifyingGlass, MapPin, Train, WarningCircle, X } from "@phosphor-icons/react";
 import { AREA_NAME, PLACES, SET, ZONES_STRICT, courseOf, serviceArea, type Place as P, type PlaceKind } from "../data";
 import { useT } from "../i18n";
-import { nearestKnown, norm, placeZone, stayHotel, stopTimeRange, zoneAt, type StopRange } from "../logic";
+import { hasHotelStep, nearestKnown, norm, placeZone, stayHotel, stopTimeRange, zoneAt, type StopRange } from "../logic";
 import { Anno, BottomBar, Q, ScreenTag, StepHead } from "../components/ui";
 import { DriveChip, MapView, type MapMarker } from "../components/GoogleMap";
 import { useDrive, useMaps, type LL } from "../gmaps";
 import { useFlow } from "./flow";
 import { useApp, type Draft } from "../store";
 import { USE_API, api } from "../api/client";
+import { useSeatGuard } from "../api/seatCheck";
 
 const KIND_ICON: Record<PlaceKind, typeof Bed> = { hotel: Bed, station: Train, airport: Airplane, spot: Buildings, map: MapPin };
 // 5 자주 고르는 곳 (설정 POPULAR_PLACES): 삿포로역·오도리·스스키노·TV타워 + 시내 밖 예시(공항·오타루). 데이터에 고정 → Google 요금 없음
@@ -116,6 +117,7 @@ export default function Place() {
   const lastDayRound = p ? p.days[p.days.length - 1] : null;
   const lastDayCourse = lastDayRound ? courseOf(lastDayRound.course) : null;
   const dropPlace = d.dropSame ? d.pick : d.drop;
+  const guard = useSeatGuard(); // B-01: 다음으로 가기 전 잔여석 다시 확인 (S-03·S-05·S-08과 같음)
   const pickLeg = useDrive(d.pick, day1Course);
   const dropLeg = useDrive(lastDayCourse, dropPlace);
   const gmin = (x: typeof pickLeg) => (x.drive?.source === "google" ? x.drive.min : null);
@@ -272,7 +274,7 @@ export default function Place() {
   };
 
   const done = !!d.pick && !!(d.dropSame ? d.pick : d.drop) && !!d.pickTime; // 희망 승차 시간은 필수, 하차 시간은 선택 (팀 결정 10/21)
-  const back = () => nav(d.editReturn ? "/golf/book/review" : p.opts.length ? "/golf/book/hotel" : `/golf/packages/${p.id}`);
+  const back = () => nav(d.editReturn ? "/golf/book/review" : hasHotelStep(p) ? "/golf/book/hotel" : `/golf/packages/${p.id}`); // 숙박 있는 패키지는 옵션이 없어도 S-05로
   const pv = preview?.place;
   const pvOk = pv ? !!placeZone(pv) : false;
   const center = preview ? preview.at : cur ? { lat: cur.lat, lng: cur.lng } : null;
@@ -328,6 +330,7 @@ export default function Place() {
         </select>
       </label>
       {tab === "pick" && pickRange?.base && pickRange.options.length > 0 && <p className="flex gap-1.5 text-[13px] text-ink-2"><Clock size={16} className="mt-0.5 flex-none text-brand" />{t("pickWait")}</p>}
+      {tab === "drop" && <p className="flex gap-1.5 text-[13px] text-ink-2"><Clock size={16} className="mt-0.5 flex-none text-brand" />{t("dropTimeNote")}</p>}
       <p className="help">{t("wishNote")}</p>
     </section>
   );
@@ -481,18 +484,18 @@ export default function Place() {
   );
   const bottomEl = (
     <BottomBar width={isLg ? "narrow" : "step"}>
-      <span className="absolute -top-3 left-3"><Anno n={9} t="하단 다음: 승차·하차 장소와 희망 승차 시간이 지정되면 활성 (희망 하차 시간은 선택) → S-08 (T-10) / 범위 밖 → 그대로 (T-31)" /></span>
+      <span className="absolute -top-3 left-3"><Anno n={9} t="하단 다음: 승차·하차 장소와 희망 승차 시간이 지정되면 활성 (희망 하차 시간은 선택) → 잔여석 다시 확인(B-01) → S-08 (T-10) / 범위 밖 → 그대로 (T-31)" /></span>
       <div className="min-w-0 flex-1 text-[12.5px] leading-tight text-muted">
         <p className="truncate">{t("pick")} · {d.pick ? withTime(n(d.pick.name), d.pickTime) : "-"}</p>
         <p className="truncate">{t("drop")} · {dropShown ? withTime(n(dropShown.name), d.dropTime) : "-"}</p>
       </div>
-      <button className="btn btn-primary min-w-[140px]" disabled={!done} onClick={() => { if (d.dropSame) d.patch({ drop: d.pick }); nav("/golf/book/review"); }}>{d.editReturn ? t("editBack") : t("next")}</button>
+      <button className="btn btn-primary min-w-[140px]" disabled={!done} onClick={() => guard(() => { if (d.dropSame) d.patch({ drop: d.pick }); nav("/golf/book/review"); })}>{d.editReturn ? t("editBack") : t("next")}</button>
     </BottomBar>
   );
   const head = (
     <>
       <ScreenTag id="S-06" name="승하차 장소 지정" refs="FN-12, FN-13 · L-06 · API-05, API-06 · V-10, V-11 · T-10, T-31" />
-      <StepHead at={2} hasHotel={p.opts.length > 0} onBack={back} />
+      <StepHead at={2} hasHotel={hasHotelStep(p)} onBack={back} />
     </>
   );
 

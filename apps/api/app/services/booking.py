@@ -264,7 +264,8 @@ def get_booking(m: Member, no: str) -> dict:
 
 
 def save_companions(m: Member, no: str, companions: list[dict]) -> dict:
-    """API-13: 동반자 명단 저장 (마감 전, CONFIRMED만)"""
+    """API-13: 동반자 이름 수정 (오타 수정용, 팀 결정 10/23). 이름은 예약(API-10) 때 모두 받음.
+    마감(출발 COMPANION_DUE_DAYS일 전) 전 CONFIRMED만, 인원 − 1명 모두 필수 (빈 이름으로 저장 불가)"""
     with tx() as c:
         b = one(c, """SELECT b.member_id, b.status, b.people, d.dep_date FROM booking b JOIN departure d ON d.id = b.departure_id
                       WHERE b.no = :no FOR UPDATE""", no=no) or fail("E-NOTFOUND")
