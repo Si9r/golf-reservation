@@ -1,12 +1,13 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { motion } from "motion/react";
-import { ArrowLeft, ArrowSquareOut, Bed, Bus, CaretDown, CheckCircle, Flag, Info, MapPin, MinusCircle, Star, Sun, Warning } from "@phosphor-icons/react";
+import { ArrowSquareOut, Bed, Bus, CaretDown, CheckCircle, Flag, Info, MapPin, MinusCircle, Star, Sun, Warning } from "@phosphor-icons/react";
 import { AREA_NAME, SET, hotelOf, pkgOf, type Pkg } from "../data";
 import { useT } from "../i18n";
 import { useDb, useDraft } from "../store";
-import { addDays, coursesOf, departuresIn, depView, dowNames, fDate, fMonth, fMonthShort, fShort, itinerary, judgeDate, monthInSeason, monthsAhead, prevAt, todayISO, tripEnd, yen, ymOf, type ItinItem } from "../logic";
-import { Anno, BottomBar, Collapse, ErrorBanner, Img, PeopleInput, PriceBlock, Q, ScreenTag, Steps, gmapLink, useFakeLoad } from "../components/ui";
+import { useDepartures } from "../api/sync";
+import { addDays, coursesOf, departuresIn, depView, dowNames, fDate, fMonth, fMonthShort, fShort, itinerary, judgeDate, monthInSeason, monthsAhead, optionOf, prevAt, todayISO, tripEnd, yen, yenDiff, ymOf, type ItinItem } from "../logic";
+import { Anno, BottomBar, Collapse, ErrorBanner, gmapLink, Img, PeopleInput, PriceBlock, Q, ScreenTag, StepHead, useFakeLoad } from "../components/ui";
 import { PkgTags, TypeBadge } from "../components/booking";
 import { LegRow, MapView, type MapMarker } from "../components/GoogleMap";
 
@@ -25,6 +26,7 @@ function DetailInner({ p }: { p: Pkg }) {
   const d = useDraft();
   const extra = useDb((s) => s.extra);
   const load = useFakeLoad(`pkg-${p.id}`, 450);
+  const apiV = useDepartures([p.id], monthsAhead().filter(monthInSeason)); // API 모드: 출발편·잔여석을 서버에서 (API-03)
 
   useEffect(() => {
     if (d.pkgId !== p.id) d.choosePkg(p.id);
@@ -33,7 +35,7 @@ function DetailInner({ p }: { p: Pkg }) {
   const dep = d.pkgId === p.id ? d.dep : null;
 
   // 4 월 탭: 시즌 달만. 처음에는 고른 출발일(또는 S-01 날짜)의 달, 없으면 가장 빠른 달
-  const months = useMemo(() => monthsAhead().filter((m) => monthInSeason(m) && departuresIn(p, m).length > 0), [p]);
+  const months = useMemo(() => monthsAhead().filter((m) => monthInSeason(m) && departuresIn(p, m).length > 0), [p, apiV]); // eslint-disable-line react-hooks/exhaustive-deps
   const firstOk = months.find((m) => departuresIn(p, m).some((x) => depView(p.id, x, d.people, extra).state !== "unavailable")) ?? months[0];
   const [ym, setYm] = useState(dep ? ymOf(dep) : d.date && months.includes(ymOf(d.date)) ? ymOf(d.date) : firstOk);
   useEffect(() => {
@@ -48,13 +50,19 @@ function DetailInner({ p }: { p: Pkg }) {
   const courses = coursesOf(p);
   const itin = itinerary(p, p.opts[0] ?? null, null, null);
   const [openDays, setOpenDays] = useState<boolean[]>(() => itin.map((_, i) => i === 0)); // 1일차만 펼침
+  // 지도 핀마다 무엇인지: 골프장은 라운드하는 일차, 호텔은 숙박 (호텔 옵션 화면 지도는 없애고 위치는 여기서만 보여 줌)
+  const dayRole = (cid: number) => {
+    const ds = p.days.map((r, i) => (r?.course === cid ? i + 1 : 0)).filter(Boolean);
+    const txt = ds.length > 1 && ds[ds.length - 1] - ds[0] === ds.length - 1 ? `${ds[0]}~${ds[ds.length - 1]}` : ds.join("·");
+    return L === "ko" ? `${txt}일차` : `${txt}日目`;
+  };
   const places = [
-    ...courses.map((c, i) => ({ key: `c${c.id}`, label: n(c.name), q: c.name.ja, placeId: c.placeId as string | undefined, lat: c.lat, lng: c.lng, kind: "golf" as const, glyph: String(i + 1) })),
-    ...(hotel ? [{ key: "h", label: n(hotel.name), q: hotel.name.ja.replace(/（例）|\(例\)/, ""), placeId: undefined, lat: hotel.lat, lng: hotel.lng, kind: "hotel" as const, glyph: "H" }] : []),
+    ...courses.map((c, i) => ({ key: `c${c.id}`, label: n(c.name), role: dayRole(c.id), q: c.name.ja, placeId: c.placeId as string | undefined, lat: c.lat, lng: c.lng, kind: "golf" as const, glyph: String(i + 1) })),
+    ...(hotel ? [{ key: "h", label: n(hotel.name), role: L === "ko" ? "숙박" : "宿泊", q: hotel.name.ja.replace(/（例）|\(例\)/, ""), placeId: undefined, lat: hotel.lat, lng: hotel.lng, kind: "hotel" as const, glyph: "H" }] : []),
   ];
-  const [mapKey, setMapKey] = useState<string>(places[0].key); // 9 위치 지도: 첫 골프장
-  const mapPlace = places.find((x) => x.key === mapKey) ?? places[0];
-  const markers = useMemo<MapMarker[]>(() => places.map((x) => ({ lat: x.lat, lng: x.lng, title: x.label, kind: x.kind, glyph: x.glyph })), [p.id, hotel?.id, L]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [mapKey, setMapKey] = useState<string>("all"); // 9 위치 지도: 처음엔 전체(골프장·호텔 핀 모두), 버튼을 누르면 그곳으로
+  const mapPlace = mapKey === "all" ? null : places.find((x) => x.key === mapKey) ?? null;
+  const markers = useMemo<MapMarker[]>(() => places.map((x) => ({ lat: x.lat, lng: x.lng, title: `${x.label} · ${x.role}`, kind: x.kind, glyph: x.glyph })), [p.id, hotel?.id, L]); // eslint-disable-line react-hooks/exhaustive-deps
   const reserveRef = useRef<HTMLDivElement>(null);
 
   const go = () => {
@@ -112,7 +120,10 @@ function DetailInner({ p }: { p: Pkg }) {
                     {full ? t("depEnough", { b: dv.booked }) : off ? t("depShort", { n: d.people }) : enough ? t("depEnough", { b: dv.booked }) : t("depNow", { b: dv.booked })}
                   </span>
                 </span>
-                <span className={`num text-[13px] font-semibold ${off ? "text-muted" : "text-ink-2"}`}>{full ? t("full") : t("seatsLeft", { s: dv.seats })}</span>
+                <span className={`num text-[13px] font-semibold ${off ? "text-muted" : "text-ink-2"}`}>{full ? t("full") : t("seatsLeft", { s: dv.seats })}
+                  {/* 결제 중(10분 확보) 자리: 정원 − 확정 인원 − 잔여석 */}
+                  {!full && SET.BUS_SEATS - dv.booked - dv.seats > 0 && <span className="block text-[11.5px] font-normal text-muted">{t("seatsHeld", { h: SET.BUS_SEATS - dv.booked - dv.seats })}</span>}
+                </span>
               </button>
             );
           })}
@@ -142,12 +153,7 @@ function DetailInner({ p }: { p: Pkg }) {
   return (
     <div className="page wide">
       <ScreenTag id="S-03" name="패키지 상세" refs="FN-06~08, FN-11, FN-18 · L-01·02·04·11 · API-02, API-03 · T-06, T-07, T-28, T-29" />
-      <div className="mb-1 flex items-center gap-3 lg:max-w-[760px]">
-        <button className="grid h-10 w-10 flex-none place-items-center rounded-full hover:bg-surface-2" onClick={() => (d.editReturn ? nav("/golf/book/review") : nav("/golf/packages"))} aria-label={t("back")}>
-          <ArrowLeft size={20} weight="bold" />
-        </button>
-        <div className="flex-1"><Steps at={0} hasHotel={p.opts.length > 0} /></div>
-      </div>
+      <StepHead at={0} hasHotel={p.opts.length > 0} onBack={() => (d.editReturn ? nav("/golf/book/review") : nav("/golf/packages"))} className="lg:-mt-1" />
       {load.error && <ErrorBanner onRetry={load.retry} />}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-10">
@@ -163,7 +169,7 @@ function DetailInner({ p }: { p: Pkg }) {
             <p className="rounded-xl bg-surface-2 px-3 py-2 text-[12.5px] leading-relaxed text-ink-2">{t(`typeLong_${p.type}`)}</p>
             <h1 className="text-[23px] font-bold leading-snug tracking-tight lg:text-[30px]">{n(p.name)}</h1>
             <PkgTags p={p} />
-            <p className="max-w-[60ch] text-[14.5px] leading-relaxed text-ink-2">{n(p.short)}</p>
+            <p className="text-[14.5px] leading-relaxed text-ink-2">{n(p.short)}</p>
           </section>
           {/* 2 포함 사항 */}
           <section className="relative soft grid gap-3 p-4 sm:grid-cols-2">
@@ -220,9 +226,10 @@ function DetailInner({ p }: { p: Pkg }) {
             <h2 className="sec-title mb-3">{t("courseInfo")}</h2>
             <div className="grid gap-3 lg:grid-cols-2">
               {courses.map((c) => (
-                <div key={c.id} className="card overflow-hidden">
-                  <div className="flex items-stretch">
-                    <div className="w-[104px] flex-none"><Img src={c.photo} alt={n(c.name)} /></div>
+                <div key={c.id} className="card flex flex-col overflow-hidden">
+                  {/* 사진은 칸 높이에 맞춰 채우고(원본 비율 무시), 소개 칸이 남는 높이를 채워 옆 카드와 칸을 맞춤 */}
+                  <div className="flex h-[112px] items-stretch">
+                    <div className="relative w-[104px] flex-none"><Img src={c.photo} alt={n(c.name)} className="absolute inset-0 h-full w-full" /></div>
                     <div className="min-w-0 flex-1 p-3">
                       <b className="block text-[14.5px] leading-snug">{n(c.name)}</b>
                       <span className="mt-1 flex flex-wrap items-center gap-x-2 text-[12.5px] text-muted">
@@ -234,7 +241,7 @@ function DetailInner({ p }: { p: Pkg }) {
                       <a className="link mt-1.5 inline-flex items-center gap-1 text-[12.5px]" href={gmapLink(c.name.ja, c.placeId)} target="_blank" rel="noreferrer">{t("openGmap")} <ArrowSquareOut size={13} /></a>
                     </div>
                   </div>
-                  <p className="border-t border-line px-3 py-2.5 text-[13px] text-ink-2">{n(c.intro)}</p>
+                  <p className="flex-1 border-t border-line px-3 py-2.5 text-[13px] text-ink-2">{n(c.intro)}</p>
                 </div>
               ))}
             </div>
@@ -246,13 +253,35 @@ function DetailInner({ p }: { p: Pkg }) {
               <Anno n={8} t="숙박 호텔: 이름, 객실, 평점, 위치(역에서 몇 분), TRAVENDER 호텔 페이지 링크, 옵션 수 안내" />
               <h2 className="sec-title mb-3">{t("hotelInfo")}</h2>
               <div className="card grid gap-1.5 p-4">
-                <b className="text-[15px]">{n(hotel.name)}</b>
+                <b className="flex flex-wrap items-center gap-2 text-[15px]">
+                  {n(hotel.name)}
+                  {p.opts.length > 1 && <span className="badge brand">{t("defaultHotel")}</span>}
+                </b>
                 <p className="text-[13px] text-muted">
                   {t("roomType")} {n(hotel.room)} · {n(hotel.near)}
                   {hotel.rating && <> · ★ <span className="num">{hotel.rating}</span></>}
                 </p>
                 {hotel.zone === "CITY" && <a className="link inline-flex items-center gap-1 text-[13px]" href="https://travender-hokkaido.com/hotels" target="_blank" rel="noreferrer">{t("hotelPage")} <ArrowSquareOut size={13} /></a>}
-                {p.opts.length > 1 && <p className="text-[13px] font-semibold text-brand">{t("optCount", { n: p.opts.length })}</p>}
+                {!p.opts.length && <p className="text-[13px] text-ink-2">{t("hotelFixed")}</p>}
+                {/* 기본 호텔 외에 다음 단계(호텔 옵션)에서 바꿀 수 있는 것: 다른 호텔·객실 업그레이드·호텔 없이 + 1인 가격 차이 */}
+                {p.opts.length > 1 && (
+                  <div className="mt-1 rounded-xl bg-surface-2 p-3">
+                    <p className="text-[13px] font-semibold text-brand">{t("optChangeT")}</p>
+                    <ul className="mt-1.5 grid gap-1 text-[13px] text-ink-2">
+                      {p.opts.slice(1).map((id) => {
+                        const o = optionOf(id)!;
+                        const oh = o.hotel ? hotelOf(o.hotel) : null;
+                        const label = oh ? n(oh.name) : `${n(o.name)} · ${n(o.sub)}`;
+                        return (
+                          <li key={id} className="flex justify-between gap-3">
+                            <span className="min-w-0">· {label}</span>
+                            <span className={`num flex-none font-semibold ${o.add < 0 ? "text-ok" : "text-ink"}`}>{o.add === 0 ? t("sameP") : yenDiff(o.add)}</span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                )}
                 <p className="text-[12.5px] text-muted">{t("hotelPhotoLater")} <Q id="Q-02" t="호텔 정보 범위 (패키지 데이터)" /></p>
               </div>
             </section>
@@ -263,15 +292,17 @@ function DetailInner({ p }: { p: Pkg }) {
             <Anno n={9} t="위치 지도 (I-01): 첫 골프장, 골프장·호텔 탭을 바꾸면 핀 이동" />
             <h2 className="sec-title mb-3">{t("mapT")}</h2>
             <div className="hscroll mb-3">
+              <button className="fchip" data-on={mapKey === "all"} onClick={() => setMapKey("all")}>{L === "ko" ? "전체 보기" : "全体を表示"}</button>
               {places.map((x) => (
                 <button key={x.key} className="fchip" data-on={mapKey === x.key} onClick={() => setMapKey(x.key)}>
                   <span className="grid h-5 min-w-5 place-items-center rounded-full px-1 text-[11px] font-bold text-white" style={{ background: x.kind === "golf" ? "var(--tag-stay)" : "var(--tag-multi)" }}>{x.glyph}</span>
                   {x.label}
+                  <span className="text-[12px] font-normal text-muted">· {x.role}</span>
                 </button>
               ))}
             </div>
-            <MapView markers={markers} center={{ lat: mapPlace.lat, lng: mapPlace.lng }} zoom={13} focusKey={mapKey} label={t("mapT")} className="aspect-[16/10] lg:aspect-video" />
-            <a className="link mt-2 inline-flex items-center gap-1 text-[13px]" href={gmapLink(mapPlace.q, mapPlace.placeId)} target="_blank" rel="noreferrer">{mapPlace.label} · {t("openGmap")} <ArrowSquareOut size={14} /></a>
+            <MapView markers={markers} center={mapPlace ? { lat: mapPlace.lat, lng: mapPlace.lng } : null} zoom={13} focusKey={mapKey} label={t("mapT")} className="aspect-[16/10] lg:aspect-video" />
+            {mapPlace && (<a className="link mt-2 inline-flex items-center gap-1 text-[13px]" href={gmapLink(mapPlace.q, mapPlace.placeId)} target="_blank" rel="noreferrer">{mapPlace.label} · {t("openGmap")} <ArrowSquareOut size={14} /></a>)}
           </section>
 
           {/* 10 렌탈 안내·예약 전 확인 */}
@@ -307,8 +338,8 @@ export function DepStateText({ v, dep, go, showErr }: { v: ReturnType<typeof dep
   const { t, L } = useT();
   if (v.state === "unavailable") return showErr ? <p className="err text-[12.5px]">{t("M-120", { s: v.seats, n: v.sum - v.booked })}</p> : null;
   if (go) return <p className="text-[12.5px] font-semibold text-ok">{v.seatsAfter ? t("M-123", { s: v.seatsAfter }) : t("goFull")}</p>;
-  if (v.state === "enough") return <p className="text-[12.5px] font-semibold text-ok">{v.seatsAfter ? `${t("M-125", { d: fShort(judgeDate(dep), L) })} · ${t("seatsLeft", { s: v.seatsAfter })}` : t("depFull", { m: SET.BUS_SEATS, d: fShort(judgeDate(dep), L) })}</p>;
-  return <p className="text-[12.5px] font-semibold text-ink-2">{t("M-122", { n: v.need })} · {t("seatsLeft", { s: v.seatsAfter })}</p>;
+  if (v.state === "enough") return <p className="text-[12.5px] font-semibold text-ok">{v.seatsAfter ? `${t("M-125", { d: fShort(judgeDate(dep), L) })} · ${t("seatsAfterL", { s: v.seatsAfter })}` : t("depFull", { m: SET.BUS_SEATS, d: fShort(judgeDate(dep), L) })}</p>;
+  return <p className="text-[12.5px] font-semibold text-ink-2">{t("M-122", { n: v.need })} · {t("byDate", { d: fShort(judgeDate(dep), L) })} · {t("seatsAfterL", { s: v.seatsAfter })}</p>;
 }
 
 // 일정 목록 (구간 이동 시간 포함)

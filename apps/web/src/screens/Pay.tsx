@@ -1,13 +1,17 @@
 import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowLeft, CreditCard, Info, Lock, Timer, WarningCircle } from "@phosphor-icons/react";
+import { CreditCard, Info, Lock, Timer, WarningCircle } from "@phosphor-icons/react";
 import { SET } from "../data";
 import { useT } from "../i18n";
 import { releaseHold, useApp, useAuth, useDb, useDraft, type Booking, type PayResult } from "../store";
-import { bookingNo, depView, fDate, fShort, judgeDate, todayISO, totalPrice, yen } from "../logic";
-import { Anno, BottomBar, ScreenTag, Steps } from "../components/ui";
+import { addDays, bookingNo, depView, fDate, fShort, itinerary, judgeDate, optionOf, stayHotel, todayISO, totalPrice, tripEnd, yen } from "../logic";
+import { Anno, BottomBar, Img, ScreenTag, StepHead } from "../components/ui";
+import { ItinList } from "./Detail";
+import { PriceDetail } from "../components/booking";
 import { useFlow } from "./flow";
+import { ApiError, USE_API, api, apiDepId, apiOptId } from "../api/client";
+import { refreshMonth, toBooking } from "../api/sync";
 
 export default function Pay() {
   const { t, n, L } = useT();
@@ -19,9 +23,17 @@ export default function Pay() {
   const [paying, setPaying] = useState(false);
   const [error, setError] = useState<null | "M-173" | "M-174">(null);
   const [left, setLeft] = useState(() => Math.max(0, (d.holdUntil ?? Date.now() + SET.HOLD_MINUTES * 60000) - Date.now()));
+  const [srvTotal, setSrvTotal] = useState<number | null>(null);
+  const [itinAll, setItinAll] = useState(false); // 휴대폰: 일정표 전체 펼치기
+  useEffect(() => {
+    if (!USE_API || !d.pkgId || !d.dep) return;
+    api.quote({ departureId: apiDepId(d.pkgId, d.dep), optionId: apiOptId(d.pkgId, d.opt), people: d.people, singles: d.singles })
+      .then((q) => setSrvTotal(q.total)).catch(() => setSrvTotal(null)); // API-07 서버 금액
+  }, [d.pkgId, d.dep, d.opt, d.people, d.singles]);
 
   useEffect(() => {
     if (redirect) return;
+    if (USE_API && !d.holdId) { nav("/golf/book/info", { replace: true }); return; } // 서버 확보(API-08) 없이 들어오면 정보 입력으로
     if (!d.holdUntil) d.patch({ holdUntil: Date.now() + SET.HOLD_MINUTES * 60000, holdPeople: d.people });
     const tm = window.setInterval(() => {
       const until = useDraft.getState().holdUntil;
@@ -30,11 +42,16 @@ export default function Pay() {
     return () => window.clearInterval(tm);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // 결제 화면을 어떤 방법으로 떠나도(브라우저 뒤로 가기·메뉴·로고) 확보 해제 (API-09).
+  // 새로고침·탭 닫기는 화면 안 이동이 아니므로 그대로 두고 10분 뒤 자동 해제. StrictMode 재실행에 풀리지 않게 주소로 판단
+  useEffect(() => () => {
+    window.setTimeout(() => { if (!window.location.hash.startsWith("#/golf/book/pay")) releaseHold(); }, 0);
+  }, []);
   if (redirect) return <Navigate to={redirect} replace />;
 
   const price = totalPrice(p, d.opt, d.people, d.singles);
   const unit = price.unit;
-  const total = price.total;
+  const total = srvTotal ?? price.total;
   const expired = left <= 0 && error !== "M-174";
   const mm = `${Math.floor(left / 60000)}:${String(Math.floor((left % 60000) / 1000)).padStart(2, "0")}`;
   const reselect = () => {
@@ -52,6 +69,30 @@ export default function Pay() {
     setPaying(true);
     setError(null);
     const result: PayResult = payResult;
+    if (USE_API && result !== "soldout") {
+      // API-10 예약 확정. 결제는 가짜 연결: 결제 ID가 PAY-FAIL로 시작하면 실패 (adapters/payment.py)
+      const drop = d.dropSame ? d.pick! : d.drop!;
+      const info = d.info!;
+      const stop = (kind: "PICK" | "DROP", pl: NonNullable<typeof d.pick>, time: string | null) => ({ kind, placeName: n(pl.name), placeId: pl.placeId ?? null, address: pl.addr ?? null, lat: pl.lat, lng: pl.lng, memo: kind === "PICK" ? d.pickMemo || null : null, desiredTime: time ?? "" });
+      api.book({
+        holdId: d.holdId!, optionId: apiOptId(p.id, d.opt), singles: d.singles, stops: [stop("PICK", d.pick!, d.pickTime), stop("DROP", drop, d.dropTime)],
+        rep: { nameLocal: info.nameKo, nameEn: info.nameEn, countryCode: info.cc, phone: info.phone, email: info.email },
+        companions: info.companions.map((nameEn) => ({ nameEn })), paymentId: `${result === "fail" ? "PAY-FAIL" : "PAY"}-${Date.now()}`, lang: L,
+      })
+        .then(async (r) => {
+          db.add(toBooking(await api.booking(r.bookingNo))); // 화면 저장소에도 서버 예약을 넣어 둠 (S-11·S-13 표시용)
+          useDraft.setState({ holdId: null, holdUntil: null, holdPeople: 0 });
+          await refreshMonth(p.id, d.dep!.slice(0, 7));
+          nav(`/golf/bookings/${r.bookingNo}/complete`, { replace: true }); // T-17
+        })
+        .catch((e) => {
+          setPaying(false);
+          const code = e instanceof ApiError ? e.body.error : "";
+          if (code === "E-SOLDOUT") { useDraft.setState({ holdId: null, holdUntil: null, holdPeople: 0 }); setError("M-174"); }
+          else setError("M-173"); // E-PAY, E-AMOUNT, V-12-range 등: 결제 화면에 머묾 (T-18)
+        });
+      return;
+    }
     window.setTimeout(() => {
       setPaying(false);
       if (result === "fail") return setError("M-173"); // E-PAY, T-18
@@ -86,13 +127,28 @@ export default function Pay() {
     }, 1400);
   };
 
+  const opt = optionOf(d.opt);
+  const hotel = stayHotel(p, d.opt);
+  const info = d.info!;
+  const drop = d.dropSame ? d.pick : d.drop;
+  const payBtn = (cls: string) => (
+    <button className={`btn btn-primary ${cls}`} disabled={paying || expired || error === "M-174"} onClick={pay} aria-busy={paying}>
+      {paying ? (
+        <>
+          <motion.span className="h-4 w-4 rounded-full border-2 border-current border-t-transparent" animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 0.8, ease: "linear" }} />
+          {t("paying")}
+        </>
+      ) : (
+        t("payBtn", { p: yen(total) })
+      )}
+    </button>
+  );
+
   return (
     <div className="page step">
       <ScreenTag id="S-10" name="결제" refs="FN-22, FN-23 · L-07, L-08, L-09 · API-08~10 · I-06 · T-17, T-18" />
-      <div className="mb-1 flex items-center gap-3">
-        <button className="grid h-10 w-10 flex-none place-items-center rounded-full hover:bg-surface-2" onClick={back} aria-label={t("back")} disabled={paying}><ArrowLeft size={20} weight="bold" /></button>
-        <div className="flex-1"><Steps at={5} hasHotel={p.opts.length > 0} /></div>
-      </div>
+      <StepHead at={5} hasHotel={p.opts.length > 0} onBack={back} disabled={paying} />
+      <h1 className="mb-4 text-[22px] font-bold">{t("payT")}</h1>
 
       {/* 1 남은 시간 (결제 후 자리 없음이면 잡아 둔 자리가 이미 풀렸으므로 숨김) */}
       {error !== "M-174" && <section className={`relative mb-4 flex items-center gap-3 rounded-2xl border-[1.5px] p-4 ${expired ? "border-bad-line bg-bad-soft" : "border-brand-line bg-brand-soft"}`} role={expired ? "alert" : undefined}>
@@ -110,36 +166,9 @@ export default function Pay() {
         )}
       </section>}
 
-      {/* 2 결제 요약 */}
-      <section className="relative rounded-[20px] bg-surface-2 p-5">
-        <Anno n={2} t="결제 요약: 패키지, 출발일·인원, 총액" />
-        <p className="text-[13.5px] font-semibold text-muted">{t("payAmount", { n: d.people })}</p>
-        <p className="num mt-1 text-[34px] font-extrabold leading-tight tracking-tight">{yen(total)}</p>
-        <p className="mt-1 text-[13.5px] text-ink-2">{n(p.name)}</p>
-        <p className="num text-[13px] text-muted">{fShort(d.dep!, L)} · {t("peopleN", { n: d.people })} · {t("perPerson")} {yen(unit)}</p>
-      </section>
-
-      {/* 3 결제 수단 */}
-      <section className="relative mt-5">
-        <Anno n={3} t="결제 수단: 카드만, 메인 사이트 결제창으로 이동 (M-172, I-06)" />
-        <h2 className="mb-2 text-[16px] font-bold">{t("payMethod")}</h2>
-        <div className="opt" role="radio" aria-checked="true">
-          <span className="radio" />
-          <CreditCard size={22} className="text-brand" />
-          <b className="flex-1 text-[15.5px]">{t("card")}</b>
-          <span className="text-[12px] text-muted">TRAVENDER</span>
-        </div>
-        <p className="mt-2 flex items-start gap-1.5 text-[13px] text-muted"><Lock size={15} className="mt-0.5 flex-none" />{t("M-172")}</p>
-      </section>
-
-      <section className="mt-4 flex gap-2.5 rounded-2xl border border-line p-4">
-        <Info size={20} className="mt-0.5 flex-none text-brand" />
-        <p className="text-[14px] leading-relaxed">{t("M-150", { m: SET.MIN_DEPARTURE, d: fDate(judgeDate(d.dep!), L) })}</p>
-      </section>
-
       <AnimatePresence>
         {error && (
-          <motion.section initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} role="alert" className="mt-4 flex items-start gap-3 rounded-2xl border p-4" style={{ background: "var(--bad-soft)", borderColor: "var(--bad-line)" }}>
+          <motion.section initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} role="alert" className="mb-4 flex items-start gap-3 rounded-2xl border p-4" style={{ background: "var(--bad-soft)", borderColor: "var(--bad-line)" }}>
             <WarningCircle size={22} weight="fill" className="flex-none text-bad" />
             <div className="flex-1">
               <p className="text-[14.5px] font-bold text-bad">{t(error)}</p>
@@ -149,29 +178,99 @@ export default function Pay() {
         )}
       </AnimatePresence>
 
-      {/* 데모 전용 (실서비스 제외) */}
-      <div className="mt-6 grid gap-2 rounded-2xl border border-dashed p-3" style={{ borderColor: "var(--anno)" }}>
-        <span className="text-[12.5px] font-bold" style={{ color: "var(--anno)" }}>{t("demoPay")}</span>
-        <div className="grid grid-cols-3 gap-1 rounded-xl bg-surface-2 p-1">
-          {(["ok", "fail", "soldout"] as const).map((r) => (
-            <button key={r} aria-pressed={payResult === r} onClick={() => setApp({ payResult: r })} className={`min-h-[38px] rounded-lg px-1 text-[12.5px] font-bold ${payResult === r ? "bg-surface shadow-sm" : "text-muted"}`}>{t(r)}</button>
-          ))}
+      {/* PC: 왼쪽 최종 확인 · 오른쪽 결제 금액과 버튼 (확인 화면과 같은 2칸) */}
+      <div className="grid gap-3 lg:grid-cols-[1.4fr_1fr] lg:items-start lg:gap-6">
+        <div className="grid gap-3">
+          {/* 2 최종 확인: 선택 내용 + 입력한 예약자·동반자 (결제 전 오타 확인) */}
+          <section className="relative card overflow-hidden">
+            <Anno n={2} t="최종 확인: 패키지·날짜·인원·호텔·승하차 + 대표자·동반자 영문 이름 (결제 전 마지막 확인)" />
+            <p className="border-b border-line px-4 py-2.5 text-[13px] font-semibold text-muted">{t("payCheckT")}</p>
+            <div className="flex items-center gap-3 px-4 py-3">
+              <div className="relative h-[54px] w-[70px] flex-none overflow-hidden rounded-xl"><Img src={p.photos[0]} alt={n(p.name)} className="absolute inset-0 h-full w-full" /></div>
+              <div className="min-w-0 flex-1">
+                <b className="line-clamp-2 text-[14.5px] font-extrabold leading-snug">{n(p.name)}</b>
+                <p className="flex flex-wrap items-center gap-2 text-[13px] text-ink-2">{fShort(d.dep!, L)} ~ {fShort(tripEnd(p, d.dep!), L)} <span className="badge brand">{t("peopleN", { n: d.people })}</span></p>
+              </div>
+            </div>
+            <dl className="grid gap-1.5 border-t border-line px-4 py-3 text-[13.5px]">
+              <div className="flex gap-3"><dt className="w-16 flex-none text-muted">{t("rowHotel")}</dt><dd className="min-w-0">{hotel ? `${n(hotel.name)} · ${opt && !opt.hotel ? n(opt.sub) : n(hotel.room)}` : opt?.none ? n(opt.name) : t("noHotel")}</dd></div>
+              <div className="flex gap-3"><dt className="w-16 flex-none text-muted">{t("pick")}</dt><dd className="min-w-0">{d.pick ? n(d.pick.name) : "-"} · {t("wishAt", { t: d.pickTime ?? "-" })}</dd></div>
+              <div className="flex gap-3"><dt className="w-16 flex-none text-muted">{t("drop")}</dt><dd className="min-w-0">{drop ? n(drop.name) : "-"} · {t("wishAt", { t: d.dropTime ?? "-" })}</dd></div>
+            </dl>
+            <dl className="grid gap-1.5 border-t border-line px-4 py-3 text-[13.5px]">
+              <div className="flex gap-3"><dt className="w-16 flex-none text-muted">{t("payRep")}</dt><dd className="min-w-0"><b className="font-semibold">{info.nameEn}</b> ({info.nameKo})<span className="block whitespace-nowrap">{info.cc} {info.phone}</span><span className="block text-muted">{info.email}</span></dd></div>
+              {info.companions.length > 0 && <div className="flex gap-3"><dt className="w-16 flex-none text-muted">{t("payComp")}</dt><dd className="min-w-0 font-semibold">{info.companions.join(", ")}</dd></div>}
+            </dl>
+            <button className="link block w-full border-t border-line px-4 py-2.5 text-left text-[13.5px]" onClick={back} disabled={paying}>{t("payEdit")}</button>
+          </section>
+
+          {/* 일정표: 마지막 확인이라 전체 일정을 펼쳐서 보여 줌 (승하차·골프·숙박 시간 흐름) */}
+          <section className="relative card overflow-hidden">
+            <Anno n={6} t="일정표 (L-11): 결제 전 마지막 확인이라 모든 일차를 펼친 상태, 고른 승하차 장소·호텔이 들어간 일정" />
+            <p className="border-b border-line px-4 py-2.5 text-[13px] font-semibold text-muted">{t("itin")} · {fShort(d.dep!, L)} ~ {fShort(tripEnd(p, d.dep!), L)}</p>
+            <div className="grid gap-1 pt-2">
+              {itinerary(p, d.opt, d.pick, drop).map((items, i) => (
+                <div key={i} className={!itinAll && i > 0 ? "hidden lg:block" : undefined}>
+                  <p className="px-4 pb-1 text-[13px] font-bold text-brand">{t("dayN", { i: i + 1 })} · {fShort(addDays(d.dep!, i), L)}</p>
+                  <ItinList items={i === 0 && !itinAll ? items.slice(0, 2) : items} memo={i === 0 ? d.pickMemo : undefined} />
+                </div>
+              ))}
+            </div>
+            {!itinAll && <button className="link w-full border-t border-line px-4 py-2.5 text-left text-[13.5px] lg:hidden" onClick={() => setItinAll(true)}>{t("payItinAll", { n: itinerary(p, d.opt, d.pick, drop).length })}</button>}
+          </section>
+
+          {/* 3 결제 수단 */}
+          <section className="relative card p-4">
+            <Anno n={3} t="결제 수단: 카드만, 메인 사이트 결제창으로 이동 (M-172, I-06)" />
+            <h2 className="mb-2 text-[15px] font-bold">{t("payMethod")}</h2>
+            <div className="opt" role="radio" aria-checked="true">
+              <span className="radio" />
+              <CreditCard size={22} className="text-brand" />
+              <b className="flex-1 text-[15px]">{t("card")}</b>
+              <span className="text-[12px] text-muted">TRAVENDER</span>
+            </div>
+            <p className="mt-2 flex items-start gap-1.5 text-[13px] text-muted"><Lock size={15} className="mt-0.5 flex-none" />{t("M-172")}</p>
+          </section>
+
+          {/* 테스트용 결제 결과 (본 사이트 결제 연동 전까지 항상 표시, 출시 때 제거) */}
+          {(
+            <div className="grid gap-2 rounded-2xl border border-dashed p-3" style={{ borderColor: "var(--anno)" }}>
+              <span className="text-[12.5px] font-bold" style={{ color: "var(--anno)" }}>{t("demoPay")}</span>
+              <div className="grid grid-cols-3 gap-1 rounded-xl bg-surface-2 p-1">
+                {(["ok", "fail", "soldout"] as const).map((r) => (
+                  <button key={r} aria-pressed={payResult === r} onClick={() => setApp({ payResult: r })} className={`min-h-[38px] rounded-lg px-1 text-[12.5px] font-bold ${payResult === r ? "bg-surface shadow-sm" : "text-muted"}`}>{t(r)}</button>
+                ))}
+              </div>
+              <span className="text-[11.5px] text-muted">{user?.memberId}</span>
+            </div>
+          )}
         </div>
-        <span className="text-[11.5px] text-muted">{user?.memberId}</span>
+
+        <div className="grid gap-3 lg:sticky lg:top-24">
+          {/* 4 결제 금액 (보라 테두리, 큰 총액) + PC 결제 버튼 */}
+          <section className="relative card border-[1.5px] p-4 lg:p-5" style={{ borderColor: "var(--brand)" }}>
+            <Anno n={4} t="결제 금액: 패키지 × 인원, 옵션, 1인실, 버스 포함, 총액 + 결제 버튼 (C-10 중복 탭 방지)" />
+            <p className="mb-2 text-[13px] font-bold text-brand lg:text-[14px]">{t("payAmount", { n: d.people })}</p>
+            <PriceDetail p={p} opt={d.opt} people={d.people} singles={d.singles} />
+            <div className="mt-3 flex items-baseline justify-between border-t border-line pt-3">
+              <span className="text-[14px] font-semibold">{t("totalL", { n: d.people })}</span>
+              <span className="num text-[26px] font-extrabold text-brand lg:text-[32px]">{yen(total)}</span>
+            </div>
+            <p className="mt-1 text-right text-[12px] text-muted">{t("perPerson")} {yen(unit)}</p>
+            {payBtn("mt-4 hidden w-full lg:flex")}
+          </section>
+
+          {/* 출발 조건 (확인 화면과 같은 문장) */}
+          <section className="flex gap-2.5 rounded-2xl border border-warn-line bg-warn-soft p-4">
+            <Info size={20} className="mt-0.5 flex-none text-warn" />
+            <p className="text-[13.5px] leading-relaxed">{t("rvRule", { d: fDate(judgeDate(d.dep!), L), m: SET.MIN_DEPARTURE })}</p>
+          </section>
+        </div>
       </div>
 
-      <BottomBar>
-        <span className="absolute -top-3 left-3"><Anno n={4} t="결제 버튼 '¥총액 결제하기' (C-10 중복 탭 방지): 성공 → L-08 → S-11 (T-17) / 실패 → 그대로 (T-18, M-173) / 결제 후 자리 없음 → 자동 환불 (M-174)" /></span>
-        <button className="btn btn-primary w-full" disabled={paying || expired || error === "M-174"} onClick={pay} aria-busy={paying}>
-          {paying ? (
-            <>
-              <motion.span className="h-4 w-4 rounded-full border-2 border-current border-t-transparent" animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 0.8, ease: "linear" }} />
-              {t("paying")}
-            </>
-          ) : (
-            t("payBtn", { p: yen(total) })
-          )}
-        </button>
+      <BottomBar pcHidden>
+        <span className="absolute -top-3 left-3"><Anno n={5} t="결제 버튼 '¥총액 결제하기' (C-10 중복 탭 방지): 성공 → L-08 → S-11 (T-17) / 실패 → 그대로 (T-18, M-173) / 결제 후 자리 없음 → 자동 환불 (M-174)" /></span>
+        {payBtn("w-full")}
       </BottomBar>
     </div>
   );

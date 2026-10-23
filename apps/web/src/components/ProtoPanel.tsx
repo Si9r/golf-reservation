@@ -90,7 +90,7 @@ export function ProtoPanel() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className={`fixed bottom-[96px] right-3 z-[55] flex h-11 items-center gap-1.5 rounded-full border px-3 text-[12.5px] font-bold transition-opacity lg:bottom-6 lg:left-6 lg:right-auto ${atEnd ? "pointer-events-none opacity-0" : ""}`}
+        className={`fixed bottom-[92px] left-2 z-[55] flex h-8 items-center gap-1 rounded-full border px-2.5 text-[11.5px] font-bold opacity-70 transition-opacity lg:bottom-6 lg:left-6 lg:h-11 lg:px-3 lg:text-[12.5px] lg:opacity-100 ${atEnd ? "pointer-events-none opacity-0" : ""}`}
         style={{ background: "var(--surface)", borderColor: "var(--anno)", color: "var(--anno)", boxShadow: "var(--shadow)" }}
         aria-label="프로토타입 설계 도구 열기"
       >

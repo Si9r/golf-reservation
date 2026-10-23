@@ -2,13 +2,15 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
 import { Bus, CalendarBlank, CaretDown, CaretRight, MagnifyingGlass, MapPinLine, Sparkle, UsersThree, X } from "@phosphor-icons/react";
-import { PHOTOS, SET } from "../data";
+import { PHOTOS, SET, ZONES_STRICT } from "../data";
 import { useT } from "../i18n";
 import { fullReset, useDb, useDraft } from "../store";
 import { fShort, searchPkgs, upcomingDepartures } from "../logic";
 import { Anno, Img, PeopleInput, Q, ScreenTag, StageTag, useStage } from "../components/ui";
 import { DatePeopleSheet, PkgCard, TypeBadge } from "../components/booking";
 import { AiSheet } from "./AiSheet";
+import { knownPkgIds, useDepartures } from "../api/sync";
+import { monthInSeason, monthsAhead } from "../logic";
 
 export default function Home() {
   const { t, n, L } = useT();
@@ -17,6 +19,7 @@ export default function Home() {
   const stage = useStage();
   const { q, date, people, patch, choosePkg } = useDraft();
   const extra = useDb((s) => s.extra);
+  const apiV = useDepartures(knownPkgIds, monthsAhead().filter(monthInSeason)); // API 모드: 추천·곧 출발 카드의 출발일·잔여석을 서버 값으로 (API-03). 안 받은 달은 프로토타입 계산으로 떨어지므로 판매 달 전부
   const [sheet, setSheet] = useState(false);
   const [ai, setAi] = useState(false);
   // 로고 → 확인 창 '처음으로'(M-101): 홈이 열린 뒤 진행 중 예약을 비움 (L-13)
@@ -29,14 +32,14 @@ export default function Home() {
   }, [loc.key]);
 
   // L-03: 검색어·날짜·인원으로 결과 수 즉시 갱신 (필터는 S-02에서)
-  const results = useMemo(() => searchPkgs({ q, date, people, extra }), [q, date, people, extra]);
+  const results = useMemo(() => searchPkgs({ q, date, people, extra }), [q, date, people, extra, apiV]);
   const conditioned = !!q.trim() || !!date;
   const cards = conditioned ? results.slice(0, 7) : searchPkgs({ q: "", date: null, people, extra }).filter((r) => r.p.rec).slice(0, 3);
-  const soon = useMemo(() => upcomingDepartures(people, extra, 6), [people, extra]);
+  const soon = useMemo(() => upcomingDepartures(people, extra, 6), [people, extra, apiV]);
 
   const guides = [
     { icon: Bus, t: t("guide1T"), s: t("guide1S") },
-    { icon: MapPinLine, t: t("guide2T"), s: t("guide2S") },
+    { icon: MapPinLine, t: t("guide2T"), s: t("guide2S", { r: Math.round(ZONES_STRICT[0].r / 1000) }) }, // 반경은 승하차 범위 설정값 (T-1 확정되면 자동 반영)
     { icon: UsersThree, t: t("guide3T"), s: t("guide3S") },
   ];
   const openPkg = (id: number, dep?: string) => {
@@ -54,8 +57,8 @@ export default function Home() {
             <Img className="absolute inset-0" src={PHOTOS.aerialTrees} alt={L === "ko" ? "숲으로 둘러싸인 홋카이도 골프장" : "森に囲まれた北海道のゴルフ場"} eager />
             <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(17,19,26,0.05) 20%, rgba(17,19,26,0.72) 100%)" }} />
             <motion.div className="absolute inset-x-0 bottom-0 p-5 pb-12 text-white lg:p-10" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}>
-              <h1 className="whitespace-pre-line text-[27px] font-bold leading-[1.25] tracking-tight lg:text-[44px]">{t("s01Title")}</h1>
-              <p className="mt-2 max-w-[38ch] text-[14.5px] leading-relaxed text-white/85 lg:text-[16px]">{t("s01Sub")}</p>
+              <h1 className="whitespace-pre-line text-[27px] font-bold leading-[1.25] tracking-tight lg:whitespace-normal lg:text-[44px]">{t("s01Title")}</h1>
+              <p className="mt-2 max-w-[38ch] text-[14.5px] leading-relaxed text-white/85 lg:max-w-none lg:text-[16px]">{t("s01Sub")}</p>
             </motion.div>
           </div>
 
@@ -91,7 +94,7 @@ export default function Home() {
             <PeopleInput label={t("people")} value={people} onChange={(v) => patch({ people: v })} anno={<Anno n={4} t="인원 (V-02): 1~20명, 바꾸면 결과 수 즉시 갱신" />} />
             <div className="relative grid gap-2">
               <Anno n={5} t="조건 결과 수 + 패키지 보기 (T-01): 출발일을 고르기 전에는 비활성 + M-127, 0개여도 이동" />
-              <p className="text-center text-[13.5px] font-semibold text-ink-2" aria-live="polite">{date ? t("M-111", { n: results.length }) : <span className="text-warn">{t("M-127")}</span>}</p>
+              <p className="text-center text-[13.5px] font-semibold text-ink-2" aria-live="polite">{date ? t("M-111", { n: results.length }) : <span className="font-normal text-muted">{t("homeDateHint")}</span>}</p>
               <button className="btn btn-primary w-full" disabled={!date} onClick={() => nav("/golf/packages")}>{t("seeBtn")}</button>
             </div>
           </motion.div>

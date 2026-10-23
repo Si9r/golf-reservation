@@ -2,6 +2,8 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { PKGS, SET, serviceArea, type Lang, type Place } from "./data";
 import { mapsLangDiffers } from "./gmaps";
+import { USE_API, api } from "./api/client";
+import { syncToken } from "./api/sync";
 import { addDays, booked, departuresIn, judgeDate, monthsAhead, stopTimeRange, todayISO, tripEnd, type Extra, type SearchFilters } from "./logic";
 
 // ---------- 앱 설정 (언어·테마·프로토타입 도구) ----------
@@ -75,6 +77,10 @@ export const useAuth = create<AuthState>()(
   ),
 );
 
+// API 모드: 로그인 상태를 가짜 토큰(Bearer demo:M0001)으로 서버에 전달 (메인 사이트 연동 전, TBD-03)
+syncToken(!!useAuth.getState().user);
+useAuth.subscribe((st) => syncToken(!!st.user));
+
 // ---------- 진행 중인 예약 (L-13: 브라우저 세션에 저장, 뒤로 가기·새로고침·로그인 다녀오기에도 유지) ----------
 export const DEFAULT_FILTERS: SearchFilters = { nights: "all", zone: "all", rounds: "all", sort: "rec" };
 export interface Info {
@@ -85,6 +91,8 @@ export interface Info {
   email: string;
   companions: string[];
   later: boolean;
+  en?: [string, string]; // 입력 중인 대표자 영문 [성, 이름] (보낼 때 nameEn = '성 이름')
+  compEn?: [string, string][]; // 입력 중인 동반자 영문 [성, 이름] (보낼 때 companions)
   // 예약 화면 동의 2개 (V-25): 취소 규정 · 합승 안내. 이용약관·개인정보는 본 사이트 회원가입 때 동의 (운영사 확정)
   agree: { cancel: boolean; shared: boolean };
 }
@@ -106,6 +114,7 @@ export interface Draft {
   info: Info | null;
   holdUntil: number | null; // 좌석 임시확보 만료 (seat_hold.expires_at)
   holdPeople: number;
+  holdId?: number | null; // API 모드: 서버 좌석 확보 ID (API-08)
   singles: number | null; // 1인실 이용 인원 (null = 자동: 홀수면 1명)
   editReturn: boolean; // S-08 '변경'으로 들어온 경우 → '변경 완료' 후 S-08
 }
@@ -152,7 +161,11 @@ export const useDraft = create<DraftState>()(
 // 서비스명 탭 확인 후 초기화 (M-101, C-06)
 export const fullReset = () => useDraft.setState({ ...blankDraft() });
 // 좌석 임시확보 해제 (뒤로 가기·만료)
-export const releaseHold = () => useDraft.setState({ holdUntil: null, holdPeople: 0 });
+export const releaseHold = () => {
+  const id = useDraft.getState().holdId;
+  if (USE_API && id) api.releaseHold(id).catch(() => undefined); // API-09 (실패해도 B-02가 정리)
+  useDraft.setState({ holdUntil: null, holdPeople: 0, holdId: null });
+};
 
 // ---------- 예약 데이터 (데모 DB: 브라우저에 저장) ----------
 // 코드 정의: booking.status / departure.status / cancel_by / refund_status

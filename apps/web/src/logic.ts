@@ -1,3 +1,4 @@
+import { calendarCount, depFromApi } from "./api/sync";
 import { AREA_NAME, COURSES, HOTELS, OPTIONS, PKGS, PLACES, SET, TRAVEL, activeZones, courseOf, hotelOf, type Area, type Lang, type Pkg, type Place, type Zone } from "./data";
 
 // ---------- 날짜 ----------
@@ -50,7 +51,11 @@ export const monthsAhead = (n = 14) => {
 };
 export const judgeDate = (dep: string) => addDays(dep, -SET.JUDGE_DAYS);
 // L-01 출발일 판단: 출발 요일 + 판매 시즌 안·휴장기 밖 + 판정일(출발 − JUDGE_DAYS)이 오늘 이후
-export const isDeparture = (p: Pkg, d: string) => p.wd.includes(dow(d)) && inSeason(d) && judgeDate(d) > todayISO();
+export const isDeparture = (p: Pkg, d: string) => {
+  const a = depFromApi(p.id, d); // API 모드: 서버 출발편(API-03)이 있으면 그것으로 판단
+  if (a !== undefined) return !!a && (a.status === "OPEN" || a.status === "GO") && judgeDate(d) > todayISO();
+  return p.wd.includes(dow(d)) && inSeason(d) && judgeDate(d) > todayISO();
+};
 export const departuresIn = (p: Pkg, ym: string) => {
   const out: string[] = [];
   const n = daysInMonth(ym);
@@ -80,8 +85,13 @@ export const baseBooked = (pkgId: number, d: string) => {
   return h % 18; // 0~17명 (서버 seed_demo 와 같은 범위)
 };
 export type Extra = Record<string, number>;
-export const booked = (pkgId: number, d: string, extra: Extra) => Math.min(SET.BUS_SEATS, baseBooked(pkgId, d) + (extra[`${pkgId}|${d}`] ?? 0));
-export const seatsLeft = (pkgId: number, d: string, extra: Extra) => SET.BUS_SEATS - booked(pkgId, d, extra);
+export const booked = (pkgId: number, d: string, extra: Extra) => {
+  const a = depFromApi(pkgId, d);
+  if (a) return a.booked;
+  return Math.min(SET.BUS_SEATS, baseBooked(pkgId, d) + (extra[`${pkgId}|${d}`] ?? 0));
+};
+// API 모드에서는 서버 잔여석 (확보 중인 좌석까지 뺀 값, L-02)
+export const seatsLeft = (pkgId: number, d: string, extra: Extra) => depFromApi(pkgId, d)?.seatsLeft ?? SET.BUS_SEATS - booked(pkgId, d, extra);
 
 // 가장 빠른 예약 가능 출발일 (date가 있으면 그날만, L-03)
 export const firstAvailable = (pkg: Pkg, date: string | null, people: number, extra: Extra) => {
@@ -97,7 +107,7 @@ export const firstAvailable = (pkg: Pkg, date: string | null, people: number, ex
 export type DepState = "unavailable" | "enough" | "need";
 export const depView = (pkgId: number, d: string, people: number, extra: Extra) => {
   const b = booked(pkgId, d, extra);
-  const seats = SET.BUS_SEATS - b;
+  const seats = seatsLeft(pkgId, d, extra);
   const sum = b + people;
   const state: DepState = people > seats ? "unavailable" : sum >= SET.MIN_DEPARTURE ? "enough" : "need";
   return { booked: b, seats, sum, state, need: Math.max(0, SET.MIN_DEPARTURE - sum), seatsAfter: Math.max(0, seats - people) };
@@ -139,7 +149,7 @@ export const upcomingDepartures = (people: number, extra: Extra, n = 6) => {
 };
 
 // 날짜별 출발 패키지 수 (날짜·인원 시트, API-04)
-export const pkgCountOn = (d: string, people: number, extra: Extra) => PKGS.filter((p) => isDeparture(p, d) && seatsLeft(p.id, d, extra) >= people).length;
+export const pkgCountOn = (d: string, people: number, extra: Extra) => calendarCount(d.slice(0, 7), people, d) ?? PKGS.filter((p) => isDeparture(p, d) && seatsLeft(p.id, d, extra) >= people).length;
 
 // ---------- 가격 ----------
 export const optionOf = (id: string | null | undefined) => (id ? OPTIONS[id] ?? null : null);
