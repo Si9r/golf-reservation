@@ -102,7 +102,7 @@ export interface Draft {
   dropSame: boolean; // 하차도 승차와 같은 곳 (기본 체크)
   pickMemo: string;
   pickTime: string | null; // 희망 승차 시간 'HH:MM' (booking_stop.desired_time, 참고용)
-  dropTime: string | null; // 희망 하차 시간 (하차가 승차와 같은 곳이어도 따로 받음)
+  dropTime: string | null; // 희망 하차 시간, 선택 (하차가 승차와 같은 곳이어도 따로 받음)
   info: Info | null;
   holdUntil: number | null; // 좌석 임시확보 만료 (seat_hold.expires_at)
   holdPeople: number;
@@ -186,6 +186,9 @@ export interface Booking {
   lang: Lang;
 }
 
+// S-12 예약 조회 탭: 예정 = 예약 확정, 지난 = 여행 완료, 취소 = 고객 취소 + 운행 취소 (서버 rules.py booking_tab 과 같음, 팀 테스트 10/23)
+export const tabOf = (status: BookingStatus): "up" | "past" | "cancel" => (status === "CONFIRMED" ? "up" : status === "DONE" ? "past" : "cancel");
+
 // 화면 표시용 상태 (B-01 판정·B-03 완료를 계산으로 흉내)
 export const viewOf = (b: Booking, extra: Extra) => {
   const p = PKGS.find((x) => x.id === b.pkgId)!;
@@ -204,7 +207,7 @@ export const viewOf = (b: Booking, extra: Extra) => {
   if (status === "CONFIRMED" && dep === "DONE") status = "DONE";
   // 화면 라벨: 예약 확정·모집 중 / 인원 충족 / 출발 확정 / 운행 취소 / 고객 취소 / 여행 완료
   const label: "OPEN" | "ENOUGH" | "GO" | BookingStatus = status === "CONFIRMED" ? (dep === "GO" ? "GO" : cnt >= SET.MIN_DEPARTURE ? "ENOUGH" : "OPEN") : status;
-  const tab: "up" | "past" | "cancel" = status === "CONFIRMED" ? "up" : status === "DONE" ? "past" : "cancel";
+  const tab = tabOf(status);
   return { p, dep, status, refund, cancelBy, label, tab, booked: cnt, end };
 };
 

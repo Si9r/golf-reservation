@@ -13,10 +13,12 @@ from ..adapters.mail import notify
 from ..adapters.payment import payment
 from ..db import conn, one, rows, run, tx
 from ..errors import fail
-from ..rules import add_days, booking_no, in_area, is_bookable_date, quote
+from ..rules import add_days, booking_no, booking_tab, in_area, is_bookable_date, quote
 from .catalog import DEP_SQL, dep_seats, sale_rule, stay_info
 
-NAME_EN = re.compile(r"[A-Z][A-Z ]{1,59}")
+# V-21·V-24 영문 이름: 성과 이름을 모두 (영문 대문자 단어 2개 이상, 단어 사이 공백 1칸, 60자 이하). 소문자는 대문자로 바꿔 검사 (팀 테스트 10/23)
+NAME_EN = re.compile(r"[A-Z]+( [A-Z]+)+")
+NAME_EN_MAX = 60
 HHMM = re.compile(r"([01]\d|2[0-3]):[0-5]\d")
 
 
@@ -61,13 +63,18 @@ def release_hold(m: Member, hold_id: int) -> None:
         run(c, "DELETE FROM seat_hold WHERE id = :id AND member_id = :m", id=hold_id, m=m.memberId)
 
 
+def valid_en(name: str) -> bool:
+    s = name.strip().upper()
+    return len(s) <= NAME_EN_MAX and NAME_EN.fullmatch(s) is not None
+
+
 def _validate(req: dict, people: int) -> None:
     """입력 검사 V-20~V-24 (화면 검사와 같은 규칙을 서버에서 다시)"""
     f: list[dict] = []
     r = req["rep"]
     if not r["nameLocal"].strip() or len(r["nameLocal"].strip()) > 30:
         f.append({"field": "rep.nameLocal", "rule": "V-20"})
-    if not NAME_EN.fullmatch(r["nameEn"].strip().upper()):
+    if not valid_en(r["nameEn"]):
         f.append({"field": "rep.nameEn", "rule": "V-21"})
     if not re.fullmatch(r"[\d\s-]{8,}", r["phone"]):
         f.append({"field": "rep.phone", "rule": "V-22"})
@@ -76,7 +83,7 @@ def _validate(req: dict, people: int) -> None:
     if len(req["companions"]) > people - 1:
         f.append({"field": "companions", "rule": "V-24"})
     for i, x in enumerate(req["companions"]):
-        if x["nameEn"] and not NAME_EN.fullmatch(x["nameEn"].strip().upper()):
+        if x["nameEn"] and not valid_en(x["nameEn"]):
             f.append({"field": f"companions.{i}.nameEn", "rule": "V-24"})
     for k in ("PICK", "DROP"):
         if sum(1 for s in req["stops"] if s["kind"] == k) != 1:
@@ -85,7 +92,9 @@ def _validate(req: dict, people: int) -> None:
         if len(s.get("memo") or "") > S.MEMO_MAX:
             f.append({"field": f"stops.{i}.memo", "rule": "V-11"})
         t = s.get("desiredTime") or ""
-        if not HHMM.fullmatch(t) or _min(t) % S.STOP_TIME_STEP_MIN:  # V-12 희망 시간: 승차·하차 모두 필수, 30분 단위
+        if s["kind"] == "DROP" and not t:
+            continue  # V-12 희망 하차 시간은 선택
+        if not HHMM.fullmatch(t) or _min(t) % S.STOP_TIME_STEP_MIN:  # V-12 희망 시간: 승차 필수, 30분 단위
             f.append({"field": f"stops.{i}.desiredTime", "rule": "V-12"})
     if f:
         fail("E-VALID", f)
@@ -158,7 +167,9 @@ def create_booking(m: Member, req: dict) -> dict:
             stops.append({**s, "areaId": area})
         days = _days_of_dep(c, hold["departure_id"])
         out = []
-        for i, s in enumerate(stops):  # V-12 범위: 패키지 일정으로 정한 범위 안인지
+        for i, s in enumerate(stops):  # V-12 범위: 패키지 일정으로 정한 범위 안인지 (하차 시간을 안 넣었으면 건너뜀)
+            if not s.get("desiredTime"):
+                continue
             lo, hi = stop_time_range(days, s["kind"], s["areaId"])
             if not lo <= _min(s["desiredTime"]) <= hi:
                 out.append({"field": f"stops.{i}.desiredTime", "rule": "V-12-range"})
@@ -195,7 +206,7 @@ def create_booking(m: Member, req: dict) -> dict:
                 run(c, """INSERT INTO booking_stop (booking_no, kind, place_name, place_id, address, lat, lng, area_id, memo, desired_time)
                           VALUES (:no, :k, :n, :pid, :a, :lat, :lng, :area, :memo, :dt)""",
                     no=no, k=s["kind"], n=s["placeName"], pid=s.get("placeId"), a=s.get("address"), lat=s["lat"], lng=s["lng"], area=s["areaId"],
-                    memo=s.get("memo"), dt=s["desiredTime"])
+                    memo=s.get("memo"), dt=s.get("desiredTime") or None)
             r = req["rep"]
             run(c, """INSERT INTO booking_member (booking_no, seq, is_rep, name_ko, name_en, country_code, phone, email)
                       VALUES (:no, 1, 1, :nl, :ne, :cc, :ph, :em)""",
@@ -217,14 +228,14 @@ def create_booking(m: Member, req: dict) -> dict:
 
 
 def list_bookings(m: Member, departure_id: str | None = None) -> list[dict]:
-    """API-11: 내 예약 목록. departureId를 주면 그 출발편의 살아 있는 예약만 (중복 예약 확인, EV-28 ④)"""
+    """API-11: 내 예약 목록. departureId를 주면 그 출발편의 살아 있는 예약만 (중복 예약 확인, EV-28 ④). tab = S-12 탭 분류 (booking_tab)"""
     with conn() as c:
         rs = rows(c, f"""SELECT b.no, p.id package_id, p.name_ko, p.name_ja, d.dep_date, b.people, b.total_price, b.status, d.status dstatus
                          FROM booking b JOIN departure d ON d.id = b.departure_id JOIN package p ON p.id = d.package_id
                          WHERE b.member_id = :m {"AND b.departure_id = :d AND b.status = 'CONFIRMED'" if departure_id else ""}
                          ORDER BY d.dep_date DESC, b.no""", m=m.memberId, d=departure_id)
     return [{"no": r["no"], "packageId": r["package_id"], "packageName": {"ko": r["name_ko"], "ja": r["name_ja"]}, "depDate": r["dep_date"],
-             "people": r["people"], "total": r["total_price"], "status": r["status"], "departureStatus": r["dstatus"]} for r in rs]
+             "people": r["people"], "total": r["total_price"], "status": r["status"], "tab": booking_tab(r["status"]), "departureStatus": r["dstatus"]} for r in rs]
 
 
 def get_booking(m: Member, no: str) -> dict:
@@ -259,7 +270,7 @@ def save_companions(m: Member, no: str, companions: list[dict]) -> dict:
             fail("E-FORBID")
         if b["status"] != "CONFIRMED" or clock.today() > add_days(b["dep_date"], -S.COMPANION_DUE_DAYS):
             fail("E-DUE")
-        if len(companions) > b["people"] - 1 or any(x["nameEn"] and not NAME_EN.fullmatch(x["nameEn"].strip().upper()) for x in companions):
+        if len(companions) > b["people"] - 1 or any(x["nameEn"] and not valid_en(x["nameEn"]) for x in companions):
             fail("E-VALID", [{"field": "companions", "rule": "V-24"}])
         for i in range(b["people"] - 1):
             name = (companions[i]["nameEn"].strip().upper() or None) if i < len(companions) else None

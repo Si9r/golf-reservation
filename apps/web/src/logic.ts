@@ -1,4 +1,5 @@
-import { AREA_NAME, COURSES, HOTELS, OPTIONS, PKGS, PLACES, SET, TRAVEL, activeZones, courseOf, hotelOf, type Area, type Lang, type Pkg, type Place, type Zone } from "./data";
+import { AREA_NAME, COURSES, HOTELS, OPTIONS, PKGS, PLACES, SET, TRAVEL, activeZones, courseOf, hotelOf, type Area, type Course, type Lang, type Pkg, type Place, type Zone } from "./data";
+import { cachedDriveMin } from "./gmaps";
 
 // ---------- 날짜 ----------
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -24,6 +25,9 @@ export const fDate = (d: string, L: Lang) =>
   L === "ko" ? `${d.slice(0, 4)}.${d.slice(5, 7)}.${d.slice(8)} (${dowName(d, L)})` : `${d.slice(0, 4)}年${Number(d.slice(5, 7))}月${Number(d.slice(8))}日(${dowName(d, L)})`;
 export const fShort = (d: string, L: Lang) =>
   L === "ko" ? `${Number(d.slice(5, 7))}.${Number(d.slice(8))} (${dowName(d, L)})` : `${Number(d.slice(5, 7))}/${Number(d.slice(8))}(${dowName(d, L)})`;
+// 손님 문장용 날짜 (팀 테스트 10/23: '판정일' 대신 '10월 23일(금)에 출발 여부가 정해져요')
+export const fDayLong = (d: string, L: Lang) =>
+  L === "ko" ? `${Number(d.slice(5, 7))}월 ${Number(d.slice(8))}일(${dowName(d, L)})` : `${Number(d.slice(5, 7))}月${Number(d.slice(8))}日(${dowName(d, L)})`;
 export const fMonth = (ym: string, L: Lang) => (L === "ko" ? `${ym.slice(0, 4)}년 ${Number(ym.slice(5))}월` : `${ym.slice(0, 4)}年${Number(ym.slice(5))}月`);
 export const fMonthShort = (ym: string, L: Lang) => (L === "ko" ? `${Number(ym.slice(5))}월` : `${Number(ym.slice(5))}月`);
 
@@ -61,6 +65,8 @@ export const departuresIn = (p: Pkg, ym: string) => {
   return out;
 };
 export const tripEnd = (p: Pkg, dep: string) => addDays(dep, p.nights);
+// 호텔 화면(S-05)을 보여 주는 패키지: 호텔 옵션이 있거나, 숙박이 있고 기본 호텔이 정해진 패키지 (팀 테스트 10/23 B-03). 당일 패키지만 건너뜀
+export const hasHotelStep = (p: Pkg) => p.opts.length > 0 || (p.nights > 0 && !!p.hotel);
 export const rounds = (p: Pkg) => p.days.filter(Boolean).length;
 export const isNColor = (p: Pkg) => new Set(p.days.filter(Boolean).map((r) => r!.course)).size > 1;
 
@@ -259,9 +265,21 @@ export interface ItinItem {
   note?: { ko: string; ja: string };
   course?: number;
   tbd?: boolean; // 시간은 출발 확정 후 안내 (L-11)
+  wish?: boolean; // 손님이 고른 희망 시간 (실제 시간은 출발 확정 후 안내)
 }
-// L-11 일정표 만들기. 승차 시간은 출발 확정 후 운영이 등록(API-17)한 값만 표시
-export const itinerary = (p: Pkg, optId: string | null, pick: Place | null, drop: Place | null, confirmedPickup?: string | null) => {
+// 승차·호텔 출발 시각 = 그날 티오프 − 이동 시간 − 30분(체크인 여유, 서버 PICK_MARGIN_MIN), 30분 단위 내림 (팀 테스트 10/23 B-02)
+// 이동 시간: 받아 둔 Google 경로 시간, 없으면 지역 대략값(TRAVEL), 그것도 없으면 60분
+const TRAVEL_FROM = (a: Area | Zone | null): Zone | null => (a && a in TRAVEL ? (a as Zone) : null);
+const leaveAt = (tee: string, from: { lat: number; lng: number }, fromArea: Area | Zone | null, c: Course) => {
+  const z = TRAVEL_FROM(fromArea);
+  const travel = cachedDriveMin(from, c) ?? (z ? TRAVEL[z][c.area] : undefined) ?? 60;
+  const step = SET.STOP_TIME_STEP_MIN;
+  return fmtMin(Math.floor((toMin(tee) - travel - SET.PICK_MARGIN_MIN) / step) * step);
+};
+// L-11 일정표 만들기. 첫날 승차는 운영이 등록(API-17)한 확정 시간, 없으면 손님 희망 시간('희망'), 둘 다 없으면 '확정 후'.
+// 마지막 날 하차는 손님 희망 하차 시간이 있으면 그것('희망')
+export const itinerary = (p: Pkg, optId: string | null, pick: Place | null, drop: Place | null, o: { confirmedPickup?: string | null; pickTime?: string | null; dropTime?: string | null } = {}) => {
+  const { confirmedPickup, pickTime, dropTime } = o;
   const h = stayHotel(p, optId);
   const hAt = h ? { lat: h.lat, lng: h.lng } : undefined;
   const pAt = pick ? { lat: pick.lat, lng: pick.lng } : undefined;
@@ -271,9 +289,9 @@ export const itinerary = (p: Pkg, optId: string | null, pick: Place | null, drop
   const last = p.days.length - 1;
   return p.days.map((r, i) => {
     const items: ItinItem[] = [];
-    if (i === 0) items.push({ kind: "bus", at: pAt, time: confirmedPickup ?? undefined, tbd: !confirmedPickup, title: { ko: `버스 승차 · ${pickName.ko}`, ja: `バス乗車・${pickName.ja}` }, note: { ko: "확정 승차 시간은 출발 확정 후 이메일로 안내", ja: "確定乗車時刻は催行決定後にメールでご案内" } });
-    else if (h && !h.onsite) items.push({ kind: "bus", at: hAt, time: r ? addMin(r.tee, -50) : "09:00", title: { ko: `${h.name.ko} 출발`, ja: `${h.name.ja} 出発` } });
-    else if (!h && i > 0) items.push({ kind: "bus", at: pAt, time: r ? addMin(r.tee, -60) : "09:00", title: { ko: `버스 승차 · ${pickName.ko}`, ja: `バス乗車・${pickName.ja}` } });
+    if (i === 0) items.push({ kind: "bus", at: pAt, time: confirmedPickup ?? pickTime ?? undefined, wish: !confirmedPickup && !!pickTime, tbd: !confirmedPickup && !pickTime, title: { ko: `버스 승차 · ${pickName.ko}`, ja: `バス乗車・${pickName.ja}` }, note: { ko: "확정 승차 시간은 출발 확정 후 이메일로 안내", ja: "確定乗車時刻は催行決定後にメールでご案内" } });
+    else if (h && !h.onsite) items.push({ kind: "bus", at: hAt, time: r ? leaveAt(r.tee, h, h.area, courseOf(r.course)) : "09:00", title: { ko: `${h.name.ko} 출발`, ja: `${h.name.ja} 出発` } });
+    else if (!h && i > 0) items.push({ kind: "bus", at: pAt, time: r && pick ? leaveAt(r.tee, pick, placeZone(pick), courseOf(r.course)) : "09:00", title: { ko: `버스 승차 · ${pickName.ko}`, ja: `バス乗車・${pickName.ja}` } });
     if (r) {
       const c = courseOf(r.course);
       items.push({ kind: "golf", at: { lat: c.lat, lng: c.lng }, time: r.tee, title: { ko: `${c.name.ko} · 18홀`, ja: `${c.name.ja}・18ホール` }, note: { ko: `${c.caddie ? "캐디 동반" : "셀프"} · ${c.holes}홀 코스 · 렌탈은 골프장 현장 문의`, ja: `${c.caddie ? "キャディ付き" : "セルフ"}・${c.holes}ホール・レンタルはゴルフ場に直接お問い合わせ` }, course: c.id });
@@ -282,14 +300,9 @@ export const itinerary = (p: Pkg, optId: string | null, pick: Place | null, drop
     }
     if (i < last && h) items.push({ kind: "hotel", at: hAt, time: r?.back, title: { ko: `숙박 · ${h.name.ko}`, ja: `宿泊・${h.name.ja}` }, note: { ko: "체크인 15:00 이후 · 조식 포함", ja: "チェックイン15:00以降・朝食付き" } });
     if (i < last && !h) items.push({ kind: "drop", at: dAt, time: r?.back, title: { ko: `버스 하차 · ${dropName.ko}`, ja: `バス降車・${dropName.ja}` }, note: { ko: "숙박은 직접 준비 (호텔 없이 옵션)", ja: "宿泊はご自身で手配（ホテルなし）" } });
-    if (i === last) items.push({ kind: "drop", at: dAt, time: r ? r.back : "11:00", title: { ko: `버스 하차 · ${dropName.ko}`, ja: `バス降車・${dropName.ja}` } });
+    if (i === last) items.push({ kind: "drop", at: dAt, time: dropTime ?? (r ? r.back : "11:00"), wish: !!dropTime, title: { ko: `버스 하차 · ${dropName.ko}`, ja: `バス降車・${dropName.ja}` }, ...(dropTime ? { note: { ko: "실제 하차 시간은 출발 확정 후 이메일로 안내", ja: "実際の降車時刻は催行決定後にメールでご案内" } } : {}) });
     return items;
   });
-};
-const addMin = (t: string, n: number) => {
-  const [h, m] = t.split(":").map(Number);
-  const x = h * 60 + m + n;
-  return `${pad(Math.floor(x / 60))}:${pad(x % 60)}`;
 };
 
 export const coursesOf = (p: Pkg) => [...new Set(p.days.filter(Boolean).map((r) => r!.course))].map(courseOf);

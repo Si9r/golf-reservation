@@ -165,15 +165,23 @@ def stops_with(pick=None, drop=None):
     return st
 
 
-def test_desired_time_required(client):  # V-12
+def test_desired_time_required(client):  # V-12: 승차 희망 시간은 필수, 형식·30분 단위 검사는 하차에도
     set_booked(DEP, 0)
     hid = hold(client)
-    r = client.post(U + "/bookings", json=body(hid, stops=stops_with(pick="10:30")), headers=A).json()
-    assert r["error"] == "E-VALID" and r["fields"] == [{"field": "stops.1.desiredTime", "rule": "V-12"}]
     r = client.post(U + "/bookings", json=body(hid, stops=stops_with(drop="15:00")), headers=A).json()
-    assert r["fields"] == [{"field": "stops.0.desiredTime", "rule": "V-12"}]
+    assert r["error"] == "E-VALID" and r["fields"] == [{"field": "stops.0.desiredTime", "rule": "V-12"}]
     r = client.post(U + "/bookings", json=body(hid, stops=stops_with(pick="10:15", drop="15:00")), headers=A).json()  # 30분 단위 아님
     assert r["fields"] == [{"field": "stops.0.desiredTime", "rule": "V-12"}]
+    r = client.post(U + "/bookings", json=body(hid, stops=stops_with(pick="10:30", drop="15:15")), headers=A).json()
+    assert r["fields"] == [{"field": "stops.1.desiredTime", "rule": "V-12"}]
+
+
+def test_drop_time_optional(client):  # 희망 하차 시간은 선택: 없어도 예약되고 상세에는 null
+    set_booked(DEP, 0)
+    r = client.post(U + "/bookings", json=body(hold(client), stops=stops_with(pick="10:30")), headers=A)
+    assert r.status_code == 201, r.text
+    stops = client.get(U + f"/bookings/{r.json()['bookingNo']}", headers=A).json()["stops"]
+    assert {s["kind"]: s["desiredTime"] for s in stops} == {"PICK": "10:30", "DROP": None}
 
 
 def test_desired_time_range(client):  # V-12-range: 첫날 티오프(12:30) 이후 승차, 범위 끝(11:00) 넘김, 티오프 2시간 30분 전(10:00)보다 이름
@@ -307,3 +315,37 @@ def test_site_cancel_op_cancel_state(client):
     r = site_cancel(client, no)
     assert r.status_code == 409 and r.json()["error"] == "E-STATE"
     assert site_cancel(client, "GT-000000-9999").json()["error"] == "E-NOTFOUND"
+
+
+# ---------- 팀 테스트 10/23 ----------
+def test_name_en_requires_full_name(client):  # V-21 대표자 · V-24 동반자: 'KIM' 거절, 'KIM MINJI' 통과
+    set_booked(SITE_DEP, 0)
+    hid = hold(client, SITE_DEP, 2)
+    rep = {"nameLocal": "김민지", "nameEn": "KIM", "countryCode": "+82", "phone": "10-1234-5678", "email": "a@example.com"}
+    r = client.post(U + "/bookings", json=body(hid, rep=rep, companions=[{"nameEn": "PARK"}]), headers=A).json()
+    assert r["error"] == "E-VALID" and [f["rule"] for f in r["fields"]] == ["V-21", "V-24"]
+    r = client.post(U + "/bookings", json=body(hid, rep={**rep, "nameEn": "kim minji"}, companions=[{"nameEn": "PARK SEOYEON"}]), headers=A)
+    assert r.status_code == 201, r.text
+    no = r.json()["bookingNo"]
+    assert client.get(U + f"/bookings/{no}", headers=A).json()["members"][0]["nameEn"] == "KIM MINJI"
+    assert client.put(U + f"/bookings/{no}/companions", json={"companions": [{"nameEn": "PARK"}]}, headers=A).json()["error"] == "E-VALID"
+    assert client.put(U + f"/bookings/{no}/companions", json={"companions": [{"nameEn": "PARK SEOYEON"}]}, headers=A).status_code == 200
+
+
+def test_booking_list_tab(client):  # S-12 탭: 고객 취소 → cancel
+    set_booked(SITE_DEP, 0)
+    no = client.post(U + "/bookings", json=body(hold(client, SITE_DEP, 2)), headers=A).json()["bookingNo"]
+    tab = lambda: next(x["tab"] for x in client.get(U + "/bookings", headers=A).json()["items"] if x["no"] == no)  # noqa: E731
+    assert tab() == "up"
+    site_cancel(client, no)
+    assert tab() == "cancel"
+
+
+def test_quote_fixed_hotel_odd_people(client):  # B-03: 옵션 없는(호텔이 정해진) 패키지도 기본 호텔로 숙박 → 홀수 인원 1인실 추가 요금
+    pkg = client.get(U + "/packages/PKG-004").json()
+    assert pkg["options"] == [] and pkg["nights"] >= 1 and pkg["hotel"] is not None
+    dep = db1("SELECT id FROM departure WHERE package_id = 'PKG-004' ORDER BY dep_date LIMIT 1")["id"]
+    q = client.post(U + "/quotes", json={"departureId": dep, "people": 3}).json()
+    assert q["rooms"] == {"singles": 1, "twins": 1} and q["total"] == pkg["basePrice"] * 3 + pkg["singleAdd"]
+    q = client.post(U + "/quotes", json={"departureId": dep, "people": 3, "singles": 3}).json()  # S-05에서 1인실 인원을 바꾸면
+    assert q["rooms"] == {"singles": 3, "twins": 0} and q["total"] == pkg["basePrice"] * 3 + pkg["singleAdd"] * 3

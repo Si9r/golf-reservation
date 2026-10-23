@@ -4,7 +4,7 @@ import { ArrowLeft, ArrowSquareOut, Bed, Bus, FileText, Flag, Headset, Printer, 
 import { AREA_NAME, SET, courseOf, pkgOf } from "../data";
 import { useT } from "../i18n";
 import { useAuth, useDb, useToast, viewOf, type Booking } from "../store";
-import { addDays, coursesOf, fDate, fShort, itinerary, judgeDate, optionOf, pickupWindow, stayHotel, todayISO, tripEnd, yen } from "../logic";
+import { addDays, coursesOf, fDate, fDayLong, fShort, itinerary, judgeDate, optionOf, pickupWindow, stayHotel, todayISO, tripEnd, yen } from "../logic";
 import { Anno, Q, ScreenTag, Sheet, gmapLink } from "../components/ui";
 import { MapView, type MapMarker } from "../components/GoogleMap";
 import { useDrive } from "../gmaps";
@@ -33,13 +33,14 @@ export default function MyDetail() {
   const hotel = stayHotel(p, b.opt);
   const opt = optionOf(b.opt);
   const confirmedPickup = v.dep === "GO" || v.status === "DONE" ? b.pickupTime ?? pickupWindow(p, b.pick, pickDrive.drive?.min)?.exact ?? null : null;
-  const itin = itinerary(p, b.opt, b.pick, b.drop, confirmedPickup);
+  const itin = itinerary(p, b.opt, b.pick, b.drop, { confirmedPickup, pickTime: b.pickTime, dropTime: b.dropTime });
   const due = addDays(b.dep, -SET.COMPANION_DUE_DAYS);
   const alive = v.status === "CONFIRMED";
   const canEdit = alive && todayISO() <= due; // 명단 마감 전, 살아 있는 예약만 (E-DUE)
   const need = b.info.later || b.info.companions.length < b.people - 1;
   const draft = comps ?? Array.from({ length: b.people - 1 }, (_, i) => b.info.companions[i] ?? "");
-  const stateText = v.label === "OPEN" || v.label === "ENOUGH" ? t("M-200", { d: fDate(judgeDate(b.dep), L) }) : v.label === "GO" ? t("M-201") : v.label === "OP_CANCEL" ? t("M-202") : v.label === "USER_CANCEL" ? t("M-203") : t("M-204");
+  // 4 (팀 테스트 10/23): 모집 중 + 합계 < 20 → M-200 / 합계 ≥ 20, 판정 전 → M-129만 / 출발 확정 → M-201 (서버 departure_view state·full 과 같은 기준)
+  const stateText = v.label === "OPEN" ? t("M-200", { d: fDayLong(judgeDate(b.dep), L) }) : v.label === "ENOUGH" ? t("M-129", { d: fDayLong(judgeDate(b.dep), L) }) : v.label === "GO" ? t("M-201") : v.label === "OP_CANCEL" ? t("M-202") : v.label === "USER_CANCEL" ? t("M-203") : t("M-204");
   const boxTone = v.label === "OP_CANCEL" ? "border-bad-line bg-bad-soft" : v.label === "GO" ? "border-ok-bg bg-ok-soft" : v.status === "CONFIRMED" ? "border-brand-line bg-brand-soft" : "border-line bg-surface-2";
   const setDemo = (k: "open" | "go" | "cancel" | "user" | "done") => {
     const patch: Partial<Booking> =
@@ -66,16 +67,15 @@ export default function MyDetail() {
 
         {/* 1 상태 상자 */}
         <section className={`relative rounded-[20px] border-[1.5px] p-5 ${boxTone}`}>
-          <Anno n={1} t="상태 상자: 상태명, 상태별 안내(M-200~204), 현재 인원 / 최소 20명, 잔여석. 취소 예약은 취소 주체(cancel_by)·환불 상태(refund_status, M-208)" />
+          <Anno n={1} t="상태 상자: 상태명, 상태별 안내(M-200·M-129·M-201~204, 합계 20명 이상이면 M-129만), 현재 인원 / 최소 20명, 잔여석. 취소 예약은 취소 주체(cancel_by)·환불 상태(refund_status, M-208)" />
           <span className={`badge ${LABEL_CLASS[v.label]}`} style={v.label === "GO" ? { background: "var(--tag-stay)", color: "#fff" } : v.label === "OPEN" ? { background: "var(--brand)", color: "var(--brand-ink)" } : undefined}>{t(`lab_${v.label}`)}</span>
           <p className="mt-2 text-[15px] font-semibold leading-relaxed">{stateText}</p>
-          {v.label === "ENOUGH" && <p className="mt-1 text-[13.5px] font-semibold text-ok">{t("M-125", { d: fShort(judgeDate(b.dep), L) })}</p>}
           {alive && v.label !== "GO" && (
             <div className="mt-3 grid gap-1.5">
               <Meter now={v.booked} add={0} />
               <div className="flex justify-between text-[12.5px] text-ink-2">
                 <span className="num">{t("depNow", { b: v.booked })}</span>
-                <span className="num">{SET.BUS_SEATS - v.booked > 0 ? t("seatsLeft", { s: SET.BUS_SEATS - v.booked }) : t("full")} · {t("judge", { d: fShort(judgeDate(b.dep), L) })}</span>
+                <span className="num">{SET.BUS_SEATS - v.booked > 0 ? t("seatsLeft", { s: SET.BUS_SEATS - v.booked }) : t("full")} · {t("judge", { d: fDayLong(judgeDate(b.dep), L) })}</span>
               </div>
             </div>
           )}
@@ -175,7 +175,7 @@ export default function MyDetail() {
                 {draft.map((c, i) => (
                   <label key={i} className="field">
                     <span className="text-[13px] font-semibold text-ink-2">{t("compN", { i: i + 1 })}</span>
-                    <input className="input uppercase" value={c} maxLength={60} onChange={(e) => { const x = [...draft]; x[i] = e.target.value.toUpperCase(); setComps(x); }} />
+                    <input className="input uppercase" placeholder="KIM MINJI" value={c} maxLength={60} onChange={(e) => { const x = [...draft]; x[i] = e.target.value.toUpperCase(); setComps(x); }} />
                   </label>
                 ))}
                 <button
@@ -241,7 +241,7 @@ export default function MyDetail() {
               <span className="font-semibold">{val}</span>
             </div>
           ))}
-          <p className="text-[12.5px] text-muted">{t("M-150", { m: SET.MIN_DEPARTURE, d: fDate(judgeDate(b.dep), L) })}</p>
+          <p className="text-[12.5px] text-muted">{t("M-150", { m: SET.MIN_DEPARTURE, d: fDayLong(judgeDate(b.dep), L) })}</p>
         </div>
       </Sheet>
     </>

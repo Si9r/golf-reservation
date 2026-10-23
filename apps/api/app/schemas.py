@@ -33,7 +33,7 @@ class StopIn(PlacePoint):
     placeId: str | None = Field(default=None, max_length=100)
     address: str | None = Field(default=None, max_length=200)
     memo: str | None = None
-    desiredTime: str | None = None  # 'HH:MM' 희망 시간. 필수·형식·범위 검사는 V-12 (services/booking.py)
+    desiredTime: str | None = None  # 'HH:MM' 희망 시간 (승차 필수, 하차 선택). 형식·범위 검사는 V-12 (services/booking.py)
 
 
 class RepIn(BaseModel):

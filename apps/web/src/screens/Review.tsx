@@ -5,7 +5,8 @@ import { pkgOf } from "../data";
 import { SET } from "../data";
 import { useT } from "../i18n";
 import { useDb } from "../store";
-import { addDays, depView, fDate, fShort, itinerary, judgeDate, optionOf, stayHotel, totalPrice, tripEnd, yen } from "../logic";
+import { addDays, depView, fDayLong, fShort, hasHotelStep, itinerary, judgeDate, optionOf, stayHotel, totalPrice, tripEnd, yen } from "../logic";
+import { useSeatGuard } from "../api/seatCheck";
 import { Anno, BottomBar, Collapse, PriceBlock, Q, ScreenTag, Sheet, Steps } from "../components/ui";
 import { DepStateText, ItinList, Meter } from "./Detail";
 import { useFlow } from "./flow";
@@ -18,6 +19,7 @@ export default function Review() {
   const [dupOpen, setDupOpen] = useState(false);
   const { d, p, redirect, user } = useFlow({ place: true });
   const [itinOpen, setItinOpen] = useState(true); // 5 일정표: 펼침
+  const guard = useSeatGuard();
   useEffect(() => {
     if (d.editReturn) d.patch({ editReturn: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -41,21 +43,21 @@ export default function Review() {
     { k: t("rowPkg"), v: n(p.name), to: `/golf/packages/${p.id}` },
     { k: t("rowDep"), v: t("depRange", { a: fShort(dep, L), n: p.nights ? t("nightsDays", { n: p.nights, d: p.nights + 1 }) : t("dayTrip") }), to: `/golf/packages/${p.id}` },
     { k: t("rowPeople"), v: t("peopleN", { n: d.people }), to: `/golf/packages/${p.id}` },
-    { k: t("rowHotel"), v: hotel ? `${n(hotel.name)}${opt ? ` · ${n(opt.sub)}` : ""}` : opt?.none ? `${n(opt.name)} · ${n(opt.sub)}` : t("noHotel"), to: p.opts.length ? "/golf/book/hotel" : undefined },
+    { k: t("rowHotel"), v: hotel ? `${n(hotel.name)}${opt ? ` · ${n(opt.sub)}` : ""}` : opt?.none ? `${n(opt.name)} · ${n(opt.sub)}` : t("noHotel"), to: hasHotelStep(p) ? "/golf/book/hotel" : undefined },
     ...(price.rooms ? [{ k: t("rowRooms"), v: t(price.rooms.singles ? "roomsSum" : "roomsSum0", { t: price.rooms.twins, s: price.rooms.singles }), to: "/golf/book/hotel" }] : []),
     { k: t("rowPick"), v: `${n(d.pick!.name)} · ${t("wishAt", { t: d.pickTime! })}` + (d.pickMemo ? ` · ${d.pickMemo}` : ""), to: "/golf/book/place" },
-    { k: t("rowDrop"), v: drop ? n(drop.name) + (d.dropSame ? ` (${t("sameAsPick")})` : "") + ` · ${t("wishAt", { t: d.dropTime! })}` : "-", to: "/golf/book/place" },
+    { k: t("rowDrop"), v: drop ? n(drop.name) + (d.dropSame ? ` (${t("sameAsPick")})` : "") + (d.dropTime ? ` · ${t("wishAt", { t: d.dropTime })}` : "") : "-", to: "/golf/book/place" },
   ];
-  const itin = itinerary(p, d.opt, d.pick, drop);
+  const itin = itinerary(p, d.opt, d.pick, drop, { pickTime: d.pickTime, dropTime: d.dropTime });
   const go = () => nav(user ? "/golf/book/info" : `/login?next=${encodeURIComponent("/golf/book/info")}`); // T-14
   // EV-28 ④ 중복 예약 확인 (M-152): 같은 회원 · 같은 패키지 · 같은 출발일의 유효 예약
-  const dup = !!user && bookings.some((b) => b.pkgId === p.id && b.dep === dep && b.status === "CONFIRMED");
-  const proceed = () => (dup ? setDupOpen(true) : go());
+  const dupB = user ? bookings.find((b) => b.pkgId === p.id && b.dep === dep && b.status === "CONFIRMED") : undefined;
+  const proceed = () => guard(() => (dupB ? setDupOpen(true) : go())); // B-01: 잔여석 다시 확인 후
 
   return (
     <div className="page step">
       <ScreenTag id="S-08" name="비용 확인" refs="FN-16~18, FN-32 · L-04, L-05, L-11 · API-07 · T-14, T-28" />
-      <Steps at={3} hasHotel={p.opts.length > 0} />
+      <Steps at={3} hasHotel={hasHotelStep(p)} />
       <h1 className="mb-4 text-[22px] font-bold">{t("s08T")}</h1>
 
       {seatErr && (
@@ -102,7 +104,7 @@ export default function Review() {
       <section className="relative mt-4 rounded-2xl border-[1.5px] p-4" style={{ background: "var(--warn-soft)", borderColor: "var(--warn-line)" }}>
         <Anno n={3} t="최소 출발 인원 안내 (M-150, departure.judge_date)" />
         <h2 className="mb-1 flex items-center gap-2 text-[15px] font-bold text-warn"><UsersThree size={20} weight="fill" /> {t("minT")}</h2>
-        <p className="text-[14px] leading-relaxed text-ink">{t("M-150", { m: SET.MIN_DEPARTURE, d: fDate(judgeDate(dep), L) })}</p>
+        <p className="text-[14px] leading-relaxed text-ink">{t("M-150", { m: SET.MIN_DEPARTURE, d: fDayLong(judgeDate(dep), L) })}</p>
       </section>
 
       {/* 4 출발 확정 현황 */}
@@ -155,15 +157,17 @@ export default function Review() {
         onClose={() => setDupOpen(false)}
         title={t("dupT")}
         footer={
-          <div className="grid grid-cols-2 gap-2">
-            <button className="btn btn-ghost" onClick={() => setDupOpen(false)}>{t("dupStop")}</button>
+          <div className="grid gap-2">
+            {dupB && <button className="btn btn-ghost" onClick={() => { setDupOpen(false); nav(`/golf/my/${dupB.no}`); }}>{t("dupView")}</button>}
             <button className="btn btn-primary" onClick={() => { setDupOpen(false); go(); }}>{t("dupGo")}</button>
+            <button className="btn btn-sm text-muted" onClick={() => setDupOpen(false)}>{t("close")}</button>
           </div>
         }
       >
-        <div className="relative">
-          <Anno n={8} t="중복 예약 확인 (EV-28 ④, M-152): 인원 추가는 고객센터, 다른 일행이면 계속 (T-2 팀 결정 대기)" />
-          <p className="text-[14px] leading-relaxed">{t("M-152", { d: fShort(dep, L), p: n(pkgOf(p.id)!.name) })}</p>
+        <div className="relative grid gap-3 text-[15px] leading-relaxed">
+          <Anno n={8} t="중복 예약 확인 (EV-28 ④, M-152): 기존 예약번호·인원, 버튼 3개 — 기존 예약 보기(S-13) / 다른 일행으로 계속(S-09) / 닫기 (T-2 팀 결정 대기)" />
+          {dupB && <p className="num rounded-xl bg-surface-2 px-4 py-3 font-bold">{t("dupInfo", { no: dupB.no, n: dupB.people })}</p>}
+          {t("M-152", { d: fShort(dep, L), p: n(pkgOf(p.id)!.name) }).split(/(?<=\D[.。])\s*/).filter(Boolean).map((x) => <p key={x}>{x}</p>)}
         </div>
       </Sheet>
     </div>

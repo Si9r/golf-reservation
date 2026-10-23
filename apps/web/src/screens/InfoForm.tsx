@@ -4,7 +4,7 @@ import { ArrowLeft, ArrowSquareOut, CaretRight, WarningCircle } from "@phosphor-
 import { SET, TERMS_URL } from "../data";
 import { useT, type Key } from "../i18n";
 import { useDb, useDraft, useToast, type Info } from "../store";
-import { depView, totalPrice, yen } from "../logic";
+import { depView, hasHotelStep, totalPrice, yen } from "../logic";
 import { Anno, BottomBar, Collapse, PriceBlock, Q, ScreenTag, Sheet, Steps } from "../components/ui";
 import { useFlow } from "./flow";
 
@@ -12,10 +12,10 @@ import { useFlow } from "./flow";
 // 동의 항목 (V-25, 운영사 확정): 이 서비스에만 해당하는 취소 규정 · 합승 안내 2개. 이용약관·개인정보는 본 사이트 회원가입 때 동의
 const AGREE = ["cancel", "shared"] as const;
 const AGREE_LABEL = { cancel: "agreeCancel", shared: "agreeShared" } as const;
-export const V21 = /^[A-Z][A-Z ]*[A-Z]$/; // 영문 대문자와 공백만, 2~60자, 앞뒤 공백 없음
+export const V21 = /^[A-Z]+( [A-Z]+)+$/; // V-21·V-24: 성과 이름 모두 (영문 대문자 단어 2개 이상, 단어 사이 공백 1칸), 60자 이하 (팀 테스트 10/23, 서버 NAME_EN 과 같음)
 const V22 = /^\+?[0-9][0-9 -]{7,}$/; // 국가번호 포함 숫자·공백·하이픈 8자 이상
 const V23 = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-export const validEn = (s: string) => s.length >= 2 && s.length <= 60 && V21.test(s);
+export const validEn = (s: string) => s.length <= 60 && V21.test(s);
 
 export default function InfoForm() {
   const { t, n, list } = useT();
@@ -74,7 +74,7 @@ export default function InfoForm() {
       <ScreenTag id="S-09" name="정보 입력" refs="FN-19~21 · V-20~V-25 · L-07 · API-08 · T-15, T-16" />
       <div className="mb-1 flex items-center gap-3">
         <button className="grid h-10 w-10 flex-none place-items-center rounded-full hover:bg-surface-2" onClick={() => nav("/golf/book/review")} aria-label={t("back")}><ArrowLeft size={20} weight="bold" /></button>
-        <div className="flex-1"><Steps at={4} hasHotel={p.opts.length > 0} /></div>
+        <div className="flex-1"><Steps at={4} hasHotel={hasHotelStep(p)} /></div>
       </div>
       {tried && !ok && (
         <p role="alert" className="mb-3 flex items-center gap-2 rounded-2xl border p-3 text-[14px] font-semibold text-bad" style={{ background: "var(--bad-soft)", borderColor: "var(--bad-line)" }}>
@@ -90,8 +90,8 @@ export default function InfoForm() {
         <Field id="nameKo" n={1} anno="대표자 이름(한글) booking_member.name_ko, 회원 정보로 채움 (V-20: 1~30자)" label={t("nameKo")} err={show("nameKo")} refs={refs}>
           <input id="f-nameKo" className="input" value={f.nameKo} maxLength={30} aria-invalid={!!show("nameKo")} onBlur={() => blur("nameKo")} onChange={(e) => set({ nameKo: e.target.value })} autoComplete="name" />
         </Field>
-        <Field id="nameEn" n={2} anno="대표자 영문 이름 (V-21: 자동 대문자, 영문 대문자·공백 2~60자)" label={t("nameEn")} err={show("nameEn")} refs={refs}>
-          <input id="f-nameEn" className="input uppercase" value={f.nameEn} maxLength={60} aria-invalid={!!show("nameEn")} onBlur={() => { set({ nameEn: f.nameEn.trim() }); blur("nameEn"); }} onChange={(e) => set({ nameEn: e.target.value.toUpperCase() })} autoComplete="off" placeholder="KIM MINJUN" />
+        <Field id="nameEn" n={2} anno="대표자 영문 이름 (V-21: 자동 대문자, 성과 이름 모두 — 영문 대문자 단어 2개 이상, 60자 이하)" label={t("nameEn")} err={show("nameEn")} refs={refs}>
+          <input id="f-nameEn" className="input uppercase" value={f.nameEn} maxLength={60} aria-invalid={!!show("nameEn")} onBlur={() => { set({ nameEn: f.nameEn.trim() }); blur("nameEn"); }} onChange={(e) => set({ nameEn: e.target.value.toUpperCase() })} autoComplete="off" placeholder="KIM MINJI" />
         </Field>
         <Field id="phone" n={3} anno="연락처 (V-22: 국가번호 포함 숫자·공백·하이픈 8자 이상)" label={t("phone")} err={show("phone")} refs={refs}>
           <div className="grid grid-cols-[96px_1fr] gap-2">
@@ -123,7 +123,7 @@ export default function InfoForm() {
               {comps.map((c, i) => (
                 <label key={i} className="field">
                   <span className="text-[13px] font-semibold text-ink-2">{t("compN", { i: i + 1 })}</span>
-                  <input className="input uppercase" value={c} maxLength={60} aria-invalid={(tried || touched.comps) && !validEn(c)} onBlur={() => blur("comps")} onChange={(e) => { const next = [...comps]; next[i] = e.target.value.toUpperCase(); set({ companions: next }); }} />
+                  <input className="input uppercase" placeholder="KIM MINJI" value={c} maxLength={60} aria-invalid={(tried || touched.comps) && !validEn(c)} onBlur={() => blur("comps")} onChange={(e) => { const next = [...comps]; next[i] = e.target.value.toUpperCase(); set({ companions: next }); }} />
                 </label>
               ))}
             </div>

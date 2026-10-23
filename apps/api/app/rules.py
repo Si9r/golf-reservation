@@ -78,6 +78,11 @@ def departure_view(booked: int, seats: int, status: str, people: int, min_people
             "full": state != "unavailable" and after == 0, "state": state, "msg": _MSG[state]}
 
 
+def booking_tab(status: str) -> str:
+    """S-12 예약 조회 탭: 예정 = 예약 확정, 지난 = 여행 완료, 취소 = 고객 취소 + 운행 취소 (팀 테스트 10/23)"""
+    return {"CONFIRMED": "up", "DONE": "past"}.get(status, "cancel")
+
+
 def rooms_of(people: int, singles: int | None = None) -> dict:
     """객실 구성 (화면설계 v2): 2인 1실 기본, 1인실 인원은 인원과 홀짝이 같음"""
     s = people % 2 if singles is None else singles

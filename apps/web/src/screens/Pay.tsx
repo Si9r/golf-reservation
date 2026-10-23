@@ -5,7 +5,7 @@ import { ArrowLeft, CreditCard, Info, Lock, Timer, WarningCircle } from "@phosph
 import { SET } from "../data";
 import { useT } from "../i18n";
 import { releaseHold, useApp, useAuth, useDb, useDraft, type Booking, type PayResult } from "../store";
-import { bookingNo, depView, fDate, fShort, judgeDate, todayISO, totalPrice, yen } from "../logic";
+import { bookingNo, depView, fDayLong, fShort, hasHotelStep, judgeDate, todayISO, totalPrice, yen } from "../logic";
 import { Anno, BottomBar, ScreenTag, Steps } from "../components/ui";
 import { useFlow } from "./flow";
 
@@ -91,7 +91,7 @@ export default function Pay() {
       <ScreenTag id="S-10" name="결제" refs="FN-22, FN-23 · L-07, L-08, L-09 · API-08~10 · I-06 · T-17, T-18" />
       <div className="mb-1 flex items-center gap-3">
         <button className="grid h-10 w-10 flex-none place-items-center rounded-full hover:bg-surface-2" onClick={back} aria-label={t("back")} disabled={paying}><ArrowLeft size={20} weight="bold" /></button>
-        <div className="flex-1"><Steps at={5} hasHotel={p.opts.length > 0} /></div>
+        <div className="flex-1"><Steps at={5} hasHotel={hasHotelStep(p)} /></div>
       </div>
 
       {/* 1 남은 시간 (결제 후 자리 없음이면 잡아 둔 자리가 이미 풀렸으므로 숨김) */}
@@ -134,7 +134,7 @@ export default function Pay() {
 
       <section className="mt-4 flex gap-2.5 rounded-2xl border border-line p-4">
         <Info size={20} className="mt-0.5 flex-none text-brand" />
-        <p className="text-[14px] leading-relaxed">{t("M-150", { m: SET.MIN_DEPARTURE, d: fDate(judgeDate(d.dep!), L) })}</p>
+        <p className="text-[14px] leading-relaxed">{t("M-150", { m: SET.MIN_DEPARTURE, d: fDayLong(judgeDate(d.dep!), L) })}</p>
       </section>
 
       <AnimatePresence>

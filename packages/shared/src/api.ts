@@ -39,8 +39,8 @@ export interface QuoteRes { unitPrice: number; optionDiff: number; people: numbe
 export interface HoldReq { departureId: string; people: number }
 export interface HoldRes { holdId: number; expiresAt: string }
 
-// desiredTime: 'HH:MM' 희망 승하차 시간 (참고용, 30분 단위). PICK·DROP 모두 필수 (V-12), 패키지 일정으로 정한 범위 밖이면 V-12-range
-export interface StopInput { kind: StopKind; placeName: string; placeId?: string | null; address?: string | null; lat: number; lng: number; memo?: string | null; desiredTime: string }
+// desiredTime: 'HH:MM' 희망 승하차 시간 (참고용, 30분 단위). PICK은 필수, DROP은 선택 (V-12). 패키지 일정으로 정한 범위 밖이면 V-12-range
+export interface StopInput { kind: StopKind; placeName: string; placeId?: string | null; address?: string | null; lat: number; lng: number; memo?: string | null; desiredTime?: string | null }
 export interface RepInput { nameLocal: string; nameEn: string; countryCode: string; phone: string; email: string }
 export interface BookingCreateReq {
   holdId: number;
@@ -53,4 +53,5 @@ export interface BookingCreateReq {
   lang: Lang;
 }
 export interface BookingCreateRes { bookingNo: string; status: BookingStatus }
-export interface BookingSummary { no: string; packageId: string; packageName: L2; depDate: string; people: number; total: number; status: BookingStatus; departureStatus: DepartureStatus }
+// tab: S-12 탭 (up 예정 = CONFIRMED, past 지난 = DONE, cancel 취소 = USER_CANCEL·OP_CANCEL)
+export interface BookingSummary { no: string; packageId: string; packageName: L2; depDate: string; people: number; total: number; status: BookingStatus; tab: "up" | "past" | "cancel"; departureStatus: DepartureStatus }

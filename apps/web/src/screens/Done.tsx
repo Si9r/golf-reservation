@@ -5,7 +5,7 @@ import { Bus, CalendarCheck, Check, Copy, EnvelopeSimple, UsersThree } from "@ph
 import { SET, pkgOf } from "../data";
 import { useT } from "../i18n";
 import { fullReset, useDb, useToast } from "../store";
-import { fDate, judgeDate, yen } from "../logic";
+import { fDate, fDayLong, judgeDate, yen } from "../logic";
 import { Anno, Q, ScreenTag } from "../components/ui";
 
 export default function Done() {
@@ -30,7 +30,7 @@ export default function Done() {
   };
   const nexts = [
     { icon: EnvelopeSimple, text: t("M-181", { e: b.info.email }) },
-    { icon: CalendarCheck, text: t("M-182", { d: fDate(judgeDate(b.dep), L), m: SET.MIN_DEPARTURE }) },
+    { icon: CalendarCheck, text: t("M-182", { d: fDayLong(judgeDate(b.dep), L), m: SET.MIN_DEPARTURE }) },
     { icon: Bus, text: t("M-183") },
     ...(b.info.later && b.people > 1 ? [{ icon: UsersThree, text: t("M-184") }] : []),
   ];

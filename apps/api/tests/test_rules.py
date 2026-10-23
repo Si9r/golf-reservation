@@ -1,4 +1,4 @@
-from app.rules import booking_no, departure_view, in_area, in_closed_season, is_bookable_date, is_sale_date, quote, rooms_of, seats_left
+from app.rules import booking_no, booking_tab, departure_view, in_area, in_closed_season, is_bookable_date, is_sale_date, quote, rooms_of, seats_left
 
 PKG = {"dep_weekdays": "TUE,FRI", "season_from": "04-20", "season_to": "11-15"}
 
@@ -41,3 +41,14 @@ def test_area_and_no():  # L-06, L-09
     sq = {"type": "polygon", "points": [[43, 141.3], [43.1, 141.3], [43.1, 141.4], [43, 141.4]]}
     assert in_area({"lat": 43.05, "lng": 141.35}, sq) and not in_area({"lat": 43.2, "lng": 141.35}, sq)
     assert booking_no("2026-10-23", 7) == "GT-261023-0007"
+
+
+def test_booking_tab():  # S-12 탭 (팀 테스트 10/23)
+    assert [booking_tab(s) for s in ("CONFIRMED", "DONE", "USER_CANCEL", "OP_CANCEL")] == ["up", "past", "cancel", "cancel"]
+
+
+def test_name_en_full_name():  # V-21·V-24: 성과 이름 모두
+    from app.services.booking import valid_en
+
+    assert valid_en("KIM MINJI") and valid_en("kim minji") and valid_en(" LEE JUNG HOON ")
+    assert not valid_en("KIM") and not valid_en("KIM  MINJI") and not valid_en("KIM-MINJI") and not valid_en("A " * 30 + "B")

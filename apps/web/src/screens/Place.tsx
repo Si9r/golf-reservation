@@ -212,7 +212,7 @@ export default function Place() {
     setPreview(null);
   };
 
-  const done = !!d.pick && !!(d.dropSame ? d.pick : d.drop) && !!d.pickTime && !!d.dropTime; // 희망 시간도 승차·하차 모두 필수
+  const done = !!d.pick && !!(d.dropSame ? d.pick : d.drop) && !!d.pickTime; // 희망 승차 시간은 필수, 하차 시간은 선택
   const back = () => nav(d.editReturn ? "/golf/book/review" : p.opts.length ? "/golf/book/hotel" : `/golf/packages/${p.id}`);
   const pv = preview?.place;
   const pvOk = pv ? !!placeZone(pv) : false;
@@ -380,12 +380,12 @@ export default function Place() {
 
       {/* 10 희망 승차·하차 시간 (탭마다 따로, 하차가 승차와 같은 곳이어도 따로) */}
       <section className="relative mt-4 card grid gap-2 p-4">
-        <Anno n={10} t="희망 시간 (booking_stop.desired_time, V-12): 승차·하차 모두 필수, 30분 단위. 승차 첫날 티오프 − 2시간 30분(06:00 이후) ~ 첫날 티오프 − 이동 − 30분 + 합승 대기 안내 / 하차 마지막 라운드(티오프+5시간) + 이동 ~ 21:00. 범위 밖이 되면 선택 지움. 참고용" />
+        <Anno n={10} t="희망 시간 (booking_stop.desired_time, V-12): 승차 필수 · 하차 선택, 30분 단위. 승차 첫날 티오프 − 2시간 30분(06:00 이후) ~ 첫날 티오프 − 이동 − 30분 + 합승 대기 안내 / 하차 마지막 라운드(티오프+5시간) + 이동 ~ 21:00. 범위 밖이 되면 선택 지움. 참고용" />
         <label className="field">
           <span className="label">{tab === "pick" ? t("wishPick") : t("wishDrop")}</span>
           {tabRange && <span className={`text-[13px] ${tabRange.options.length ? "text-ink-2" : "font-semibold text-bad"}`}>{rangeText(tab, tabRange)}</span>}
           <select className="input" value={tabTime ?? ""} disabled={!tabRange?.options.length} onChange={(e) => d.patch(tab === "pick" ? { pickTime: e.target.value || null } : { dropTime: e.target.value || null })}>
-            <option value="">{tabPlace ? t("wishNone") : t("wishPlaceFirst")}</option>
+            <option value="">{!tabPlace ? t("wishPlaceFirst") : tab === "drop" ? t("wishSkip") : t("wishNone")}</option>
             {tabRange?.options.map((x) => <option key={x} value={x}>{x}</option>)}
           </select>
         </label>
@@ -448,7 +448,7 @@ export default function Place() {
       <p className="mt-2 text-[12px] text-muted">{!anno ? null : serviceArea.wide ? "SERVICE_AREA: 넓은 범위 (기타히로시마·치토세·공항 포함, 확인 필요)" : `SERVICE_AREA: 삿포로 중심 반경 ${ZONES_STRICT[0].r / 1000}km (상세설계 설정값)`}</p>
 
       <BottomBar>
-        <span className="absolute -top-3 left-3"><Anno n={9} t="하단 다음: 승차·하차 장소와 희망 시간이 모두 지정되면 활성 → S-08 (T-10) / 범위 밖 → 그대로 (T-31)" /></span>
+        <span className="absolute -top-3 left-3"><Anno n={9} t="하단 다음: 승차·하차 장소와 희망 승차 시간이 지정되면 활성 (희망 하차 시간은 선택) → S-08 (T-10) / 범위 밖 → 그대로 (T-31)" /></span>
         <div className="min-w-0 flex-1 text-[12.5px] leading-tight text-muted">
           <p className="truncate">{t("pick")} · {d.pick ? withTime(n(d.pick.name), d.pickTime) : "-"}</p>
           <p className="truncate">{t("drop")} · {dropShown ? withTime(n(dropShown.name), d.dropTime) : "-"}</p>

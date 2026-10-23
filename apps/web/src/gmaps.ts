@@ -97,6 +97,9 @@ const estimate = (a: LL, b: LL): Drive => {
   return { km: Math.round(km * 10) / 10, min: Math.max(5, Math.round((km / 45) * 60)), source: "estimate" };
 };
 
+// 이미 받아 둔 Google 경로 시간(분). 캐시에는 Google 결과만 저장되므로 없으면 null (일정표 시각 계산용, 팀 테스트 10/23 B-02)
+export const cachedDriveMin = (a: LL, b: LL): number | null => cache[keyOf(a, b)]?.min ?? null;
+
 export function getDrive(a: LL, b: LL): Promise<Drive | null> {
   const k = keyOf(a, b);
   if (cache[k]) return Promise.resolve(cache[k]);

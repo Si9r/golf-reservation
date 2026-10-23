@@ -5,10 +5,11 @@ import { ArrowLeft, ArrowSquareOut, Bed, Bus, CaretDown, CheckCircle, Flag, Info
 import { AREA_NAME, SET, hotelOf, pkgOf, type Pkg } from "../data";
 import { useT } from "../i18n";
 import { useDb, useDraft } from "../store";
-import { addDays, coursesOf, departuresIn, depView, dowNames, fDate, fMonth, fMonthShort, fShort, itinerary, judgeDate, monthInSeason, monthsAhead, prevAt, todayISO, tripEnd, yen, ymOf, type ItinItem } from "../logic";
+import { addDays, coursesOf, departuresIn, depView, dowNames, fDate, fDayLong, fMonth, fMonthShort, fShort, hasHotelStep, itinerary, judgeDate, monthInSeason, monthsAhead, prevAt, todayISO, tripEnd, yen, ymOf, type ItinItem } from "../logic";
 import { Anno, BottomBar, Collapse, ErrorBanner, Img, PeopleInput, PriceBlock, Q, ScreenTag, Steps, gmapLink, useFakeLoad } from "../components/ui";
 import { PkgTags, TypeBadge } from "../components/booking";
 import { LegRow, MapView, type MapMarker } from "../components/GoogleMap";
+import { takeSeatNotice, useSeatGuard } from "../api/seatCheck";
 
 export const ICON: Record<ItinItem["kind"], typeof Bus> = { bus: Bus, golf: Flag, hotel: Bed, drop: MapPin, free: Sun };
 
@@ -56,14 +57,25 @@ function DetailInner({ p }: { p: Pkg }) {
   const mapPlace = places.find((x) => x.key === mapKey) ?? places[0];
   const markers = useMemo<MapMarker[]>(() => places.map((x) => ({ lat: x.lat, lng: x.lng, title: x.label, kind: x.kind, glyph: x.glyph })), [p.id, hotel?.id, L]); // eslint-disable-line react-hooks/exhaustive-deps
   const reserveRef = useRef<HTMLDivElement>(null);
+  const guard = useSeatGuard();
+  // B-01: 다음 단계에서 잔여석이 바뀐 것을 알고 돌아온 경우 (M-128). 출발일을 다시 고르면 사라짐
+  const [seatNotice] = useState(() => takeSeatNotice(p.id));
+  const seatChanged = seatNotice && !dep;
+  useEffect(() => {
+    if (seatChanged) window.setTimeout(() => reserveRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 300);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const go = () => {
     if (!canGo) {
       reserveRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
-    if (d.editReturn) nav("/golf/book/review"); // T-28
-    else nav(p.opts.length ? "/golf/book/hotel" : "/golf/book/place"); // T-06 / T-07
+    // B-01: 넘어가기 전에 잔여석·판정일을 다시 확인 (api/seatCheck.ts)
+    guard(() => {
+      if (d.editReturn) nav("/golf/book/review"); // T-28
+      else nav(hasHotelStep(p) ? "/golf/book/hotel" : "/golf/book/place"); // T-06 / T-07 (숙박 있는 패키지는 옵션이 없어도 S-05)
+    });
   };
   const btnLabel = d.editReturn ? t("editBack") : dep ? t("reserve") : t("pickDepFirst");
 
@@ -96,6 +108,7 @@ function DetailInner({ p }: { p: Pkg }) {
             </button>
           ))}
         </div>
+        {seatChanged && <p className="err rounded-xl p-3" role="alert" style={{ background: "var(--bad-soft)" }}>{t("M-128")}</p>}
         <div className="grid gap-2" role="radiogroup" aria-label={t("depSelect")}>
           {deps.length === 0 && <p className="rounded-xl bg-surface-2 p-4 text-[14px] text-muted">{t("depNone", { m: fMonthShort(ym, L) })}</p>}
           {deps.map((x) => {
@@ -112,7 +125,7 @@ function DetailInner({ p }: { p: Pkg }) {
                     {full ? t("depEnough", { b: dv.booked }) : off ? t("depShort", { n: d.people }) : enough ? t("depEnough", { b: dv.booked }) : t("depNow", { b: dv.booked })}
                   </span>
                 </span>
-                <span className={`num text-[13px] font-semibold ${off ? "text-muted" : "text-ink-2"}`}>{full ? t("full") : t("seatsLeft", { s: dv.seats })}</span>
+                <span className={`num text-[13px] font-semibold ${off ? "text-muted" : "text-ink-2"}`}>{full ? t("full") : t("seatsNow", { s: dv.seats })}</span>
               </button>
             );
           })}
@@ -146,7 +159,7 @@ function DetailInner({ p }: { p: Pkg }) {
         <button className="grid h-10 w-10 flex-none place-items-center rounded-full hover:bg-surface-2" onClick={() => (d.editReturn ? nav("/golf/book/review") : nav("/golf/packages"))} aria-label={t("back")}>
           <ArrowLeft size={20} weight="bold" />
         </button>
-        <div className="flex-1"><Steps at={0} hasHotel={p.opts.length > 0} /></div>
+        <div className="flex-1"><Steps at={0} hasHotel={hasHotelStep(p)} /></div>
       </div>
       {load.error && <ErrorBanner onRetry={load.retry} />}
 
@@ -307,8 +320,9 @@ export function DepStateText({ v, dep, go, showErr }: { v: ReturnType<typeof dep
   const { t, L } = useT();
   if (v.state === "unavailable") return showErr ? <p className="err text-[12.5px]">{t("M-120", { s: v.seats, n: v.sum - v.booked })}</p> : null;
   if (go) return <p className="text-[12.5px] font-semibold text-ok">{v.seatsAfter ? t("M-123", { s: v.seatsAfter }) : t("goFull")}</p>;
-  if (v.state === "enough") return <p className="text-[12.5px] font-semibold text-ok">{v.seatsAfter ? `${t("M-125", { d: fShort(judgeDate(dep), L) })} · ${t("seatsLeft", { s: v.seatsAfter })}` : t("depFull", { m: SET.BUS_SEATS, d: fShort(judgeDate(dep), L) })}</p>;
-  return <p className="text-[12.5px] font-semibold text-ink-2">{t("M-122", { n: v.need })} · {t("seatsLeft", { s: v.seatsAfter })}</p>;
+  // 9: 출발일 목록은 '남은 자리'(지금), 출발 현황은 '예약하면 남는 자리'(우리 인원을 넣은 뒤) — 숫자 계산은 그대로
+  if (v.state === "enough") return <p className="text-[12.5px] font-semibold text-ok">{v.seatsAfter ? `${t("M-125", { d: fDayLong(judgeDate(dep), L) })} · ${t("seatsAfterBook", { s: v.seatsAfter })}` : t("depFull", { m: SET.BUS_SEATS, d: fDayLong(judgeDate(dep), L) })}</p>;
+  return <p className="text-[12.5px] font-semibold text-ink-2">{t("M-122", { n: v.need })} · {t("seatsAfterBook", { s: v.seatsAfter })}</p>;
 }
 
 // 일정 목록 (구간 이동 시간 포함)
@@ -322,7 +336,10 @@ export function ItinList({ items, memo }: { items: ItinItem[]; memo?: string }) 
           <Fragment key={j}>
             {j > 0 && <LegRow from={prevAt(items, j)} to={it.at} />}
             <li className="relative grid grid-cols-[52px_28px_1fr] gap-2 pb-3 last:pb-0">
-              <span className={`num pt-0.5 text-right text-[13px] font-bold ${it.tbd ? "text-muted" : "text-brand"}`}>{it.time ?? (it.tbd ? t("tbd") : "")}</span>
+              <span className={`num pt-0.5 text-right text-[13px] font-bold leading-tight ${it.tbd ? "text-muted" : "text-brand"}`}>
+                {it.wish && <span className="block text-[10.5px] font-semibold text-muted">{t("wish")}</span>}
+                {it.time ?? (it.tbd ? t("tbd") : "")}
+              </span>
               <span className="relative flex justify-center">
                 <span className="z-[1] grid h-7 w-7 place-items-center rounded-full bg-brand-soft text-brand"><I size={15} weight="bold" /></span>
               </span>

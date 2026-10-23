@@ -55,7 +55,7 @@ export function ProtoPanel() {
       useDraft.setState({ pick: s.pick ?? pl, drop: s.drop ?? pl, dropSame: true });
     }
     const st0 = useDraft.getState();
-    if ((to.includes("review") || to.includes("info") || to.includes("pay")) && (!st0.pickTime || !st0.dropTime)) {
+    if ((to.includes("review") || to.includes("info") || to.includes("pay")) && !st0.pickTime) {
       // 희망 시간: 승차는 고를 수 있는 가장 늦은 시간, 하차는 가장 이른 시간 (TRAVEL 대략값 기준)
       const p = PKGS.find((x) => x.id === st0.pkgId)!;
       useDraft.setState({ pickTime: st0.pickTime ?? stopTimeRange(p, "pick", st0.pick)?.options.at(-1) ?? null, dropTime: st0.dropTime ?? stopTimeRange(p, "drop", st0.dropSame ? st0.pick : st0.drop)?.options[0] ?? null });

@@ -112,7 +112,7 @@ uvicorn app.main:app --reload --port 8787
 
 - `Activate.ps1`이 "스크립트를 실행할 수 없습니다"로 막히면 한 번만: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`
 - 확인: http://localhost:8787/health → `{"ok":true}`, http://localhost:8787/api/golf/docs → API 문서 (바로 호출해 볼 수 있음)
-- `http://localhost:8787/` 자체는 화면이 없어서 `Not Found`가 정상입니다.
+- `http://localhost:8787/`은 화면 빌드(`apps/web/dist`)가 있으면 메인 화면, 없으면 빌드 방법 안내가 나옵니다 (6번 참고).
 
 ### 5. 화면 (React)
 
@@ -128,9 +128,20 @@ $env:VITE_USE_API="1"; npm run dev:web    # Mac/Linux: VITE_USE_API=1 npm run de
 
 ### 6. 접속
 
-메인 페이지: **http://localhost:5173** (자동으로 `#/golf` 홈 화면으로 이동)
+메인 페이지는 두 가지 방법으로 열 수 있습니다. 둘 다 자동으로 `#/golf` 홈 화면으로 이동합니다.
 
-| 화면 | 주소 (`http://localhost:5173` 뒤에) |
+| 방법 | 주소 | 언제 |
+|---|---|---|
+| 화면 개발 서버 (5번) | **http://localhost:5173** | 화면 코드를 고치면서 볼 때 (저장하면 바로 반영) |
+| API 서버가 화면도 내보냄 | **http://localhost:8787** | 서버 하나로 전체를 볼 때. 화면을 고친 뒤에는 다시 빌드 |
+
+8787로 보려면 저장소 루트에서 화면을 한 번 빌드해 둡니다. API 서버는 다시 켤 필요 없이 새로고침하면 반영됩니다.
+
+```powershell
+$env:VITE_USE_API="1"; npm run build      # → apps/web/dist (API 서버가 / 에서 이 파일을 내보냄)
+```
+
+| 화면 | 주소 (위 주소 뒤에) |
 |---|---|
 | 홈 | `/#/golf` |
 | 패키지 목록 (지금 API로 동작, S-02) | `/#/golf/packages` |
@@ -152,6 +163,8 @@ cd apps/api; .\.venv\Scripts\Activate.ps1; uvicorn app.main:app --reload --port 
 # 2) 화면 (저장소 루트)
 $env:VITE_USE_API="1"; npm run dev:web
 ```
+
+화면을 고치지 않고 보기만 할 거라면 1)만 켜고 http://localhost:8787 로 접속해도 됩니다 (빌드는 6번).
 
 ### Mac / Linux
 

@@ -145,14 +145,14 @@ export function PeopleInput({ value, onChange, error, max = SET.MAX_PEOPLE, labe
   );
 }
 
-// ---------- 예약 진행 단계 (C-04: 항상 6단계, 호텔 옵션 없는 패키지는 2단계를 건너뜀 표시) ----------
+// ---------- 예약 진행 단계 (C-04: 항상 6단계, 숙박 없는 당일 패키지만 2단계를 건너뜀 표시 — hasHotel = logic.ts hasHotelStep) ----------
 export function Steps({ at, hasHotel }: { at: number; hasHotel: boolean }) {
   const { list, t } = useT();
   const steps = list("steps");
   const short = list("stepsShort");
   return (
     <div className="relative mb-4" aria-label={`${at + 1}/${steps.length} ${steps[at]}`}>
-      <Anno n="C-04" t="예약 진행 단계: 칸마다 단계 이름(패키지·호텔·승하차·확인·정보·결제), 현재 단계 굵게, 호텔 옵션 없으면 2단계 건너뜀 표시" />
+      <Anno n="C-04" t="예약 진행 단계: 칸마다 단계 이름(패키지·호텔·승하차·확인·정보·결제), 현재 단계 굵게, 당일 패키지(숙박 없음)만 2단계 건너뜀 표시" />
       <div className="flex gap-1.5" aria-hidden="true">
         {steps.map((s, i) => {
           const skip = !hasHotel && i === 1;
