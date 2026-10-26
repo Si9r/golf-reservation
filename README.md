@@ -11,13 +11,17 @@ TRAVENDER 메인 사이트에 붙는 홋카이도 골프 버스 패키지 예약
 apps/
   api/      API 서버 (Python · FastAPI · SQLAlchemy · MySQL 8)
     migrations/      테이블 (Alembic, 상세설계 '테이블' 시트)
-    app/routes.py    API-01 ~ API-18
+    app/routes.py    API-01 ~ API-19 (API-19: 본 사이트 → 이 서비스, 고객 취소·환불 결과)
     app/services/    처리 로직 L-xx
     app/rules.py     DB 없이 계산되는 규칙 (출발일·잔여석·금액·범위)
     app/jobs/        정기 실행 B-xx
     app/adapters/    메인 사이트 로그인 · 결제 · 메일 (지금은 가짜 연결)
     tests/           pytest (실제 MySQL로 통합 테스트)
   web/      화면 (React · Vite · TypeScript). 팀 프로토타입을 옮겨 온 것
+    src/api/client.ts     API 호출 (API-01 ~ 13)
+    src/api/sync.ts       API 모드(VITE_USE_API=1)에서 브라우저 계산을 서버 값으로 바꾸는 다리
+    src/api/seatCheck.ts  다음 단계로 넘어갈 때 잔여석 다시 확인 (S-03·S-05·S-06·S-08)
+    src/data.ts · logic.ts · store.ts   프로토타입 데이터·계산·브라우저 저장 (API로 바꾸면서 걷어 냄)
 packages/
   shared/   화면이 쓰는 기준 값 · 규칙(미리 보기용) · API 응답 타입
 docs/
@@ -123,7 +127,9 @@ npm install                               # 처음 한 번, package.json 바뀌�
 $env:VITE_USE_API="1"; npm run dev:web    # Mac/Linux: VITE_USE_API=1 npm run dev:web
 ```
 
-`VITE_USE_API`를 빼면 화면은 API를 쓰지 않고 프로토타입처럼 브라우저 안 데이터로 동작합니다.
+`VITE_USE_API=1`이면 출발편·잔여석·달력·금액·좌석 확보·예약·내 예약·동반자 이름 수정을 서버 API로 처리합니다 (화면별 연결 상태는 `docs/DEVELOPMENT.md` 2장).
+패키지 사진·일정·호텔 옵션 같은 상품 내용은 아직 화면 안 데이터(`data.ts`)를 씁니다.
+`VITE_USE_API`를 빼면 서버 없이 프로토타입처럼 브라우저 안 데이터로만 동작합니다.
 지도를 보려면 `apps/web/.env.local`에 `VITE_GOOGLE_MAPS_API_KEY=...`
 
 ### 6. 접속
@@ -144,7 +150,7 @@ $env:VITE_USE_API="1"; npm run build      # → apps/web/dist (API 서버가 / �
 | 화면 | 주소 (위 주소 뒤에) |
 |---|---|
 | 홈 | `/#/golf` |
-| 패키지 목록 (지금 API로 동작, S-02) | `/#/golf/packages` |
+| 패키지 목록 (S-02) | `/#/golf/packages` |
 | 패키지 상세 | `/#/golf/packages/:id` |
 | 비교 | `/#/golf/compare` |
 | 내 예약 | `/#/golf/my` |
@@ -191,7 +197,8 @@ npm test                  # 화면 쪽 규칙 (packages/shared)
 ```
 
 통합 테스트는 `golf_test` DB의 테이블을 모두 지우고 다시 만듭니다 (`TEST_DATABASE_URL`로 변경).
-좌석 동시 확보, 결제 실패·금액 불일치, 확보 만료 후 결제, 출발 판정, 고객 취소까지 확인합니다.
+좌석 동시 확보, 결제 실패·금액 불일치, 확보 만료 후 결제, 출발 판정, 고객 취소(API-16·API-19),
+희망 승하차 시간 범위(V-12), 영문 풀네임(V-21·V-24), 동반자 이름 필수·수정까지 확인합니다.
 
 ## 로그인 · 결제 (가짜 연결)
 
@@ -199,6 +206,13 @@ npm test                  # 화면 쪽 규칙 (packages/shared)
 
 - 로그인: 요청 헤더 `Authorization: Bearer demo:M0001`
 - 결제: 결제 ID가 `PAY-FAIL…`이면 실패, `PAY-AMT…`이면 금액 불일치, 그 외는 성공
-- 메일: 로그로 출력하고 `notification` 테이블에 기록
+- 메일: 이 서비스가 직접 보냄 (`apps/api/app/adapters/mail.py`). `.env` `MAIL_BACKEND=log`(기본)는 보내지 않고 로그만, `smtp`는 `MAIL_FROM`·`SMTP_*` 설정으로 실제 발송. 결과는 `notification` 테이블에 OK/FAIL로 기록 (보내는 주소는 확정 대기)
+- 화면(API 모드)은 로그인하면 데모 회원 `M0001`의 토큰을 붙여 부릅니다 (`apps/web/src/api/sync.ts` `syncToken`)
 
 정해지면 `apps/api/app/adapters/`에 실제 연결을 추가하고 `.env`의 `AUTH_PROVIDER` 등으로 바꿉니다.
+
+### 본 사이트 → 이 서비스 (API-19)
+
+고객 사정 취소·환불은 본 사이트가 처리하고 결과를 `POST /api/golf/site/bookings/{no}/cancel`로 알려 줍니다.
+헤더 `X-Site-Key`를 `.env`의 `SITE_KEY`와 비교하며, `SITE_KEY`가 비어 있으면 모두 거부합니다 (실제 인증 방식은 결제 연동 협의 때).
+`.env`의 `APP_ENV`(test | production)는 테스트 서버·본 서버 구분용 자리이고 아직 동작 차이는 없습니다.

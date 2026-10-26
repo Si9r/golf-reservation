@@ -5,7 +5,7 @@ import { SET, TERMS_URL } from "../data";
 import { useT, type Key } from "../i18n";
 import { useDb, useDraft, useToast, type Info } from "../store";
 import { depView, fShort, hasHotelStep, optionOf, stayHotel, totalPrice, tripEnd, yen, seatsLeft } from "../logic";
-import { Anno, BottomBar, Img, PriceBlock, Q, ScreenTag, Sheet, StepHead } from "../components/ui";
+import { Anno, BottomBar, Img, PriceBlock, ScreenTag, Sheet, StepHead } from "../components/ui";
 import { useFlow } from "./flow";
 import { ApiError, USE_API, api, apiDepId } from "../api/client";
 import { refreshMonth } from "../api/sync";
@@ -148,7 +148,7 @@ export default function InfoForm() {
       {compN > 0 && (
         <section ref={(el) => { refs.current.comps = el; }} className="relative mt-4 card grid gap-3 p-5">
           <Anno n={5} t="동반자 명단 × (인원−1) (V-24): 필수. 사람마다 영문 성·이름 두 칸 (자동 대문자)" />
-          <h2 className="flex flex-wrap items-center gap-2 text-[16px] font-bold"><span>{t("compT")}<Req /></span> <span className="text-[13px] font-normal text-muted">{t("peopleN", { n: compN })}</span> <Q id="Q-21" t="필수 수집 항목" /></h2>
+          <h2 className="flex flex-wrap items-center gap-2 text-[16px] font-bold"><span>{t("compT")}<Req /></span> <span className="text-[13px] font-normal text-muted">{t("peopleN", { n: compN })}</span></h2>
           <p className="help -mt-1">{t("compNote")}</p>
           <div className="grid gap-3">
             {compEn.map((c, i) => (

@@ -215,7 +215,9 @@ const toMin = (t: string) => {
   return h * 60 + m;
 };
 const fmtMin = (x: number) => `${pad(Math.floor(x / 60))}:${pad(x % 60)}`;
-const travelOf = (z: Zone, area: Area, driveMin?: number | null) => driveMin ?? TRAVEL[z][area] ?? 60;
+// 이동 시간: Google 경로 시간과 서버 대략값 표(TRAVEL = 서버 TRAVEL_MIN) 중 큰 쪽.
+// 화면에서 고를 수 있는 범위가 항상 서버 검사(V-12-range) 범위 안에 들도록 (Google이 더 짧으면 화면에서 고른 시간을 서버가 거절했음)
+const travelOf = (z: Zone, area: Area, driveMin?: number | null) => Math.max(driveMin ?? 0, TRAVEL[z][area] ?? 60);
 export interface StopRange {
   from: string;
   to: string;
@@ -225,7 +227,7 @@ export interface StopRange {
 // 고를 수 있는 희망 시간 범위. 서버 services/booking.py stop_time_range 와 같은 계산
 // 승차(첫날): (첫날 티오프 − 2시간 30분, 06:00보다 이르면 06:00)을 올림 ~ (첫날 티오프 − 이동 − 30분)을 내림
 // 하차(마지막 날): (마지막 라운드 티오프 + 5시간 + 이동)을 올림 ~ 21:00
-// driveMin: Google 경로 시간(분). 없으면 TRAVEL 대략값 (서버도 TRAVEL 대략값으로 검사)
+// driveMin: Google 경로 시간(분). TRAVEL 대략값보다 짧으면 TRAVEL 을 씀 (서버가 TRAVEL 대략값으로 검사하므로 화면 범위 ⊆ 서버 범위)
 export const stopTimeRange = (p: Pkg, kind: "pick" | "drop", place: Place | null, driveMin?: number | null): StopRange | null => {
   const z = placeZone(place);
   if (!z) return null;

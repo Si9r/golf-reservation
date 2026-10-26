@@ -5,6 +5,7 @@ os.environ["DATABASE_URL"] = os.environ.get("TEST_DATABASE_URL", "mysql+pymysql:
 os.environ["FIXED_TODAY"] = "2026-10-19"
 os.environ["ADMIN_KEY"] = "test-admin"
 os.environ["SITE_KEY"] = "test-site"
+os.environ["MAIL_BACKEND"] = "log"  # .env 에 smtp 가 있어도 테스트는 실제로 보내지 않음
 
 import pytest  # noqa: E402
 from alembic import command  # noqa: E402

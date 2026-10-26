@@ -2,6 +2,8 @@
 예시 값은 YU PM 답변·팀 결정에 따라 바뀜 (TBD 번호는 상세설계 '확인·결정' 시트).
 화면 쪽 같은 값: packages/shared/src/settings.ts (둘을 같이 고칠 것)"""
 
+from .config import env
+
 MAX_PEOPLE = 20  # F-011. 한 예약도 출발편 정원을 넘을 수 없음 (운영사 확정)
 MIN_PEOPLE = 1
 BUS_SEATS = 20  # 출발편 정원 = 버스 1대 (운영사 확정)
@@ -32,7 +34,8 @@ TRAVEL_MIN = {
 }
 TRAVEL_DEFAULT_MIN = 60
 HOLD_KEEP_AFTER_EXPIRE_MIN = 60  # B-02: 만료 후 이만큼 지난 확보만 삭제 (L-08 2) 용, 개발 결정)
-SUPPORT = {"tel": "+81-11-200-4812", "email": "golf@travender-hokkaido.com", "hours": "10:00-17:00"}  # 예시 (Q-13)
+# 고객센터 (Q-13): 운영 시간은 운영사 답변 10:00~17:00. 전화번호·이메일은 확정 전이라 .env 설정값 (SUPPORT_TEL, SUPPORT_EMAIL)
+SUPPORT = {"tel": env.SUPPORT_TEL, "email": env.SUPPORT_EMAIL, "hours": "10:00-17:00"}
 TERMS_URL = {
     "terms": "https://travender-hokkaido.com/terms",
     "privacy": "https://travender-hokkaido.com/privacy",

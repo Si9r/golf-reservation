@@ -7,7 +7,7 @@ import { useT } from "../i18n";
 import { DEFAULT_FILTERS, useDraft, useToast } from "../store";
 import { fShort, type SearchFilters } from "../logic";
 import { usePackageSearch } from "../api/usePackageSearch";
-import { Anno, BottomBar, CardSkeleton, ErrorBanner, Q, ScreenTag, Sheet, StageTag, Steps, useStage } from "../components/ui";
+import { Anno, BottomBar, CardSkeleton, ErrorBanner, Q, ScreenTag, Sheet, StageTag, useStage } from "../components/ui";
 import { DatePeopleSheet, PkgCard } from "../components/booking";
 
 type FKey = keyof SearchFilters;
@@ -43,7 +43,6 @@ export default function List() {
   return (
     <div className="page wide">
       <ScreenTag id="S-02" name="패키지 목록" refs="FN-03, FN-04, FN-05 · L-03 · API-01 · T-03, T-04" />
-      <div className="mb-4 lg:max-w-[760px]"><Steps at={0} hasHotel /></div>
 
       <div className="grid gap-2.5 lg:grid-cols-[1fr_auto] lg:gap-3">
         {/* 2 검색창 */}

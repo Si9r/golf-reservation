@@ -218,6 +218,7 @@ def test_stop_time_range():  # 서버 계산 (화면 logic.ts stopTimeRange 와 
     no_round = [day("07:30", "TOMAKOMAI"), day()]
     assert stop_time_range(no_round, "PICK", "SAPPORO") == (6 * 60, 5 * 60 + 30)  # 시작 05:00 → 06:00, 끝 07:30 − 70 − 30 = 05:50 → 고를 시간 없음
     assert stop_time_range([day(dep="09:00"), day()], "PICK", "SAPPORO") == (6 * 60, 8 * 60 + 30)  # 첫날 라운드 없음: 06:00 ~ 출발 − 30분
+    assert stop_time_range([], "PICK", "SAPPORO") == (6 * 60, 21 * 60)  # 일정이 없는 패키지(데이터 오류)도 500 대신 기본 범위
     assert stop_time_range(no_round, "DROP", "SAPPORO") == (11 * 60, 21 * 60)  # 마지막 날 라운드 없음 → 11:00
 
 
@@ -373,3 +374,72 @@ def test_companions_fix_no_empty(client):  # API-13 동반자 이름 수정(오�
     assert put(["PARK SEOYEON"]).json()["error"] == "E-VALID"
     assert put(["PARK SEOYEON", "CHOI YUNA"]).status_code == 200
     assert [m["nameEn"] for m in client.get(U + f"/bookings/{no}", headers=A).json()["members"][1:]] == ["PARK SEOYEON", "CHOI YUNA"]
+
+
+# ---------- 안내 메일 (운영사 확정 10/26: 이 서비스가 직접 보냄) ----------
+def test_mail_templates():  # 4종 제목·본문에 예약번호·패키지·출발일·인원·금액
+    from app.adapters.mail import render
+
+    b = {"no": "GT-261030-0001", "package_name": "삿포로 시내 숙박 2박 3일", "dep_date": "2026-10-30", "judge_date": "2026-10-23",
+         "people": 3, "total": 221400, "name": "이정훈"}
+    for kind in ("CONFIRM", "GO", "CANCEL", "USER_CANCEL"):
+        subject, body = render(kind, b)
+        assert "GT-261030-0001" in subject
+        for x in ("GT-261030-0001", "삿포로 시내 숙박 2박 3일", "2026년 10월 30일(금)", "3명", "¥221,400", "10:00-17:00"):
+            assert x in body, (kind, x)
+    assert "전액 환불" in render("CANCEL", b)[1] and "2026년 10월 23일(금)" in render("CONFIRM", b)[1]
+
+
+def test_mail_failure_keeps_booking(client, monkeypatch):  # 발송 실패해도 예약은 그대로, 기록은 FAIL
+    from app.adapters import mail as M
+
+    class Boom:
+        def send(self, to, subject, body):
+            raise OSError("smtp down")
+
+    monkeypatch.setattr(M, "mail", Boom())
+    set_booked(SITE_DEP, 0)
+    r = client.post(U + "/bookings", json=body(hold(client, SITE_DEP, 2)), headers=A)
+    assert r.status_code == 201
+    no = r.json()["bookingNo"]
+    assert db1("SELECT status FROM booking WHERE no = :no", no=no)["status"] == "CONFIRMED"
+    assert db1("SELECT result, error FROM notification WHERE booking_no = :no", no=no) == {"result": "FAIL", "error": "smtp down"}
+
+
+def test_mail_smtp_backend(client, monkeypatch):  # MAIL_BACKEND=smtp: 보내는 주소·이름·제목으로 실제 발송 (SMTP 는 가짜로 바꿔 확인)
+    import smtplib
+
+    from app.adapters import mail as M
+    from app.config import env
+
+    sent = []
+
+    class FakeSMTP:
+        def __init__(self, host, port, timeout=None):
+            sent.append(("connect", host, port))
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def starttls(self):
+            sent.append(("starttls",))
+
+        def login(self, u, pw):
+            sent.append(("login", u))
+
+        def send_message(self, msg):
+            sent.append(("msg", msg))
+
+    monkeypatch.setattr(smtplib, "SMTP", FakeSMTP)
+    for k, v in {"MAIL_FROM": "golf@example.jp", "MAIL_FROM_NAME": "TRAVENDER 골프", "SMTP_HOST": "smtp.example.jp", "SMTP_USER": "u"}.items():
+        monkeypatch.setattr(env, k, v)
+    monkeypatch.setattr(M, "mail", M.SmtpMail())
+    set_booked(SITE_DEP, 0)
+    no = client.post(U + "/bookings", json=body(hold(client, SITE_DEP, 2)), headers=A).json()["bookingNo"]
+    msg = next(x[1] for x in sent if x[0] == "msg")
+    assert ("connect", "smtp.example.jp", 587) in sent and ("starttls",) in sent and ("login", "u") in sent
+    assert "golf@example.jp" in msg["From"] and msg["To"] == "a@example.com" and no in msg["Subject"]
+    assert db1("SELECT result FROM notification WHERE booking_no = :no", no=no)["result"] == "OK"

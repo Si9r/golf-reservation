@@ -133,6 +133,8 @@ def stop_time_range(days: list[dict], kind: str, area_id: str) -> tuple[int, int
     - 하차(마지막 날): (마지막 라운드 티오프 + 5시간 + 이동)을 30분 단위로 올림 ~ 21:00. 라운드가 없으면 NO_ROUND_DROP_FROM
     이동 시간은 지역별 대략값 표(settings.TRAVEL_MIN). 시작이 끝보다 늦으면 고를 수 있는 시간이 없음"""
     lo, hi, step = _min(S.STOP_TIME_FIRST), _min(S.STOP_TIME_LAST), S.STOP_TIME_STEP_MIN
+    if not days:  # 일정이 없는 패키지(데이터 오류)는 기본 범위로 (500 방지)
+        return lo, hi
     if kind == "PICK":
         d = days[0]
         if d["tee_time"]:
