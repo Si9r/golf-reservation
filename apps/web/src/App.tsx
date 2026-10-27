@@ -16,6 +16,7 @@ const Review = lazy(() => import("./screens/Review"));
 const InfoForm = lazy(() => import("./screens/InfoForm"));
 const Pay = lazy(() => import("./screens/Pay"));
 const Done = lazy(() => import("./screens/Done"));
+const PayReturn = lazy(() => import("./screens/PayReturn"));
 const MyList = lazy(() => import("./screens/MyList"));
 const MyDetail = lazy(() => import("./screens/MyDetail"));
 const Support = lazy(() => import("./screens/Support"));
@@ -42,6 +43,7 @@ function Pages() {
           <Route path="/golf/book/info" element={<InfoForm />} />
           <Route path="/golf/book/pay" element={<Pay />} />
           <Route path="/golf/bookings/:no/complete" element={<Done />} />
+          <Route path="/golf/payment/return" element={<PayReturn />} />
           <Route path="/golf/my" element={<MyList />} />
           <Route path="/golf/my/:no" element={<MyDetail />} />
           <Route path="/golf/support" element={<Support />} />

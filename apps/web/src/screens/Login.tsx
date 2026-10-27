@@ -27,8 +27,8 @@ export default function Login() {
       <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} className="card w-full max-w-[420px] p-6" style={{ boxShadow: "var(--shadow-lg)" }}>
         <ScreenTag id="외부" name="본 사이트 로그인 (데모 자리)" refs="F-004 · T-30" />
         <div className="mb-5"><Logo /></div>
-        <h1 className="text-[21px] font-bold">{t("loginT")}</h1>
-        <p className="mt-1.5 text-[14px] leading-relaxed text-muted">{t("loginS")}</p>
+        <h1 className="text-[21px] font-bold">{t(USE_API ? "loginNeedT" : "loginT")}</h1>
+        <p className="mt-1.5 text-[14px] leading-relaxed text-muted">{t(USE_API ? "loginNeedD" : "loginS")}</p>
         <div className="mt-5 grid gap-1 rounded-xl bg-surface-2 p-4 text-[13.5px]">
           <span className="font-semibold text-muted">{t("demoAccount")}</span>
           <span className="font-bold">{DEMO_USER.nameKo} · {DEMO_USER.email}</span>

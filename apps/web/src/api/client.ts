@@ -1,7 +1,7 @@
 // API 클라이언트 (apps/api). 요청·응답 모양은 @golf/shared 의 타입과 같음
 import type {
-  ApiErrorBody, BookingCreateReq, BookingCreateRes, BookingStatus, BookingSummary, CalendarRes, DepartureListRes, DepartureStatus,
-  HoldReq, HoldRes, PackageListRes, QuoteReq, QuoteRes,
+  ApiErrorBody, BookingCreateReq, BookingCreateRes, BookingStatus, BookingSummary, CalendarRes, CheckoutRes, DepartureListRes, DepartureStatus,
+  HoldReq, HoldRes, PackageListRes, PaymentStatusRes, QuoteReq, QuoteRes,
 } from "@golf/shared";
 
 /** VITE_USE_API=1 이면 서버 API 사용, 아니면 프로토타입 데이터(브라우저 안 계산) 사용 */
@@ -69,6 +69,12 @@ export const api = {
   releaseHold: (id: number) => req<void>("DELETE", `/holds/${id}`),
   /** API-10 예약 확정 */
   book: (b: BookingCreateReq) => req<BookingCreateRes>("POST", "/bookings", b),
+  /** 결제 대기 예약 그만두기 (주문 전이면 좌석 바로 해제) */
+  abandon: (no: string) => req<void>("DELETE", `/bookings/${no}/pending`),
+  /** API-20 결제 시작 (본 사이트 주문 생성) */
+  checkout: (no: string) => req<CheckoutRes>("POST", `/bookings/${no}/checkout`),
+  /** API-21 결제 결과 확인 (본 사이트 주문 상태 조회) */
+  payment: (no: string) => req<PaymentStatusRes>("GET", `/bookings/${no}/payment`),
   /** API-11 내 예약 (departureId를 주면 그 출발편의 살아 있는 예약만) */
   myBookings: (departureId?: string) => req<{ items: BookingSummary[] }>("GET", "/bookings" + qs({ departureId })),
   /** API-12 예약 상세 */

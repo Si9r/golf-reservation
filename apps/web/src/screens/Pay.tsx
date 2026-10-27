@@ -11,7 +11,6 @@ import { ItinList } from "./Detail";
 import { PriceDetail } from "../components/booking";
 import { useFlow } from "./flow";
 import { ApiError, USE_API, api, apiDepId, apiOptId } from "../api/client";
-import { refreshMonth, toBooking } from "../api/sync";
 
 export default function Pay() {
   const { t, n, L } = useT();
@@ -33,7 +32,7 @@ export default function Pay() {
 
   useEffect(() => {
     if (redirect) return;
-    if (USE_API && !d.holdId) { nav("/golf/book/info", { replace: true }); return; } // 서버 확보(API-08) 없이 들어오면 정보 입력으로
+    if (USE_API && !d.pendingNo) { nav("/golf/book/info", { replace: true }); return; } // 결제 대기 예약(API-10) 없이 들어오면 정보 입력으로
     if (!d.holdUntil) d.patch({ holdUntil: Date.now() + SET.HOLD_MINUTES * 60000, holdPeople: d.people });
     const tm = window.setInterval(() => {
       const until = useDraft.getState().holdUntil;
@@ -69,27 +68,19 @@ export default function Pay() {
     setPaying(true);
     setError(null);
     const result: PayResult = payResult;
-    if (USE_API && result !== "soldout") {
-      // API-10 예약 확정. 결제는 가짜 연결: 결제 ID가 PAY-FAIL로 시작하면 실패 (adapters/payment.py)
-      const drop = d.dropSame ? d.pick! : d.drop!;
-      const info = d.info!;
-      const stop = (kind: "PICK" | "DROP", pl: NonNullable<typeof d.pick>, time: string | null) => ({ kind, placeName: n(pl.name), placeId: pl.placeId ?? null, address: pl.addr ?? null, lat: pl.lat, lng: pl.lng, memo: kind === "PICK" ? d.pickMemo || null : null, desiredTime: time ?? "" });
-      api.book({
-        holdId: d.holdId!, optionId: apiOptId(p.id, d.opt), singles: d.singles, stops: [stop("PICK", d.pick!, d.pickTime), stop("DROP", drop, d.dropTime)],
-        rep: { nameLocal: info.nameKo, nameEn: info.nameEn, countryCode: info.cc, phone: info.phone, email: info.email },
-        companions: info.companions.map((nameEn) => ({ nameEn })), paymentId: `${result === "fail" ? "PAY-FAIL" : "PAY"}-${Date.now()}`, lang: L,
-      })
-        .then(async (r) => {
-          db.add(toBooking(await api.booking(r.bookingNo))); // 화면 저장소에도 서버 예약을 넣어 둠 (S-11·S-13 표시용)
-          useDraft.setState({ holdId: null, holdUntil: null, holdPeople: 0 });
-          await refreshMonth(p.id, d.dep!.slice(0, 7));
-          nav(`/golf/bookings/${r.bookingNo}/complete`, { replace: true }); // T-17
+    if (USE_API) {
+      // API-20 결제 시작: 서버가 본 사이트 주문을 만들고 결제창 주소를 줌 → 그 주소로 이동 (결과는 결제 결과 화면이 서버에 조회)
+      api.checkout(d.pendingNo!)
+        .then((r) => {
+          if (!r.checkoutUrl) throw new Error("no checkout url");
+          useDraft.setState({ pendingNo: null }); // 주문을 만들었으니 화면을 떠나도 그만두기(abandon)를 보내지 않음. 결과는 결제 결과 화면이 예약번호로 조회
+          window.location.assign(r.checkoutUrl);
         })
         .catch((e) => {
           setPaying(false);
           const code = e instanceof ApiError ? e.body.error : "";
-          if (code === "E-SOLDOUT") { useDraft.setState({ holdId: null, holdUntil: null, holdPeople: 0 }); setError("M-174"); }
-          else setError("M-173"); // E-PAY, E-AMOUNT, V-12-range 등: 결제 화면에 머묾 (T-18)
+          if (code === "E-HOLD" || code === "E-CLOSED") { useDraft.setState({ pendingNo: null, holdUntil: 0 }); setLeft(0); } // 좌석 확보 만료 → 출발일 다시 고르기
+          else setError("M-173"); // 본 사이트 연동 오류 등: 결제 화면에 머묾 (T-18)
         });
       return;
     }
@@ -232,8 +223,8 @@ export default function Pay() {
             <p className="mt-2 flex items-start gap-1.5 text-[13px] text-muted"><Lock size={15} className="mt-0.5 flex-none" />{t("M-172")}</p>
           </section>
 
-          {/* 테스트용 결제 결과 (본 사이트 결제 연동 전까지 항상 표시, 출시 때 제거) */}
-          {(
+          {/* 테스트용 결제 결과 (프로토타입만. API 모드는 서버의 가짜 본 사이트 PAYMENT_BACKEND=fake 가 결과를 정함) */}
+          {!USE_API && (
             <div className="grid gap-2 rounded-2xl border border-dashed p-3" style={{ borderColor: "var(--anno)" }}>
               <span className="text-[12.5px] font-bold" style={{ color: "var(--anno)" }}>{t("demoPay")}</span>
               <div className="grid grid-cols-3 gap-1 rounded-xl bg-surface-2 p-1">

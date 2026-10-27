@@ -113,7 +113,7 @@ export interface Draft {
   info: Info | null;
   holdUntil: number | null; // 좌석 임시확보 만료 (seat_hold.expires_at)
   holdPeople: number;
-  holdId?: number | null; // API 모드: 서버 좌석 확보 ID (API-08)
+  pendingNo?: string | null; // API 모드: 결제 대기 예약번호 (API-10, 본 사이트 결제 연동). 이 예약이 좌석을 잡음
   singles: number | null; // 1인실 이용 인원 (null = 자동: 홀수면 1명)
   editReturn: boolean; // S-08 '변경'으로 들어온 경우 → '변경 완료' 후 S-08
 }
@@ -161,9 +161,9 @@ export const useDraft = create<DraftState>()(
 export const fullReset = () => useDraft.setState({ ...blankDraft() });
 // 좌석 임시확보 해제 (뒤로 가기·만료)
 export const releaseHold = () => {
-  const id = useDraft.getState().holdId;
-  if (USE_API && id) api.releaseHold(id).catch(() => undefined); // API-09 (실패해도 B-02가 정리)
-  useDraft.setState({ holdUntil: null, holdPeople: 0, holdId: null });
+  const no = useDraft.getState().pendingNo;
+  if (USE_API && no) api.abandon(no).catch(() => undefined); // 주문 전 결제 대기면 좌석 바로 해제 (실패해도 B-08이 10분 뒤 정리)
+  useDraft.setState({ holdUntil: null, holdPeople: 0, pendingNo: null });
 };
 
 // ---------- 예약 데이터 (데모 DB: 브라우저에 저장) ----------

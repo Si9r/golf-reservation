@@ -7,7 +7,7 @@ import { useDb, useDraft, useToast, type Info } from "../store";
 import { depView, fShort, hasHotelStep, optionOf, stayHotel, totalPrice, tripEnd, yen, seatsLeft } from "../logic";
 import { Anno, BottomBar, Img, PriceBlock, ScreenTag, Sheet, StepHead } from "../components/ui";
 import { useFlow } from "./flow";
-import { ApiError, USE_API, api, apiDepId } from "../api/client";
+import { ApiError, USE_API, api, apiDepId, apiOptId } from "../api/client";
 import { refreshMonth } from "../api/sync";
 
 // 입력 검사 (상세설계 '입력 검사' V-20~V-25). 검사 시점: 칸에서 벗어날 때 + '다음'을 누를 때
@@ -78,14 +78,22 @@ export default function InfoForm() {
     }
     const info = { ...f, nameEn: joinEn(en), companions: compEn.map(joinEn) };
     if (USE_API) {
-      // API-08 좌석 임시확보 (서버가 출발편을 잠그고 잔여석 확인). 실패하면 E-SEAT → 서버 최신 잔여석으로 M-120
+      // API-10 예약 만들기: 결제 대기(PENDING_PAYMENT)로 저장, 예약번호 발급, 좌석을 잡음 (본 사이트 결제 연동 10/27).
+      // 입력값(대표자·동반자·승하차·객실 구성)도 이때 저장. 실패하면 E-SEAT → 서버 최신 잔여석으로 M-120
       if (busy || busyRef.current) return;
       busyRef.current = true;
       setBusy(true);
-      api.hold({ departureId: apiDepId(p.id, d.dep!), people: d.people })
-        .then((h) => {
-          const exp = /Z|[+-]\d\d:?\d\d$/.test(h.expiresAt) ? h.expiresAt : h.expiresAt + "Z"; // 서버는 UTC
-          d.patch({ info, holdId: h.holdId, holdUntil: Date.parse(exp), holdPeople: d.people });
+      const drop = d.dropSame ? d.pick! : d.drop!;
+      const stop = (kind: "PICK" | "DROP", pl: NonNullable<typeof d.pick>, time: string | null) => ({ kind, placeName: n(pl.name), placeId: pl.placeId ?? null, address: pl.addr ?? null, lat: pl.lat, lng: pl.lng, memo: kind === "PICK" ? d.pickMemo || null : null, desiredTime: time ?? "" });
+      api.book({
+        departureId: apiDepId(p.id, d.dep!), people: d.people, optionId: apiOptId(p.id, d.opt), singles: d.singles,
+        stops: [stop("PICK", d.pick!, d.pickTime), stop("DROP", drop, d.dropTime)],
+        rep: { nameLocal: info.nameKo, nameEn: info.nameEn, countryCode: info.cc, phone: info.phone, email: info.email },
+        companions: info.companions.map((nameEn) => ({ nameEn })), lang: L,
+      })
+        .then((r) => {
+          const exp = /Z|[+-]\d\d:?\d\d$/.test(r.expiresAt) ? r.expiresAt : r.expiresAt + "Z"; // 서버는 UTC
+          d.patch({ info, pendingNo: r.bookingNo, holdUntil: Date.parse(exp), holdPeople: d.people });
           nav("/golf/book/pay"); // T-15
         })
         .catch(async (e) => {
