@@ -31,13 +31,13 @@ def judge_departures() -> dict:
                     run(c, "UPDATE booking SET status='OP_CANCEL', cancel_by='OP', canceled_at=UTC_TIMESTAMP(3) WHERE departure_id=:id AND status='CONFIRMED'", id=dep_id)
                 run(c, "DELETE FROM seat_hold WHERE departure_id = :id", id=dep_id)  # 판정 후 예약 받지 않음
             with tx() as c:
-                bs = rows(c, """SELECT b.no, b.payment_id, b.total_price, m.email FROM booking b
+                bs = rows(c, """SELECT b.no, b.order_id, b.total_price, m.email FROM booking b
                                 JOIN booking_member m ON m.booking_no = b.no AND m.seq = 1
                                 WHERE b.departure_id = :id AND b.status = :st""", id=dep_id, st="CONFIRMED" if go else "OP_CANCEL")
                 for b in bs:
                     if not go:  # L-15 전액 환불 요청
                         try:
-                            rf, st = payment.refund(b["payment_id"], b["total_price"], "op-cancel"), "REQUESTED"
+                            rf, st = payment.refund(b["order_id"], b["total_price"], "op-cancel"), "REQUESTED"
                         except Exception:  # noqa: BLE001
                             rf, st = None, "FAIL"
                         run(c, "UPDATE booking SET refund_id=:r, refund_status=:s WHERE no=:no", r=rf, s=st, no=b["no"])

@@ -20,13 +20,19 @@ PKG_SQL = """
   FROM package p LEFT JOIN hotel h ON h.id = p.default_hotel_id
   WHERE p.published = 1"""
 
-# 출발편 + 살아 있는 임시확보 인원 (L-02)
-DEP_SQL = """SELECT d.*, COALESCE((SELECT SUM(s.people) FROM seat_hold s
-  WHERE s.departure_id = d.id AND s.expires_at > UTC_TIMESTAMP(3)), 0) held FROM departure d"""
+# 출발편 + 살아 있는 임시확보 인원(held) + 결제 대기 예약 인원(pending) (L-02)
+# 잔여석 = 정원 − 확정 인원(booked_count) − 결제 대기 − 주문 전 좌석 확보
+# 결제 대기(PENDING_PAYMENT): 본 사이트 주문을 만든 예약은 결과(paid/failed/expired)가 나올 때까지 좌석 유지 (3D 인증으로 10분을 넘길 수 있음),
+#                             주문 전 예약은 만든 지 HOLD_MINUTES 분까지만 (그 뒤는 B-08이 UNPAID로)
+DEP_SQL = f"""SELECT d.*, COALESCE((SELECT SUM(s.people) FROM seat_hold s
+  WHERE s.departure_id = d.id AND s.expires_at > UTC_TIMESTAMP(3)), 0) held,
+  COALESCE((SELECT SUM(b.people) FROM booking b WHERE b.departure_id = d.id AND b.status = 'PENDING_PAYMENT'
+    AND (b.order_id IS NOT NULL OR b.created_at > UTC_TIMESTAMP(3) - INTERVAL {S.HOLD_MINUTES} MINUTE)), 0) pending
+  FROM departure d"""
 
 
 def dep_seats(d: dict) -> int:
-    return seats_left(d["capacity"], d["booked_count"], int(d["held"]))
+    return seats_left(d["capacity"], d["booked_count"], int(d["held"]) + int(d.get("pending") or 0))
 
 
 def sale_rule(p: dict) -> dict:

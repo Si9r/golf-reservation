@@ -20,6 +20,9 @@ from .catalog import DEP_SQL, dep_seats, sale_rule, stay_info
 # 소문자는 대문자로 바꿔 검사 (팀 테스트 10/23). 화면 apps/web/src/screens/InfoForm.tsx V21 과 같음
 NAME_EN = re.compile(r"[A-Z]+(?:['-][A-Z]+)*(?: [A-Z]+(?:['-][A-Z]+)*)+")
 NAME_EN_MAX = 60
+# 손님에게 보이는 예약 (S-12·S-13, API-11·12·13): 결제 대기(PENDING_PAYMENT)·미결제(UNPAID)는 보이지 않음
+VISIBLE = ("CONFIRMED", "USER_CANCEL", "OP_CANCEL", "DONE")
+VISIBLE_SQL = "('" + "','".join(VISIBLE) + "')"
 HHMM = re.compile(r"([01]\d|2[0-3]):[0-5]\d")
 
 
@@ -191,7 +194,7 @@ def create_booking(m: Member, req: dict) -> dict:
 
     # 2)~3) 트랜잭션
     with tx() as c:
-        if one(c, "SELECT no FROM booking WHERE payment_id = :p", p=req["paymentId"]):
+        if one(c, "SELECT no FROM booking WHERE order_id = :p", p=req["paymentId"]):
             fail("E-STATE")  # 같은 결제로 두 번 예약 방지
         d = _lock_departure(c, hold["departure_id"])
         alive = one(c, "SELECT expires_at > UTC_TIMESTAMP(3) alive FROM seat_hold WHERE id = :id", id=hold["id"])
@@ -202,7 +205,7 @@ def create_booking(m: Member, req: dict) -> dict:
                    "ON DUPLICATE KEY UPDATE last_no = LAST_INSERT_ID(last_no + 1)", d=d["dep_date"])
             seq = one(c, "SELECT LAST_INSERT_ID() n")["n"]
             no = booking_no(d["dep_date"], int(seq))
-            run(c, """INSERT INTO booking (no, member_id, departure_id, hotel_option_id, people, single_count, unit_price, total_price, status, payment_id, lang)
+            run(c, """INSERT INTO booking (no, member_id, departure_id, hotel_option_id, people, single_count, unit_price, total_price, status, order_id, lang)
                       VALUES (:no, :m, :d, :o, :n, :s, :u, :t, 'CONFIRMED', :pay, :lang)""",
                 no=no, m=m.memberId, d=d["id"], o=req.get("optionId"), n=people, s=(q["rooms"] or {}).get("singles", 0),
                 u=q["unitPrice"], t=q["total"], pay=req["paymentId"], lang=req["lang"])
@@ -236,7 +239,7 @@ def list_bookings(m: Member, departure_id: str | None = None) -> list[dict]:
     with conn() as c:
         rs = rows(c, f"""SELECT b.no, p.id package_id, p.name_ko, p.name_ja, d.dep_date, b.people, b.total_price, b.status, d.status dstatus
                          FROM booking b JOIN departure d ON d.id = b.departure_id JOIN package p ON p.id = d.package_id
-                         WHERE b.member_id = :m {"AND b.departure_id = :d AND b.status = 'CONFIRMED'" if departure_id else ""}
+                         WHERE b.member_id = :m AND b.status IN {VISIBLE_SQL} {"AND b.departure_id = :d AND b.status = 'CONFIRMED'" if departure_id else ""}
                          ORDER BY d.dep_date DESC, b.no""", m=m.memberId, d=departure_id)
     return [{"no": r["no"], "packageId": r["package_id"], "packageName": {"ko": r["name_ko"], "ja": r["name_ja"]}, "depDate": r["dep_date"],
              "people": r["people"], "total": r["total_price"], "status": r["status"], "tab": booking_tab(r["status"]), "departureStatus": r["dstatus"]} for r in rs]
@@ -246,6 +249,8 @@ def get_booking(m: Member, no: str) -> dict:
     """API-12: 예약 상세 (본인만)"""
     with conn() as c:
         b = one(c, "SELECT * FROM booking WHERE no = :no", no=no) or fail("E-NOTFOUND")
+        if b["status"] not in VISIBLE:  # 결제 대기·미결제는 손님 상세에 없음 (결제 결과는 /payment)
+            fail("E-NOTFOUND")
         if b["member_id"] != m.memberId:
             fail("E-FORBID")
         d = one(c, DEP_SQL + " WHERE d.id = :id", id=b["departure_id"])
@@ -284,7 +289,7 @@ def save_companions(m: Member, no: str, companions: list[dict]) -> dict:
 
 
 def _booking_for_cancel(c: Connection, no: str) -> dict:
-    return one(c, "SELECT status, departure_id, people, payment_id, total_price FROM booking WHERE no = :no FOR UPDATE", no=no) or fail("E-NOTFOUND")
+    return one(c, "SELECT status, departure_id, people, order_id, total_price FROM booking WHERE no = :no FOR UPDATE", no=no) or fail("E-NOTFOUND")
 
 
 def _cancel_confirmed(c: Connection, no: str, b: dict, note: str | None) -> None:
@@ -303,7 +308,7 @@ def cancel_by_user(no: str, note: str) -> dict:
             fail("E-STATE")
         _cancel_confirmed(c, no, b, note)
     # L-15 환불 요청 (금액·수수료는 메인 사이트 규정 → 결제 전액을 넘기고 메인 사이트가 계산한다고 가정, 확인 필요)
-    rf = payment.refund(b["payment_id"], b["total_price"], "user-cancel")
+    rf = payment.refund(b["order_id"], b["total_price"], "user-cancel")
     with tx() as c:
         run(c, "UPDATE booking SET refund_id=:r, refund_status='REQUESTED' WHERE no=:no", r=rf, no=no)
         rep = one(c, "SELECT email FROM booking_member WHERE booking_no=:no AND seq=1", no=no)

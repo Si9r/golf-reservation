@@ -475,3 +475,31 @@ def test_session_cookie_and_once_per_request(client):  # user_session 쿠키 →
     assert {k: r.json()[k] for k in ("memberId", "nameLocal", "nameEn", "email", "phone", "logoutUrl")} == \
         {"memberId": "M0002", "nameLocal": "田中 太郎", "nameEn": "", "email": "demo2@example.com", "phone": "+81 90-1234-5678", "logoutUrl": None}
     assert [c for c in partner.calls if c[0] == "session"] == [("session", "demo:M0002")]
+
+
+# ---------- 결제 대기·미결제 (본 사이트 결제 연동 2단계) ----------
+def seats_of(client, dep):
+    d = dep.split("-")[-1]
+    items = client.get(U + f"/packages/{dep[:7]}/departures", params={"month": f"{d[:4]}-{d[4:6]}", "people": 1}).json()["items"]
+    return next(x["seatsLeft"] for x in items if x["id"] == dep)
+
+
+def test_seats_count_pending_payment(client):  # 잔여석 = 정원 − 확정 − 결제 대기(주문 후는 계속, 주문 전은 10분까지) − 확보
+    dep = "PKG-001-20261113"
+    set_booked(dep, 10)
+    base = seats_of(client, dep)
+    assert base == 10
+    with tx() as c:
+        run(c, """INSERT INTO booking (no, member_id, departure_id, people, unit_price, total_price, status, order_id, lang, created_at) VALUES
+                  ('GT-261113-9001', 'M0001', :d, 3, 1, 3, 'PENDING_PAYMENT', 'ORD-X1', 'ko', UTC_TIMESTAMP(3) - INTERVAL 2 HOUR),
+                  ('GT-261113-9002', 'M0001', :d, 2, 1, 2, 'PENDING_PAYMENT', NULL, 'ko', UTC_TIMESTAMP(3)),
+                  ('GT-261113-9003', 'M0001', :d, 4, 1, 4, 'PENDING_PAYMENT', NULL, 'ko', UTC_TIMESTAMP(3) - INTERVAL 11 MINUTE),
+                  ('GT-261113-9004', 'M0001', :d, 5, 1, 5, 'UNPAID', 'ORD-X4', 'ko', UTC_TIMESTAMP(3))""", d=dep)
+    try:
+        assert seats_of(client, dep) == 10 - 3 - 2  # 주문 후 대기 3 (2시간 지나도) + 주문 전 대기 2 (10분 안). 주문 전 11분 지난 4·미결제 5는 안 셈
+        items = client.get(U + "/bookings", headers=A).json()["items"]
+        assert not [x for x in items if x["no"].startswith("GT-261113-9")]  # 손님 목록에 안 보임
+        assert client.get(U + "/bookings/GT-261113-9001", headers=A).json()["error"] == "E-NOTFOUND"  # 손님 상세에도 안 보임
+    finally:
+        with tx() as c:
+            run(c, "DELETE FROM booking WHERE no LIKE 'GT-261113-9%'")
