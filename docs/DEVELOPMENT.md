@@ -124,6 +124,7 @@ API를 빼면(`VITE_USE_API` 없음) 지금처럼 브라우저 안 데이터로�
 | 결제 후 출발편이 이미 운행 취소면 바로 OP_CANCEL + 전액 환불(`operator_cancel`). 운행 취소 환불은 주문별로 차례로, 한 건이 실패해도 계속(FAIL 기록 + 운영자 알림 → B-07 재시도). 운영자 알림은 `notification` `OPS_ALERT` + `.env` `OPS_EMAIL` | 작업 지시 (10/27) |
 | **예약 확인 메일(CONFIRM)은 본 사이트가 보냄** → 이 서비스는 보내지 않음(템플릿은 남김). 출발 확정 GO·승차 시간 안내 PICKUP은 이 서비스가 보냄(PICKUP 템플릿만, 보내는 곳은 API-17과 함께). 운행 취소 CANCEL·고객 취소 USER_CANCEL은 담당이 정해질 때까지 그대로 보냄 | 작업 지시 (10/27). CANCEL·USER_CANCEL 보내는 쪽은 답 대기 |
 | 결과 화면 재확인: 결제 대기(pending·authenticating)면 30초 간격 3번, 그래도 대기면 '결제를 확인하고 있어요' 안내(확정되면 예약 조회에 나옴) | 작업 지시 (10/27) |
+| 승하차 가능 범위를 삿포로 중심(TV탑 부근 43.0621, 141.3544) 반경 **12km → 3km**로: 서버 `service_area`(Alembic `0004`, `seed/demo_data.json`), 화면 `data.ts` `ZONES_STRICT`. 삿포로역·오도리·스스키노·나카지마 공원까지 들어가고 마루야마(약 3.2km)·삿포로돔·신삿포로는 빠짐. 이미 있는 예약은 다시 검사하지 않음 | 팀 결정 (2026-10-27): 합승 버스 정차를 도심에 모아 승차 시간을 줄임. 운영사 확인은 질문표 10번 |
 
 ## 4. 답을 기다리는 것 (막히는 곳)
 
@@ -145,11 +146,11 @@ API를 빼면(`VITE_USE_API` 없음) 지금처럼 브라우저 안 데이터로�
 | 19 | 본 사이트 테스트 서버 주소·API 키 | `.env` `PARTNER_API_BASE`·`PARTNER_API_KEY` → `PAYMENT_BACKEND=partner` |
 | 8 | 상품 데이터 형식 + 출발편당 골프 팀 수·객실 수 상한 | API-15 / B-05 (틀만), `package.single_add`, 화면 `data.ts` 상품 데이터 (API-02 연결 대기) |
 | 9 | 실제 승차 시간·정차 순서를 정하는 주체·등록 시점 (이전 Q-23) | API-17 `routes.py` `admin_stops` (틀만), `booking_stop.stop_order`·`pickup_time` |
-| 10 | 승하차 가능 지역(삿포로 시내) 범위 (지금 중심 반경 12km) | `service_area` 데이터 (`seed/demo_data.json`), 화면 `data.ts` `ZONES_STRICT` |
+| 10 | 승하차 가능 지역(삿포로 시내) 범위 (질문표에는 12km로 보냄 → 10/27 팀 결정으로 3km) | `service_area` 데이터 (`seed/demo_data.json`), 화면 `data.ts` `ZONES_STRICT` |
 | 11 | 안내 메일: **보내는 주소 확정 대기** (이 서비스가 직접 보내는 것은 운영사 확정 10/26, 이전 Q-30) | `.env` `MAIL_FROM`·`MAIL_FROM_NAME`·`SMTP_*` → `MAIL_BACKEND=smtp`로 켜기 (`adapters/mail.py`) |
 | 12 | 고객센터 전화번호·이메일 (운영 시간은 받음) | 서버 `.env` `SUPPORT_TEL`·`SUPPORT_EMAIL` → `settings.SUPPORT`(메일·API-14). 화면 `data.ts` `SUPPORT_TEL`·`SUPPORT_MAIL`, `packages/shared` `SUPPORT`는 아직 예시 값 |
 | 13 | Google 지도 비용·키 발급 부담 | 화면 `apps/web/.env.local` `VITE_GOOGLE_MAPS_API_KEY`, `gmaps.ts` `MAP_ID`, API-05 (틀만) |
-| 14 | 리조트 패키지 승하차 범위 (운영사 내부 결정 대기) | 지금은 모든 패키지가 삿포로 중심 반경 12km 하나를 씀 (`service_area`, 화면 `data.ts` `ZONES_STRICT`). 아래 '리조트 패키지 승하차 범위' 참고 |
+| 14 | 리조트 패키지 승하차 범위 (운영사 내부 결정 대기) | 지금은 모든 패키지가 삿포로 중심 반경 3km 하나를 씀 (`service_area`, 화면 `data.ts` `ZONES_STRICT`). 아래 '리조트 패키지 승하차 범위' 참고 |
 
 ### 리조트 패키지 승하차 범위 — 지금 구조와 바꾸는 방법 (구현 안 함)
 

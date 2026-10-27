@@ -16,7 +16,7 @@ interface AppState {
   stage: 1 | 2 | 3; // MVP 단계 미리보기
   failNext: boolean; // 다음 불러오기에서 통신 오류 (C-09 데모)
   payResult: PayResult; // 다음 결제 결과 (성공 / 실패 E-PAY / 결제 후 자리 없음 E-SOLDOUT)
-  wideArea: boolean; // 승하차 범위: false = 상세설계(삿포로 12km), true = 넓은 범위(공항 포함, 확인 필요)
+  wideArea: boolean; // 승하차 범위: false = 삿포로 중심 3km, true = 넓은 범위(공항 포함, 확인 필요)
   setLang: (l: Lang) => void;
   set: (p: Partial<AppState>) => void;
 }

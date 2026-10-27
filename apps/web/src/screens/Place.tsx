@@ -566,7 +566,7 @@ export default function Place() {
       )}
       <div className="mt-5">{summaryEl}</div>
       <div className="mt-4">{feeEl}</div>
-      <p className="mt-2 text-[12px] text-muted">{!anno ? null : serviceArea.wide ? "SERVICE_AREA: 넓은 범위 (기타히로시마·치토세·공항 포함, 확인 필요)" : `SERVICE_AREA: 삿포로 중심 반경 ${ZONES_STRICT[0].r / 1000}km (상세설계 설정값)`}</p>
+      <p className="mt-2 text-[12px] text-muted">{!anno ? null : serviceArea.wide ? "SERVICE_AREA: 넓은 범위 (기타히로시마·치토세·공항 포함, 확인 필요)" : `SERVICE_AREA: 삿포로 중심 반경 ${ZONES_STRICT[0].r / 1000}km (팀 결정 10/27)`}</p>
       </div>
       {bottomEl}
     </div>
