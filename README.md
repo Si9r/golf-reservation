@@ -207,7 +207,8 @@ npm test                  # 화면 쪽 규칙 (packages/shared)
 
 - `fake`(기본): 가짜 본 사이트 (`apps/api/app/adapters/partner.py` `FakePartner`). 로컬 개발·테스트용
   - 로그인: 화면 데모 로그인 버튼, 또는 요청 헤더 `Authorization: Bearer demo:M0001`
-  - 결제: 주문을 만들면 바로 `paid`, 결제창 없이 결과 화면으로 돌아옴
+  - 결제: S-10 '결제하기' → **가짜 결제창**(`/api/golf/dev/fake-checkout/<주문>`, `apps/api/app/fake_checkout.py`)에서 결제 성공 · 결제 실패 · 시간 만료 · 카드 인증 중을 골라 결과 화면 확인. 주문 목록 `/api/golf/dev/fake-checkout`에서 '카드 인증 중'으로 둔 주문을 나중에 바꿀 수 있음 (가짜 주문은 서버를 다시 켜면 사라짐). partner 모드에는 이 경로가 없음
+  - 테스트(pytest)는 결제창 없이 `FakePartner.next_status`로 결과를 정함
 - `partner`: 실제 본 사이트 (`PARTNER_API_BASE`, `PARTNER_API_KEY`. 값은 배포 환경에만)
   - 로그인: 본 사이트 `user_session` 쿠키 → `GET /api/partner/session`. 로그인 안 됐으면 `LOGIN_URL?next=<골프 화면>`으로
   - 결제: S-09 '다음' = 결제 대기 예약(`PENDING_PAYMENT`) → S-10 결제 = 본 사이트 주문 → 결제창 → 결과 화면 `#/golf/payment/return?no=`(`PAYMENT_RETURN_URL`)

@@ -670,3 +670,24 @@ def test_refund_unpaid_order_refused(client):  # 미결제 주문 환불 → 본
     r = client.post(U + f"/admin/bookings/{no}/cancel", json={"cancelNote": "고객 요청"}, headers=ADMIN).json()
     assert r == {"status": "USER_CANCEL", "refundStatus": "FAIL"}
     assert db1("SELECT error FROM notification WHERE booking_no = :no AND kind = 'OPS_ALERT'", no=no)["error"].startswith("환불 실패 (customer_cancel): 본 사이트 409 refused")
+
+
+def test_fake_checkout_page(client):
+    """fake 모드 가짜 결제창: 주문은 pending, 결제창에서 고른 결과대로 확정·미결제 (돌아가는 주소는 경로·# 만)"""
+    from app.adapters.partner import partner
+
+    partner.page = True
+    for choice, want in (("paid", "CONFIRMED"), ("failed", "UNPAID")):
+        r = client.post("/api/golf/bookings", json=body(hold(client)), headers=A)
+        assert r.status_code == 201, r.text
+        no = r.json()["bookingNo"]
+        co = client.post(f"/api/golf/bookings/{no}/checkout", headers=A).json()
+        assert co["status"] == "PENDING_PAYMENT" and co["checkoutUrl"].startswith("/api/golf/dev/fake-checkout/")
+        page = client.get(co["checkoutUrl"])
+        assert page.status_code == 200 and no in page.text
+        assert no in client.get("/api/golf/dev/fake-checkout").text
+        r = client.post(co["checkoutUrl"], content=f"status={choice}", headers={"content-type": "application/x-www-form-urlencoded"}, follow_redirects=False)
+        assert r.status_code == 303 and r.headers["location"] == f"/#/golf/payment/return?no={no}"
+        assert client.get(f"/api/golf/bookings/{no}/payment", headers=A).json()["status"] == want
+    assert client.post(co["checkoutUrl"], content="status=hack", headers={"content-type": "application/x-www-form-urlencoded"}).status_code == 400
+

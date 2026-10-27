@@ -7,12 +7,17 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import errors
+from .config import env
 from .routes import router
 
 logging.basicConfig(level=logging.INFO)
 app = FastAPI(title="홋카이도 골프투어 API", version="0.1.0", docs_url="/api/golf/docs", openapi_url="/api/golf/openapi.json")
 errors.install(app)
 app.include_router(router)
+if env.PAYMENT_BACKEND.lower() == "fake":  # 가짜 결제창은 fake 모드에서만 (partner 모드에는 경로 자체가 없음)
+    from .fake_checkout import router as fake_checkout
+
+    app.include_router(fake_checkout)
 
 
 @app.get("/health")

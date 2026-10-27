@@ -103,21 +103,24 @@ _DEMO_USERS = {
 @dataclass
 class FakePartner:
     """로컬 개발·테스트용 본 사이트. 세션 'demo:<회원ID>' 를 로그인으로 봄.
-    주문은 만들 때 next_status(기본 paid) 상태가 되고, checkout_url 은 return_url 그대로 (결제창을 거치지 않고 바로 결과 화면).
+    page=True (서버 실행 기본): 주문은 pending 으로 만들고 checkout_url = 가짜 결제창 (fake_checkout.py). 결제창에서 결과를 고름
+    page=False (테스트): 주문은 만들 때 next_status(기본 paid) 상태, checkout_url 은 return_url 그대로 (결제창 없이 바로 결과 화면).
     테스트는 next_status · set_status · fail_cancel · api_key 로 본 사이트 응답을 흉내 냄"""
 
+    page: bool = True
     next_status: str = ORDER_PAID
     api_key: str | None = None  # 값이 있으면 env.PARTNER_API_KEY 와 비교해 다르면 401 unauthorized
     orders: dict = field(default_factory=dict)  # order_id → order
     by_ref: dict = field(default_factory=dict)  # reference → order_id
     fail_cancel: dict = field(default_factory=dict)  # order_id → (status, code) 환불 호출을 실패시킴
     calls: list = field(default_factory=list)  # (메서드, 인자) 기록
+    meta: dict = field(default_factory=dict)  # order_id → {return_url, title} 가짜 결제창 표시용
     _lock: threading.Lock = field(default_factory=threading.Lock)
 
     def reset(self) -> None:
         with self._lock:
             self.next_status, self.api_key = ORDER_PAID, None
-            self.orders.clear(), self.by_ref.clear(), self.fail_cancel.clear(), self.calls.clear()
+            self.orders.clear(), self.by_ref.clear(), self.fail_cancel.clear(), self.calls.clear(), self.meta.clear()
 
     def _key(self) -> None:
         if self.api_key is not None and env.PARTNER_API_KEY != self.api_key:
@@ -140,8 +143,10 @@ class FakePartner:
             if body["reference"] in self.by_ref:
                 raise PartnerError(409, "duplicate_reference", {"error": "duplicate_reference", "order": dict(self.orders[self.by_ref[body["reference"]]])})
             oid = f"ORD-{uuid.uuid4().hex[:12].upper()}"  # 초기화(reset)해도 겹치지 않게
-            o = {"order_id": oid, "status": self.next_status, "checkout_url": body["return_url"], "reference": body["reference"], "amount": body["amount"]}
+            st, url = (ORDER_PENDING, f"/api/golf/dev/fake-checkout/{oid}") if self.page else (self.next_status, body["return_url"])
+            o = {"order_id": oid, "status": st, "checkout_url": url, "reference": body["reference"], "amount": body["amount"]}
             self.orders[oid], self.by_ref[body["reference"]] = o, oid
+            self.meta[oid] = {"return_url": body["return_url"], "title": body["title"].get("ko") or body["title"]["ja"]}
             return dict(o)
 
     def get_order(self, order_id: str) -> dict:

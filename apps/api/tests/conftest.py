@@ -53,6 +53,7 @@ def reset():
     clock.set_today("2026-10-19")
     if hasattr(partner, "reset"):
         partner.reset()  # 가짜 본 사이트 상태 초기화
+        partner.page = False  # 테스트는 가짜 결제창 없이 next_status 로 결과를 정함
     with tx() as c:
         run(c, "DELETE FROM seat_hold")
         run(c, "UPDATE booking SET status = 'UNPAID' WHERE status = 'PENDING_PAYMENT'")  # 앞 테스트의 결제 대기가 좌석을 잡지 않게
