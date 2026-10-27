@@ -197,19 +197,24 @@ npm test                  # 화면 쪽 규칙 (packages/shared)
 ```
 
 통합 테스트는 `golf_test` DB의 테이블을 모두 지우고 다시 만듭니다 (`TEST_DATABASE_URL`로 변경).
-좌석 동시 확보, 결제 실패·금액 불일치, 확보 만료 후 결제, 출발 판정, 고객 취소(API-16·API-19),
+좌석 동시 확보, 결제 대기·확정·미결제(본 사이트 가짜 연결), 중복 주문·중복 확정, 운행 취소 환불·재시도, 출발 판정, 고객 취소(API-16·API-19),
 희망 승하차 시간 범위(V-12), 영문 풀네임(V-21·V-24), 동반자 이름 필수·수정까지 확인합니다.
 
-## 로그인 · 결제 (가짜 연결)
+## 로그인 · 결제 · 환불 (본 사이트 연동)
 
-메인 사이트 연동 방식이 정해지기 전(질문 Q-14·Q-15)이라 가짜로 동작합니다.
+본 사이트(TRAVENDER) API는 골프 서버(`apps/api`)에서만 부릅니다. 브라우저는 본 사이트 API를 직접 부르지 않습니다.
+`.env`의 `PAYMENT_BACKEND`로 고릅니다.
 
-- 로그인: 요청 헤더 `Authorization: Bearer demo:M0001`
-- 결제: 결제 ID가 `PAY-FAIL…`이면 실패, `PAY-AMT…`이면 금액 불일치, 그 외는 성공
-- 메일: 이 서비스가 직접 보냄 (`apps/api/app/adapters/mail.py`). `.env` `MAIL_BACKEND=log`(기본)는 보내지 않고 로그만, `smtp`는 `MAIL_FROM`·`SMTP_*` 설정으로 실제 발송. 결과는 `notification` 테이블에 OK/FAIL로 기록 (보내는 주소는 확정 대기)
-- 화면(API 모드)은 로그인하면 데모 회원 `M0001`의 토큰을 붙여 부릅니다 (`apps/web/src/api/sync.ts` `syncToken`)
-
-정해지면 `apps/api/app/adapters/`에 실제 연결을 추가하고 `.env`의 `AUTH_PROVIDER` 등으로 바꿉니다.
+- `fake`(기본): 가짜 본 사이트 (`apps/api/app/adapters/partner.py` `FakePartner`). 로컬 개발·테스트용
+  - 로그인: 화면 데모 로그인 버튼, 또는 요청 헤더 `Authorization: Bearer demo:M0001`
+  - 결제: 주문을 만들면 바로 `paid`, 결제창 없이 결과 화면으로 돌아옴
+- `partner`: 실제 본 사이트 (`PARTNER_API_BASE`, `PARTNER_API_KEY`. 값은 배포 환경에만)
+  - 로그인: 본 사이트 `user_session` 쿠키 → `GET /api/partner/session`. 로그인 안 됐으면 `LOGIN_URL?next=<골프 화면>`으로
+  - 결제: S-09 '다음' = 결제 대기 예약(`PENDING_PAYMENT`) → S-10 결제 = 본 사이트 주문 → 결제창 → 결과 화면 `#/golf/payment/return?no=`(`PAYMENT_RETURN_URL`)
+  - 환불: 운행 취소 `operator_cancel`, 고객 취소 `customer_cancel`. 실패하면 `refund_status=FAIL` + 운영자 알림(`OPS_EMAIL`), 배치 B-07이 다시 시도
+- 결제 확인 배치 B-08(10분마다): 주문 전 결제 대기 10분 만료, 주문 후 결제 대기는 본 사이트에 다시 조회
+- 본 사이트 Partner API 사양서 원본을 받기 전이라 요청·응답 모양은 가정입니다. `partner.py` 맨 위 '가정' 목록만 맞추면 됩니다
+- 메일: 이 서비스가 직접 보냄 (`apps/api/app/adapters/mail.py`). `.env` `MAIL_BACKEND=log`(기본)는 보내지 않고 로그만, `smtp`는 `MAIL_FROM`·`SMTP_*` 설정으로 실제 발송. 결과는 `notification` 테이블에 OK/FAIL로 기록 (보내는 주소는 확정 대기). 예약 확인(CONFIRM)은 본 사이트가 보냄
 
 ### 본 사이트 → 이 서비스 (API-19)
 
