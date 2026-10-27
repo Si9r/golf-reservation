@@ -8,7 +8,7 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Depends, Header, Query, Request, Response
 
 from . import settings as S
-from .adapters.auth import Member, auth
+from .adapters.auth import Member, login_url, member_of
 from .config import env
 from .db import conn, one, rows
 from .errors import fail
@@ -24,7 +24,8 @@ MonthQ = Annotated[str, Query(pattern=r"^\d{4}-(0[1-9]|1[0-2])$")]
 
 
 def member(req: Request) -> Member:
-    return auth.member_of(req) or fail("E-AUTH")
+    """회원이 필요한 API: 로그인 안 됨 → 401 + 로그인 주소 (화면은 그 주소로 이동, 로그인 뒤 next 로 돌아옴)"""
+    return member_of(req) or fail("E-AUTH", extra={"loginUrl": login_url(req)})
 
 
 def admin(x_admin_key: Annotated[str | None, Header()] = None) -> None:
@@ -135,10 +136,11 @@ def settings_public():
             "holdMinutes": S.HOLD_MINUTES, "closedSeason": S.CLOSED_SEASON, "singleAdd": S.SINGLE_ADD, "serviceAreas": areas}
 
 
-# API-18 로그인 회원 정보 (TBD-03)
+# API-18 로그인 회원 정보: 본 사이트 세션의 이름·이메일·전화 (영문 이름은 골프 화면에서 입력).
+# logoutUrl = 본 사이트 로그아웃 (partner 모드만. fake 모드는 null → 화면의 데모 로그아웃)
 @router.get("/me")
 def me(m: Me):
-    return asdict(m)
+    return {**asdict(m), "logoutUrl": env.LOGOUT_URL if env.PAYMENT_BACKEND.lower() == "partner" else None}
 
 
 # ---- 운영 API (운영 키 X-Admin-Key) ----

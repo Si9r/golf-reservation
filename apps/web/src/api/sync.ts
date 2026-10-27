@@ -5,8 +5,8 @@ import { useEffect } from "react";
 import { create } from "zustand";
 import type { DepartureItem } from "@golf/shared";
 import { PKGS, type Place } from "../data";
-import type { Booking } from "../store";
-import { USE_API, api, apiPkgId, optCode, protoId, setToken, type ApiBooking } from "./client";
+import { useAuth, type Booking } from "../store";
+import { ApiError, USE_API, api, apiPkgId, optCode, protoId, setToken, type ApiBooking } from "./client";
 
 const deps = new Map<string, DepartureItem>(); // key: `${protoPkgId}|${date}`
 const loaded = new Set<string>(); // key: `${protoPkgId}|${ym}`
@@ -74,6 +74,30 @@ export function useCalendar(ym: string, people: number) {
 // ---------- 로그인 토큰 (가짜 연결: Bearer demo:M0001) ----------
 export const DEMO_MEMBER = "M0001";
 export const syncToken = (loggedIn: boolean) => setToken(USE_API && loggedIn ? `demo:${DEMO_MEMBER}` : null);
+
+// ---------- 로그인 회원 (API-18 /me = 본 사이트 세션) ----------
+/** 본 사이트 로그아웃 주소 (partner 모드만, 없으면 화면의 데모 로그아웃) */
+export let logoutUrl: string | null = null;
+/** 서버에 로그인 회원을 물어 화면 로그인 상태(useAuth)를 맞춤. 이름·이메일·전화는 본 사이트 값, 영문 이름은 골프 화면에서 입력 */
+export async function loadMe(): Promise<boolean> {
+  if (!USE_API) return !!useAuth.getState().user;
+  try {
+    const m = await api.me();
+    logoutUrl = m.logoutUrl;
+    const prev = useAuth.getState().user;
+    const ph = /^(\+\d{1,4})[\s-]+(.+)$/.exec(m.phone ?? "");
+    useAuth.setState({
+      user: {
+        memberId: m.memberId, nameKo: m.nameLocal, nameEn: prev?.memberId === m.memberId ? prev.nameEn : "", email: m.email,
+        cc: m.countryCode || ph?.[1] || prev?.cc || "+82", phone: ph ? ph[2] : m.phone,
+      },
+    });
+    return true;
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 401) useAuth.setState({ user: null });
+    return false;
+  }
+}
 
 // ---------- 예약: 서버 응답 → 화면의 Booking 모양 ----------
 const placeOf = (s: ApiBooking["stops"][number] | undefined): Place | null =>

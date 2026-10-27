@@ -14,25 +14,46 @@ export class ApiError extends Error {
   }
 }
 
-// 로그인: 메인 사이트 연동 방식(TBD-03) 전까지는 데모 토큰
+// 로그인: 본 사이트 세션(user_session 쿠키)은 브라우저가 같은 주소로 자동으로 보냄. 서버가 본 사이트에 확인 (화면은 본 사이트 API를 직접 부르지 않음)
+// 서버가 PAYMENT_BACKEND=fake 이면 개발용 데모 토큰(Bearer demo:M0001)으로 로그인
 let token: string | null = null;
 export const setToken = (t: string | null) => { token = t; };
 
-async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
+/** 로그인이 필요한 API가 401 + loginUrl 을 주면 그 주소(본 사이트 로그인, ?next=지금 화면)로 이동. 개발용 데모 로그인(#/login)은 화면 안에서 처리 */
+const goLogin = (url: string | undefined) => {
+  if (url && !url.startsWith("/#/")) window.location.assign(url);
+};
+
+async function req<T>(method: string, path: string, body?: unknown, opt: { noRedirect?: boolean } = {}): Promise<T> {
   const r = await fetch(BASE + path, {
     method,
-    headers: { ...(body ? { "content-type": "application/json" } : {}), ...(token ? { authorization: `Bearer ${token}` } : {}) },
+    credentials: "same-origin",
+    headers: {
+      ...(body ? { "content-type": "application/json" } : {}),
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
+      "x-return-to": window.location.pathname + window.location.hash, // 로그인 뒤 돌아올 화면 (서버가 loginUrl 의 next 로 씀)
+    },
     body: body ? JSON.stringify(body) : undefined,
   });
   if (r.status === 204) return undefined as T;
   const j = await r.json().catch(() => ({ error: "E-SERVER", message: "M-900" }));
-  if (!r.ok) throw new ApiError(r.status, j as ApiErrorBody);
+  if (!r.ok) {
+    if (r.status === 401 && !opt.noRedirect) goLogin((j as { loginUrl?: string }).loginUrl);
+    throw new ApiError(r.status, j as ApiErrorBody);
+  }
   return j as T;
 }
 const qs = (o: Record<string, string | number | null | undefined>) =>
   "?" + Object.entries(o).filter(([, v]) => v !== null && v !== undefined && v !== "").map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join("&");
 
+/** API-18 로그인 회원 (본 사이트 세션). logoutUrl 은 partner 모드에서만 */
+export interface MeRes { memberId: string; nameLocal: string; nameEn: string; countryCode: string; phone: string; email: string; logoutUrl: string | null }
+
 export const api = {
+  /** API-18 로그인 회원. 로그인 안 됨(401)이어도 이동하지 않음 (화면이 로그인 여부만 확인) */
+  me: () => req<MeRes>("GET", "/me", undefined, { noRedirect: true }),
+  /** API-18 로그인 회원. 로그인 안 됐으면 본 사이트 로그인으로 이동 (로그인 화면 자리에서 씀) */
+  meOrLogin: () => req<MeRes>("GET", "/me"),
   /** API-01 */
   packages: (o: { q?: string; date?: string | null; people: number; nights?: string; zone?: string; rounds?: string; sort?: string }) => req<PackageListRes>("GET", "/packages" + qs(o)),
   /** API-03 출발일 목록 */

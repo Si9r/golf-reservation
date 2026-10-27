@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
 import { SERVICE_NAME } from "../data";
 import { useApp, useAuth } from "../store";
+import { logoutUrl } from "../api/sync";
 import { useT } from "../i18n";
 import { Anno, Sheet } from "./ui";
 
@@ -48,7 +49,10 @@ export function Header() {
   const nav = useNavigate();
   const loc = useLocation();
   const user = useAuth((s) => s.user);
+  const demoLogout = useAuth((s) => s.logout);
   const [confirm, setConfirm] = useState(false);
+  // 로그아웃: 본 사이트 로그아웃(partner 모드, /me 의 logoutUrl). 없으면 데모 로그아웃 (골프 쪽 로그아웃 화면은 없음)
+  const logout = () => (logoutUrl ? window.location.assign(logoutUrl) : demoLogout());
   const goHome = () => {
     if (isBookingPath(loc.pathname)) setConfirm(true);
     else nav("/golf");
@@ -74,6 +78,9 @@ export function Header() {
             <button onClick={() => nav("/golf/my")} className="max-w-[92px] truncate whitespace-nowrap rounded-full border-[1.5px] border-line px-2.5 py-1.5 text-[13px] font-bold" title={t("myBookings")}>
               {t("nameSuffix", { n: user.nameKo })}
             </button>
+          ) : null}
+          {user ? (
+            <button onClick={logout} className="whitespace-nowrap px-1 text-[12.5px] font-semibold text-muted underline-offset-2 hover:underline">{t("logout")}</button>
           ) : (
             <button onClick={() => nav(`/login?next=${encodeURIComponent(loc.pathname + loc.search)}`)} className="whitespace-nowrap rounded-full border-[1.5px] border-line px-2.5 py-1.5 text-[13px] font-bold hover:border-brand hover:text-brand">
               {t("login")}

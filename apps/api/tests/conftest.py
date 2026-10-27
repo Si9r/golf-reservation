@@ -48,7 +48,11 @@ def reset():
     from app import clock
     from app.db import tx, run
 
+    from app.adapters.partner import partner
+
     clock.set_today("2026-10-19")
+    if hasattr(partner, "reset"):
+        partner.reset()  # 가짜 본 사이트 상태 초기화
     with tx() as c:
         run(c, "DELETE FROM seat_hold")
     yield

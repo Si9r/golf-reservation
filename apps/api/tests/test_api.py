@@ -443,3 +443,35 @@ def test_mail_smtp_backend(client, monkeypatch):  # MAIL_BACKEND=smtp: 보내는
     assert ("connect", "smtp.example.jp", 587) in sent and ("starttls",) in sent and ("login", "u") in sent
     assert "golf@example.jp" in msg["From"] and msg["To"] == "a@example.com" and no in msg["Subject"]
     assert db1("SELECT result FROM notification WHERE booking_no = :no", no=no)["result"] == "OK"
+
+
+# ---------- 본 사이트 로그인 연동 (PAYMENT_BACKEND=fake) ----------
+def test_login_required_returns_login_url(client):  # 세션 없음 → 401 + 로그인 주소 (돌아올 화면 경로 포함)
+    r = client.get(U + "/me", headers={"x-return-to": "/#/golf/book/info"})
+    assert r.status_code == 401 and r.json()["error"] == "E-AUTH"
+    assert r.json()["loginUrl"] == "/#/login?next=%2Fgolf%2Fbook%2Finfo"
+    r = client.get(U + "/me", headers={"x-return-to": "https://evil.example/x"})  # 바깥 주소는 next 로 쓰지 않음
+    assert r.json()["loginUrl"] == "/#/login?next=%2Fgolf"
+
+
+def test_login_partner_mode_url(client, monkeypatch):  # partner 모드: 본 사이트 /login?next=<골프 화면 경로>
+    from app.config import env
+
+    monkeypatch.setattr(env, "PAYMENT_BACKEND", "partner")
+    r = client.get(U + "/me", headers={"x-return-to": "/#/golf/my"})
+    assert r.status_code == 401 and r.json()["loginUrl"] == "/login?next=%2F%23%2Fgolf%2Fmy"
+
+
+def test_session_cookie_and_once_per_request(client):  # user_session 쿠키 → 본 사이트 세션 조회는 요청당 한 번, /me 는 이름·이메일·전화
+    from app.adapters.partner import partner
+
+    partner.calls.clear()
+    client.cookies.set("user_session", "demo:M0002")
+    try:
+        r = client.get(U + "/me")
+    finally:
+        client.cookies.clear()
+    assert r.status_code == 200
+    assert {k: r.json()[k] for k in ("memberId", "nameLocal", "nameEn", "email", "phone", "logoutUrl")} == \
+        {"memberId": "M0002", "nameLocal": "田中 太郎", "nameEn": "", "email": "demo2@example.com", "phone": "+81 90-1234-5678", "logoutUrl": None}
+    assert [c for c in partner.calls if c[0] == "session"] == [("session", "demo:M0002")]

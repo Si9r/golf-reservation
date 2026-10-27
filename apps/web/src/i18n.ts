@@ -7,6 +7,7 @@ const ko = {
   // ---------- 공통 ----------
   brandSub: "札幌・北海道ガイド",
   login: "로그인",
+  logout: "로그아웃",
   nameSuffix: "{n} 님",
   close: "닫기",
   golfHome: "골프 홈",
@@ -457,6 +458,7 @@ type Dict = typeof ko;
 const ja: Dict = {
   brandSub: "札幌・北海道ガイド",
   login: "ログイン",
+  logout: "ログアウト",
   nameSuffix: "{n} 様",
   close: "閉じる",
   golfHome: "ゴルフホーム",

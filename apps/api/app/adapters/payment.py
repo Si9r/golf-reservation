@@ -38,7 +38,7 @@ class MockPayment:
 
 
 def _make() -> PaymentProvider:
-    if env.PAYMENT_PROVIDER == "mock":
+    if env.PAYMENT_BACKEND.lower() == "fake":
         return MockPayment()
     raise RuntimeError(f"PAYMENT_PROVIDER={env.PAYMENT_PROVIDER} 는 아직 없습니다 (메인 사이트 결제 API 확정 후 구현)")
 

@@ -2,6 +2,7 @@ import { Suspense, lazy, useEffect } from "react";
 import { HashRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { MotionConfig } from "motion/react";
 import { useApp, useDb } from "./store";
+import { loadMe } from "./api/sync";
 import { Header } from "./components/Shell";
 import { ProtoPanel } from "./components/ProtoPanel";
 import { Toast } from "./components/ui";
@@ -118,6 +119,9 @@ export default function App() {
   useEffect(() => {
     if (!seeded) seed();
   }, [seeded, seed]);
+  useEffect(() => {
+    void loadMe(); // API 모드: 본 사이트 세션으로 로그인 상태 맞추기 (API-18)
+  }, []);
   useEffect(() => {
     document.documentElement.lang = lang;
     document.body.classList.toggle("ja", lang === "ja");
