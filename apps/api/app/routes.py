@@ -105,10 +105,29 @@ def holds_delete(hold_id: int, m: Me):
     return Response(status_code=204)
 
 
-# API-10 예약 확정 (L-08)
+# API-10 예약 만들기 (L-08): 결제 대기(PENDING_PAYMENT)로 저장, 예약번호 발급, 좌석 잡음 (본 사이트 결제 연동 10/27)
 @router.post("/bookings", status_code=201)
 def bookings_create(b: BookingReq, m: Me):
     return B.create_booking(m, b.model_dump())
+
+
+# 결제 대기 예약 그만두기 (S-10 뒤로 가기): 주문 전이면 미결제로 바꿔 좌석을 바로 풂
+@router.delete("/bookings/{no}/pending", status_code=204)
+def bookings_abandon(no: str, m: Me):
+    B.abandon_pending(m, no)
+    return Response(status_code=204)
+
+
+# API-20 결제 시작: 본 사이트 주문 생성 → checkout_url (화면이 그 주소로 이동)
+@router.post("/bookings/{no}/checkout")
+def bookings_checkout(no: str, m: Me):
+    return B.checkout(m, no)
+
+
+# API-21 결제 결과 확인 (결과 화면): 본 사이트 주문 상태를 조회해 확정 · 미결제 · 결제 대기
+@router.get("/bookings/{no}/payment")
+def bookings_payment(no: str, m: Me):
+    return B.payment_status(m, no)
 
 
 # API-11 내 예약 목록 / API-12 상세 / API-13 동반자 명단

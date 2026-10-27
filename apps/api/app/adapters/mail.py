@@ -141,3 +141,14 @@ def notify(c: Connection, booking_no: str, to: str, kind: str, **_: object) -> N
     except Exception as e:  # noqa: BLE001
         log.warning("mail failed %s %s: %s", booking_no, kind, e)
         run(c, "INSERT INTO notification (booking_no, kind, result, error) VALUES (:no, :k, 'FAIL', :e)", no=booking_no, k=kind, e=str(e)[:200])
+
+
+def alert_ops(c: Connection, booking_no: str, text: str) -> None:
+    """운영자 알림 (환불 실패 등): notification 에 OPS_ALERT 로 남기고 OPS_EMAIL 이 있으면 메일. 실패해도 처리는 계속"""
+    log.warning("[ops] %s %s", booking_no, text)
+    try:
+        if env.OPS_EMAIL:
+            mail.send(env.OPS_EMAIL, f"[TRAVENDER 골프 운영 알림] {booking_no}", text)
+        run(c, "INSERT INTO notification (booking_no, kind, result, error) VALUES (:no, 'OPS_ALERT', 'OK', :e)", no=booking_no, e=text[:200])
+    except Exception as e:  # noqa: BLE001
+        run(c, "INSERT INTO notification (booking_no, kind, result, error) VALUES (:no, 'OPS_ALERT', 'FAIL', :e)", no=booking_no, e=f"{text} / {e}"[:200])

@@ -1,12 +1,10 @@
-import random
-import string
 import threading
 
 from fastapi.testclient import TestClient
 
 from app import clock
 from app.db import one, run, tx
-from app.jobs import cleanup_holds, judge_departures
+from app.jobs import check_payments, cleanup_holds, judge_departures
 
 A = {"authorization": "Bearer demo:M0001"}
 B = {"authorization": "Bearer demo:M0002"}
@@ -18,17 +16,17 @@ U = "/api/golf"
 
 
 COMP = ["PARK SEOYEON", "CHOI YUNA", "KANG DOHYUN", "LIM SEOJIN", "YOON JIHO", "HAN SOYEON"]
-HELD: dict[int, int] = {}  # holdId → 인원 (동반자 이름은 인원 − 1명 모두 필수, V-24)
 
 
-def body(hold_id, **over):
-    b = {"holdId": hold_id, "optionId": "PKG-001-mitsui", "lang": "ko",
-         "paymentId": "PAY-" + "".join(random.choices(string.ascii_lowercase, k=10)),
+def body(t=None, **over):
+    """API-10 예약 만들기 요청. t = hold() 가 돌려준 (출발편, 인원)"""
+    dep, people = t or (DEP, 2)
+    b = {"departureId": dep, "people": people, "optionId": "PKG-001-mitsui", "lang": "ko",
          # PKG-001 희망 시간 범위: 승차 10:00~11:00 (첫날 12:30 티오프 − 2시간 30분 ~ 12:30 − 삿포로→기타히로시마 40분 − 30분), 하차 11:00~21:00 (마지막 날 라운드 없음)
          "stops": [{"kind": "PICK", "placeName": "JR 삿포로역 남쪽 출구", **SAPPORO, "memo": "남쪽 출구 앞", "desiredTime": "10:30"},
                    {"kind": "DROP", "placeName": "JR 삿포로역 남쪽 출구", **SAPPORO, "desiredTime": "15:00"}],
          "rep": {"nameLocal": "이정훈", "nameEn": "lee junghoon", "countryCode": "+82", "phone": "10-1234-5678", "email": "a@example.com"},
-         "companions": [{"nameEn": x} for x in COMP[: max(0, HELD.get(hold_id, 1) - 1)]]}
+         "companions": [{"nameEn": x} for x in COMP[: people - 1]]}
     b.update(over)
     return b
 
@@ -44,10 +42,31 @@ def db1(sql, **a):
 
 
 def hold(client, dep=DEP, people=2, h=A):
-    r = client.post(U + "/holds", json={"departureId": dep, "people": people}, headers=h)
+    """예약 요청에 넣을 (출발편, 인원). 결제 연동 뒤로는 좌석 확보 대신 API-10 이 결제 대기 예약으로 좌석을 잡음"""
+    return (dep, people)
+
+
+def fake():
+    from app.adapters.partner import partner
+
+    return partner
+
+
+def pay(client, no, status="paid", h=A):
+    """API-20 주문 생성(가짜 본 사이트가 status 로 만듦) → API-21 결과 확인"""
+    fake().next_status = status
+    r = client.post(U + f"/bookings/{no}/checkout", headers=h)
+    assert r.status_code == 200, r.text
+    return client.get(U + f"/bookings/{no}/payment", headers=h).json()
+
+
+def book_confirmed(client, dep=DEP, people=2, h=A, **over):
+    """결제 대기 예약 → 주문 → paid → 예약 확정. 예약번호를 돌려줌"""
+    r = client.post(U + "/bookings", json=body((dep, people), **over), headers=h)
     assert r.status_code == 201, r.text
-    HELD[r.json()["holdId"]] = people
-    return r.json()["holdId"]
+    no = r.json()["bookingNo"]
+    assert pay(client, no, h=h)["status"] == "CONFIRMED"
+    return no
 
 
 # ---------- 조회 ----------
@@ -103,25 +122,26 @@ def test_hold_requires_login(client):
     assert client.post(U + "/holds", json={"departureId": DEP, "people": 2}).status_code == 401
 
 
-def test_booking_flow(client):
+def test_booking_flow(client):  # 결제 대기 → 주문 → paid → 확정 (확정 인원 증가, 예약 확정 메일은 본 사이트가 보내므로 골프는 안 보냄)
     set_booked(DEP, 10)
-    hid = hold(client, people=3)
-    r = client.post(U + "/bookings", json=body(hid), headers=A)
+    r = client.post(U + "/bookings", json=body((DEP, 3)), headers=A)
     assert r.status_code == 201, r.text
     no = r.json()["bookingNo"]
-    assert no.startswith("GT-261030-")
+    assert no.startswith("GT-261030-") and r.json()["status"] == "PENDING_PAYMENT" and r.json()["total"] == 69800 * 3 + 12000
+    assert db1("SELECT booked_count n FROM departure WHERE id = :id", id=DEP)["n"] == 10  # 결제 전에는 확정 인원 그대로
+    assert pay(client, no) == {"bookingNo": no, "status": "CONFIRMED", "orderStatus": "paid"}
     assert db1("SELECT booked_count n FROM departure WHERE id = :id", id=DEP)["n"] == 13
     assert len(client.get(U + "/bookings", params={"departureId": DEP}, headers=A).json()["items"]) == 1  # 중복 확인 (EV-28 ④)
     det = client.get(U + f"/bookings/{no}", headers=A).json()
     assert det["people"] == 3 and det["singles"] == 1 and det["total"] == 69800 * 3 + 12000
     assert det["members"][0]["nameEn"] == "LEE JUNGHOON"
     assert client.get(U + f"/bookings/{no}", headers=B).json()["error"] == "E-FORBID"
-    assert db1("SELECT kind, result FROM notification WHERE booking_no = :no", no=no) == {"kind": "CONFIRM", "result": "OK"}
+    assert db1("SELECT COUNT(*) n FROM notification WHERE booking_no = :no AND kind = 'CONFIRM'", no=no)["n"] == 0
 
 
 def test_booking_numbers_increase(client):  # L-09
     set_booked(DEP, 0)
-    nos = [client.post(U + "/bookings", json=body(hold(client)), headers=A).json()["bookingNo"] for _ in range(2)]
+    nos = [client.post(U + "/bookings", json=body(hold(client)), headers=h).json()["bookingNo"] for h in (A, B)]
     assert int(nos[1][-4:]) == int(nos[0][-4:]) + 1
 
 
@@ -147,6 +167,7 @@ def test_concurrent_holds_one_wins():
 def test_closed_after_judge_date(client):
     clock.set_today("2026-10-23")  # DEP 판정일 당일
     assert client.post(U + "/holds", json={"departureId": DEP, "people": 2}, headers=A).json()["error"] == "E-CLOSED"
+    assert client.post(U + "/bookings", json=body(), headers=A).json()["error"] == "E-CLOSED"
 
 
 def test_area_and_validation_errors(client):
@@ -161,7 +182,7 @@ def test_area_and_validation_errors(client):
 
 
 def stops_with(pick=None, drop=None):
-    st = body(0)["stops"]
+    st = body()["stops"]
     for s, t in zip(st, (pick, drop)):
         if t is None:
             s.pop("desiredTime")
@@ -183,9 +204,8 @@ def test_desired_time_required(client):  # V-12: 승차 희망 시간은 필수,
 
 def test_drop_time_optional(client):  # 희망 하차 시간은 선택: 없어도 예약되고 상세에는 null
     set_booked(DEP, 0)
-    r = client.post(U + "/bookings", json=body(hold(client), stops=stops_with(pick="10:30")), headers=A)
-    assert r.status_code == 201, r.text
-    stops = client.get(U + f"/bookings/{r.json()['bookingNo']}", headers=A).json()["stops"]
+    no = book_confirmed(client, stops=stops_with(pick="10:30"))
+    stops = client.get(U + f"/bookings/{no}", headers=A).json()["stops"]
     assert {s["kind"]: s["desiredTime"] for s in stops} == {"PICK": "10:30", "DROP": None}
 
 
@@ -201,9 +221,8 @@ def test_desired_time_range(client):  # V-12-range: 첫날 티오프(12:30) 이�
 
 def test_desired_time_saved(client):
     set_booked(DEP, 0)
-    r = client.post(U + "/bookings", json=body(hold(client), stops=stops_with(pick="10:00", drop="11:00")), headers=A)  # 범위 시작
-    assert r.status_code == 201, r.text
-    stops = client.get(U + f"/bookings/{r.json()['bookingNo']}", headers=A).json()["stops"]
+    no = book_confirmed(client, stops=stops_with(pick="10:00", drop="11:00"))  # 범위 시작
+    stops = client.get(U + f"/bookings/{no}", headers=A).json()["stops"]
     assert {s["kind"]: s["desiredTime"] for s in stops} == {"PICK": "10:00", "DROP": "11:00"}
 
 
@@ -222,24 +241,36 @@ def test_stop_time_range():  # 서버 계산 (화면 logic.ts stopTimeRange 와 
     assert stop_time_range(no_round, "DROP", "SAPPORO") == (11 * 60, 21 * 60)  # 마지막 날 라운드 없음 → 11:00
 
 
-def test_payment_fail_and_amount(client):
-    hid = hold(client)
-    assert client.post(U + "/bookings", json=body(hid, paymentId="PAY-FAIL-1"), headers=A).json()["error"] == "E-PAY"
-    assert client.post(U + "/bookings", json=body(hid, paymentId="PAY-AMT-1"), headers=A).json()["error"] == "E-AMOUNT"
+def test_payment_failed_or_expired_releases_seats(client):  # failed · expired → UNPAID, 좌석 해제
+    set_booked(DEP, 16)
+    for st in ("failed", "expired"):
+        no = client.post(U + "/bookings", json=body((DEP, 4)), headers=A).json()["bookingNo"]
+        assert seats_of(client, DEP) == 0  # 결제 대기 4명이 남은 4석을 잡음
+        assert pay(client, no, st) == {"bookingNo": no, "status": "UNPAID", "orderStatus": st}
+        assert seats_of(client, DEP) == 4 and db1("SELECT booked_count n FROM departure WHERE id = :id", id=DEP)["n"] == 16
+        assert client.get(U + f"/bookings/{no}", headers=A).json()["error"] == "E-NOTFOUND"  # 손님 상세에 안 보임
 
 
-def test_expired_hold(client):
-    """확보 만료 후 결제: 자리 있으면 확정, 없으면 E-SOLDOUT(환불)"""
-    set_booked(DEP, 10)
-    hid = hold(client)
+def test_orderless_pending_expires(client):  # 주문 전 결제 대기는 10분 뒤 만료 (checkout E-HOLD, 배치가 UNPAID)
+    set_booked(DEP, 0)
+    no = client.post(U + "/bookings", json=body(), headers=A).json()["bookingNo"]
     with tx() as c:
-        run(c, "UPDATE seat_hold SET expires_at = UTC_TIMESTAMP(3) - INTERVAL 1 MINUTE")
-    assert client.post(U + "/bookings", json=body(hid), headers=A).status_code == 201
-    hid2 = hold(client)
+        run(c, "UPDATE booking SET created_at = UTC_TIMESTAMP(3) - INTERVAL 11 MINUTE WHERE no = :no", no=no)
+    assert client.post(U + f"/bookings/{no}/checkout", headers=A).json()["error"] == "E-HOLD"
+    assert db1("SELECT status FROM booking WHERE no = :no", no=no)["status"] == "UNPAID"
+    no2 = client.post(U + "/bookings", json=body(), headers=A).json()["bookingNo"]
     with tx() as c:
-        run(c, "UPDATE seat_hold SET expires_at = UTC_TIMESTAMP(3) - INTERVAL 1 MINUTE")
-    set_booked(DEP, 19)  # 그 사이 자리가 참 (정원 20, 남은 1석 < 2명)
-    assert client.post(U + "/bookings", json=body(hid2), headers=A).json()["error"] == "E-SOLDOUT"
+        run(c, "UPDATE booking SET created_at = UTC_TIMESTAMP(3) - INTERVAL 11 MINUTE WHERE no = :no", no=no2)
+    assert check_payments()["expired"] == 1 and db1("SELECT status FROM booking WHERE no = :no", no=no2)["status"] == "UNPAID"
+
+
+def test_abandon_pending(client):  # 결제 화면에서 뒤로: 주문 전이면 바로 UNPAID (좌석 풀림)
+    set_booked(DEP, 18)
+    no = client.post(U + "/bookings", json=body(), headers=A).json()["bookingNo"]
+    assert seats_of(client, DEP) == 0
+    assert client.delete(U + f"/bookings/{no}/pending", headers=A).status_code == 204
+    assert seats_of(client, DEP) == 2 and db1("SELECT status FROM booking WHERE no = :no", no=no)["status"] == "UNPAID"
+    assert client.delete(U + f"/bookings/{no}/pending", headers=B).json()["error"] == "E-FORBID"
 
 
 # ---------- 배치 · 운영 ----------
@@ -249,22 +280,23 @@ def test_judge(client):
     set_booked(go, 18)
     set_booked(no, 0)
     for d in (go, no):
-        assert client.post(U + "/bookings", json=body(hold(client, d)), headers=A).status_code == 201
+        book_confirmed(client, d)
     clock.set_today("2026-10-27")  # 두 출발편 모두 판정일이 됨
     judge_departures()
     assert db1("SELECT status FROM departure WHERE id = :id", id=go)["status"] == "GO"
     assert db1("SELECT status FROM departure WHERE id = :id", id=no)["status"] == "CANCEL"
-    assert db1("SELECT status, cancel_by, refund_status FROM booking WHERE departure_id = :id", id=no) == \
-        {"status": "OP_CANCEL", "cancel_by": "OP", "refund_status": "REQUESTED"}
+    assert db1("SELECT status, cancel_by, refund_status, order_status FROM booking WHERE departure_id = :id", id=no) == \
+        {"status": "OP_CANCEL", "cancel_by": "OP", "refund_status": "DONE", "order_status": "canceled"}  # 본 사이트 operator_cancel 환불
 
 
 def test_admin_cancel(client):  # API-16
     dep = "PKG-001-20261106"
     set_booked(dep, 5)
-    no = client.post(U + "/bookings", json=body(hold(client, dep, 4)), headers=A).json()["bookingNo"]
+    no = book_confirmed(client, dep, 4)
     assert client.post(U + f"/admin/bookings/{no}/cancel", json={"cancelNote": "고객 요청"}).status_code == 401
     r = client.post(U + f"/admin/bookings/{no}/cancel", json={"cancelNote": "고객 요청"}, headers=ADMIN)
-    assert r.json() == {"status": "USER_CANCEL", "refundStatus": "REQUESTED"}
+    assert r.json() == {"status": "USER_CANCEL", "refundStatus": "DONE"}  # 본 사이트 customer_cancel 환불
+    assert ("cancel_order", db1("SELECT order_id o FROM booking WHERE no = :no", no=no)["o"], "customer_cancel") in fake().calls
     assert db1("SELECT booked_count n FROM departure WHERE id = :id", id=dep)["n"] == 5
     assert client.post(U + f"/admin/bookings/{no}/cancel", json={"cancelNote": "x"}, headers=ADMIN).json()["error"] == "E-STATE"
 
@@ -292,7 +324,7 @@ def test_site_cancel_requires_key(client):
 
 def test_site_cancel_confirmed(client):
     set_booked(SITE_DEP, 5)
-    no = client.post(U + "/bookings", json=body(hold(client, SITE_DEP, 3)), headers=A).json()["bookingNo"]
+    no = book_confirmed(client, SITE_DEP, 3)
     assert db1("SELECT booked_count n FROM departure WHERE id = :id", id=SITE_DEP)["n"] == 8
     r = site_cancel(client, no, note="고객 사정")
     assert r.status_code == 200 and r.json() == {"status": "USER_CANCEL", "refundStatus": "REQUESTED"}
@@ -304,7 +336,7 @@ def test_site_cancel_confirmed(client):
 
 def test_site_cancel_refund_update(client):
     set_booked(SITE_DEP, 5)
-    no = client.post(U + "/bookings", json=body(hold(client, SITE_DEP, 2)), headers=A).json()["bookingNo"]
+    no = book_confirmed(client, SITE_DEP, 2)
     site_cancel(client, no)
     r = site_cancel(client, no, refundId="RF-SITE-2", refundStatus="DONE")
     assert r.json() == {"status": "USER_CANCEL", "refundStatus": "DONE"}
@@ -315,7 +347,7 @@ def test_site_cancel_refund_update(client):
 
 def test_site_cancel_op_cancel_state(client):
     set_booked(SITE_DEP, 5)
-    no = client.post(U + "/bookings", json=body(hold(client, SITE_DEP, 2)), headers=A).json()["bookingNo"]
+    no = book_confirmed(client, SITE_DEP, 2)
     with tx() as c:
         run(c, "UPDATE booking SET status = 'OP_CANCEL', cancel_by = 'OP' WHERE no = :no", no=no)
     r = site_cancel(client, no)
@@ -333,6 +365,7 @@ def test_name_en_requires_full_name(client):  # V-21 대표자 · V-24 동반자
     r = client.post(U + "/bookings", json=body(hid, rep={**rep, "nameEn": "kim minji"}, companions=[{"nameEn": "PARK SEOYEON"}]), headers=A)
     assert r.status_code == 201, r.text
     no = r.json()["bookingNo"]
+    assert pay(client, no)["status"] == "CONFIRMED"
     assert client.get(U + f"/bookings/{no}", headers=A).json()["members"][0]["nameEn"] == "KIM MINJI"
     assert client.put(U + f"/bookings/{no}/companions", json={"companions": [{"nameEn": "PARK"}]}, headers=A).json()["error"] == "E-VALID"
     assert client.put(U + f"/bookings/{no}/companions", json={"companions": [{"nameEn": "O'BRIEN MIN-JI"}]}, headers=A).status_code == 200  # 하이픈·아포스트로피 허용
@@ -348,7 +381,7 @@ def test_companions_required(client):  # V-24: 동반자 이름이 인원 − 1�
 
 def test_booking_list_tab(client):  # S-12 탭: 고객 취소 → cancel
     set_booked(SITE_DEP, 0)
-    no = client.post(U + "/bookings", json=body(hold(client, SITE_DEP, 2)), headers=A).json()["bookingNo"]
+    no = book_confirmed(client, SITE_DEP, 2)
     tab = lambda: next(x["tab"] for x in client.get(U + "/bookings", headers=A).json()["items"] if x["no"] == no)  # noqa: E731
     assert tab() == "up"
     site_cancel(client, no)
@@ -367,7 +400,7 @@ def test_quote_fixed_hotel_odd_people(client):  # B-03: 옵션 없는(호텔이 
 
 def test_companions_fix_no_empty(client):  # API-13 동반자 이름 수정(오타 수정용): 빈 이름은 저장 불가, 인원 − 1명 모두 필수
     set_booked(SITE_DEP, 0)
-    no = client.post(U + "/bookings", json=body(hold(client, SITE_DEP, 3)), headers=A).json()["bookingNo"]
+    no = book_confirmed(client, SITE_DEP, 3)
     put = lambda names: client.put(U + f"/bookings/{no}/companions", json={"companions": [{"nameEn": x} for x in names]}, headers=A)  # noqa: E731
     r = put(["PARK SEOYEON", ""]).json()
     assert r["error"] == "E-VALID" and r["fields"] == [{"field": "companions", "rule": "V-24"}]
@@ -399,11 +432,10 @@ def test_mail_failure_keeps_booking(client, monkeypatch):  # 발송 실패해도
 
     monkeypatch.setattr(M, "mail", Boom())
     set_booked(SITE_DEP, 0)
-    r = client.post(U + "/bookings", json=body(hold(client, SITE_DEP, 2)), headers=A)
-    assert r.status_code == 201
-    no = r.json()["bookingNo"]
-    assert db1("SELECT status FROM booking WHERE no = :no", no=no)["status"] == "CONFIRMED"
-    assert db1("SELECT result, error FROM notification WHERE booking_no = :no", no=no) == {"result": "FAIL", "error": "smtp down"}
+    no = book_confirmed(client, SITE_DEP, 2)
+    r = client.post(U + f"/admin/bookings/{no}/cancel", json={"cancelNote": "고객 요청"}, headers=ADMIN)
+    assert r.status_code == 200 and db1("SELECT status FROM booking WHERE no = :no", no=no)["status"] == "USER_CANCEL"
+    assert db1("SELECT result, error FROM notification WHERE booking_no = :no AND kind = 'USER_CANCEL'", no=no) == {"result": "FAIL", "error": "smtp down"}
 
 
 def test_mail_smtp_backend(client, monkeypatch):  # MAIL_BACKEND=smtp: 보내는 주소·이름·제목으로 실제 발송 (SMTP 는 가짜로 바꿔 확인)
@@ -438,11 +470,12 @@ def test_mail_smtp_backend(client, monkeypatch):  # MAIL_BACKEND=smtp: 보내는
         monkeypatch.setattr(env, k, v)
     monkeypatch.setattr(M, "mail", M.SmtpMail())
     set_booked(SITE_DEP, 0)
-    no = client.post(U + "/bookings", json=body(hold(client, SITE_DEP, 2)), headers=A).json()["bookingNo"]
+    no = book_confirmed(client, SITE_DEP, 2)
+    client.post(U + f"/admin/bookings/{no}/cancel", json={"cancelNote": "고객 요청"}, headers=ADMIN)
     msg = next(x[1] for x in sent if x[0] == "msg")
     assert ("connect", "smtp.example.jp", 587) in sent and ("starttls",) in sent and ("login", "u") in sent
     assert "golf@example.jp" in msg["From"] and msg["To"] == "a@example.com" and no in msg["Subject"]
-    assert db1("SELECT result FROM notification WHERE booking_no = :no", no=no)["result"] == "OK"
+    assert db1("SELECT result FROM notification WHERE booking_no = :no AND kind = 'USER_CANCEL'", no=no)["result"] == "OK"
 
 
 # ---------- 본 사이트 로그인 연동 (PAYMENT_BACKEND=fake) ----------
@@ -503,3 +536,95 @@ def test_seats_count_pending_payment(client):  # 잔여석 = 정원 − 확정 �
     finally:
         with tx() as c:
             run(c, "DELETE FROM booking WHERE no LIKE 'GT-261113-9%'")
+
+
+# ---------- 본 사이트 주문·결과 확인 (결제 연동 3·4단계, PAYMENT_BACKEND=fake) ----------
+def test_checkout_order_body(client):  # 주문에는 서버가 계산한 금액·일본어 제목·인원·출발일·돌아올 주소
+    set_booked(DEP, 0)
+    r = client.post(U + "/bookings", json=body((DEP, 3)), headers=A).json()
+    seen = {}
+    orig = fake().create_order
+    fake().create_order = lambda b: seen.update(b) or orig(b)
+    try:
+        co = client.post(U + f"/bookings/{r['bookingNo']}/checkout", headers=A).json()
+    finally:
+        del fake().create_order
+    assert seen["reference"] == r["bookingNo"] and seen["amount"] == r["total"] == 69800 * 3 + 12000 and seen["heads"] == 3
+    assert seen["title"]["ja"] == "札幌市内泊 2泊3日・2ラウンド 2026-10-30" and seen["departure_date"] == "2026-10-30" and seen["user_id"] == "M0001"
+    assert seen["return_url"].endswith(f"/golf/payment/return?no={r['bookingNo']}") and co["checkoutUrl"] == seen["return_url"]
+    assert db1("SELECT order_id, order_status FROM booking WHERE no = :no", no=r["bookingNo"]) == {"order_id": co["orderId"], "order_status": "paid"}
+
+
+def test_checkout_amount_min_100(client):  # 100엔 미만은 본 사이트에 보내지 않고 오류
+    set_booked(DEP, 0)
+    no = client.post(U + "/bookings", json=body(), headers=A).json()["bookingNo"]
+    with tx() as c:
+        run(c, "UPDATE booking SET total_price = 99 WHERE no = :no", no=no)
+    r = client.post(U + f"/bookings/{no}/checkout", headers=A).json()
+    assert r["error"] == "E-VALID" and r["fields"] == [{"field": "amount", "rule": "min-100"}]
+    assert not [c for c in fake().calls if c[0] == "create_order"]
+
+
+def test_authenticating_keeps_seat_then_batch_confirms(client):  # authenticating 은 실패 아님: 결제 대기·좌석 유지 → 배치가 paid 로 확정
+    set_booked(DEP, 17)
+    no = client.post(U + "/bookings", json=body((DEP, 3)), headers=A).json()["bookingNo"]
+    assert pay(client, no, "authenticating") == {"bookingNo": no, "status": "PENDING_PAYMENT", "orderStatus": "authenticating"}
+    with tx() as c:  # 3D 인증으로 10분이 넘어도 주문 후 좌석은 유지
+        run(c, "UPDATE booking SET created_at = UTC_TIMESTAMP(3) - INTERVAL 30 MINUTE WHERE no = :no", no=no)
+    assert seats_of(client, DEP) == 0 and check_payments()["waiting"] == 1
+    fake().set_status(db1("SELECT order_id o FROM booking WHERE no = :no", no=no)["o"], "paid")
+    assert check_payments()["confirmed"] == 1
+    assert db1("SELECT status FROM booking WHERE no = :no", no=no)["status"] == "CONFIRMED"
+    assert db1("SELECT booked_count n FROM departure WHERE id = :id", id=DEP)["n"] == 20
+
+
+def test_checkout_twice_uses_existing_order(client):  # 같은 예약으로 주문을 두 번 → 409 duplicate_reference → 기존 주문, 주문은 하나
+    set_booked(DEP, 0)
+    no = client.post(U + "/bookings", json=body(), headers=A).json()["bookingNo"]
+    fake().next_status = "pending"
+    a = client.post(U + f"/bookings/{no}/checkout", headers=A).json()
+    b = client.post(U + f"/bookings/{no}/checkout", headers=A).json()
+    assert a["orderId"] == b["orderId"] and a["checkoutUrl"] == b["checkoutUrl"] and len(fake().orders) == 1
+    assert [c[0] for c in fake().calls].count("create_order") == 2  # 두 번째는 본 사이트가 409 로 기존 주문을 돌려줌
+
+
+def test_confirm_only_once(client):  # 확정 처리를 여러 번(결과 화면·배치, 동시 포함) 불러도 확정 인원은 한 번만 증가
+    from app.main import app
+
+    set_booked(DEP, 10)
+    no = client.post(U + "/bookings", json=body((DEP, 2)), headers=A).json()["bookingNo"]
+    assert pay(client, no, "authenticating")["status"] == "PENDING_PAYMENT"
+    fake().set_status(db1("SELECT order_id o FROM booking WHERE no = :no", no=no)["o"], "paid")
+    barrier, out = threading.Barrier(3), []
+
+    def screen():
+        with TestClient(app) as c:
+            barrier.wait()
+            out.append(c.get(U + f"/bookings/{no}/payment", headers=A).json()["status"])
+
+    def batch():
+        barrier.wait()
+        check_payments()
+        out.append("batch")
+
+    ts = [threading.Thread(target=f) for f in (screen, screen, batch)]
+    [t.start() for t in ts]
+    [t.join() for t in ts]
+    assert client.get(U + f"/bookings/{no}/payment", headers=A).json()["status"] == "CONFIRMED"
+    assert sorted(out) == ["CONFIRMED", "CONFIRMED", "batch"]
+    assert db1("SELECT booked_count n FROM departure WHERE id = :id", id=DEP)["n"] == 12
+
+
+def test_paid_after_departure_canceled_refunds(client):  # 판정 뒤 운행 취소된 출발편의 예약이 나중에 paid → 바로 operator_cancel 환불
+    dep = "PKG-001-20261103"  # 판정일 10-27
+    set_booked(dep, 0)
+    no = client.post(U + "/bookings", json=body((dep, 2)), headers=A).json()["bookingNo"]
+    assert pay(client, no, "authenticating")["status"] == "PENDING_PAYMENT"
+    clock.set_today("2026-10-27")
+    judge_departures()  # 확정 예약만 셈 → 0명 → 운행 취소
+    assert db1("SELECT status FROM departure WHERE id = :id", id=dep)["status"] == "CANCEL"
+    oid = db1("SELECT order_id o FROM booking WHERE no = :no", no=no)["o"]
+    fake().set_status(oid, "paid")
+    check_payments()
+    assert db1("SELECT status, cancel_by, refund_status FROM booking WHERE no = :no", no=no) == {"status": "OP_CANCEL", "cancel_by": "OP", "refund_status": "DONE"}
+    assert ("cancel_order", oid, "operator_cancel") in fake().calls and db1("SELECT booked_count n FROM departure WHERE id = :id", id=dep)["n"] == 0

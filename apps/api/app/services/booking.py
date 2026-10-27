@@ -9,8 +9,9 @@ from sqlalchemy.engine import Connection
 from .. import clock
 from .. import settings as S
 from ..adapters.auth import Member
-from ..adapters.mail import notify
-from ..adapters.payment import payment
+from ..adapters.mail import alert_ops, notify
+from ..adapters import payment
+from ..adapters.partner import ORDER_CANCELED, ORDER_FINAL_FAIL, ORDER_PAID, PartnerError
 from ..db import conn, one, rows, run, tx
 from ..errors import fail
 from ..rules import add_days, booking_no, booking_tab, in_area, is_bookable_date, quote
@@ -161,18 +162,17 @@ def _days_of_dep(c: Connection, dep_id: str) -> list[dict]:
 
 
 def create_booking(m: Member, req: dict) -> dict:
-    """L-08 (API-10): 결제 확인 → 출발편 잠금 → 확보 확인 → 예약 저장 → 확인서 메일"""
+    """L-08 (API-10, 본 사이트 결제 연동 10/27): 결제 전에 예약을 결제 대기(PENDING_PAYMENT)로 만들고 예약번호 발급.
+    입력 검사 → 출발편 잠금 → 같은 회원의 주문 전 결제 대기는 미결제로 → 잔여석 확인 → 예약·승하차·탑승자 저장.
+    좌석은 이 예약이 잡음 (주문 전 HOLD_MINUTES 분, 주문 후는 결과가 나올 때까지). 금액은 서버 계산값 (화면 값 안 씀)"""
+    people = req["people"]
     with conn() as c:
-        hold = one(c, "SELECT id, departure_id, people, member_id FROM seat_hold WHERE id = :id", id=req["holdId"])
-        if not hold or hold["member_id"] != m.memberId:
-            fail("E-HOLD")
-        people = hold["people"]
         _validate(req, people)
         stops = []
         for s in req["stops"]:
             area = _area_of(c, s) or fail("E-AREA", [{"field": f"stops.{s['kind']}", "rule": "L-06"}])
             stops.append({**s, "areaId": area})
-        days = _days_of_dep(c, hold["departure_id"])
+        days = _days_of_dep(c, req["departureId"])
         out = []
         for i, s in enumerate(stops):  # V-12 범위: 패키지 일정으로 정한 범위 안인지 (하차 시간을 안 넣었으면 건너뜀)
             if not s.get("desiredTime"):
@@ -182,56 +182,142 @@ def create_booking(m: Member, req: dict) -> dict:
                 out.append({"field": f"stops.{i}.desiredTime", "rule": "V-12-range"})
         if out:
             fail("E-VALID", out)
-        q = make_quote(c, hold["departure_id"], req.get("optionId"), people, req.get("singles"))
+        q = make_quote(c, req["departureId"], req.get("optionId"), people, req.get("singles"))
 
-    # 1) 결제 확인 (메인 사이트)
-    pay = payment.verify(req["paymentId"], q["total"])
-    if not pay.ok:
-        fail("E-PAY")
-    if pay.amount != q["total"]:
-        payment.cancel(req["paymentId"], "amount-mismatch")
-        fail("E-AMOUNT")
-
-    # 2)~3) 트랜잭션
     with tx() as c:
-        if one(c, "SELECT no FROM booking WHERE order_id = :p", p=req["paymentId"]):
-            fail("E-STATE")  # 같은 결제로 두 번 예약 방지
-        d = _lock_departure(c, hold["departure_id"])
-        alive = one(c, "SELECT expires_at > UTC_TIMESTAMP(3) alive FROM seat_hold WHERE id = :id", id=hold["id"])
-        # 확보가 살아 있으면 그 자리, 만료됐으면 지금 남은 자리로 판단 (만료된 확보는 잔여석 계산에서 이미 빠짐)
-        sold_out = not (alive and alive["alive"]) and dep_seats(d) < people
-        if not sold_out:
-            run(c, "INSERT INTO booking_seq (dep_date, last_no) VALUES (:d, LAST_INSERT_ID(1)) "
-                   "ON DUPLICATE KEY UPDATE last_no = LAST_INSERT_ID(last_no + 1)", d=d["dep_date"])
-            seq = one(c, "SELECT LAST_INSERT_ID() n")["n"]
-            no = booking_no(d["dep_date"], int(seq))
-            run(c, """INSERT INTO booking (no, member_id, departure_id, hotel_option_id, people, single_count, unit_price, total_price, status, order_id, lang)
-                      VALUES (:no, :m, :d, :o, :n, :s, :u, :t, 'CONFIRMED', :pay, :lang)""",
-                no=no, m=m.memberId, d=d["id"], o=req.get("optionId"), n=people, s=(q["rooms"] or {}).get("singles", 0),
-                u=q["unitPrice"], t=q["total"], pay=req["paymentId"], lang=req["lang"])
-            for s in stops:
-                run(c, """INSERT INTO booking_stop (booking_no, kind, place_name, place_id, address, lat, lng, area_id, memo, desired_time)
-                          VALUES (:no, :k, :n, :pid, :a, :lat, :lng, :area, :memo, :dt)""",
-                    no=no, k=s["kind"], n=s["placeName"], pid=s.get("placeId"), a=s.get("address"), lat=s["lat"], lng=s["lng"], area=s["areaId"],
-                    memo=s.get("memo"), dt=s.get("desiredTime") or None)
-            r = req["rep"]
-            run(c, """INSERT INTO booking_member (booking_no, seq, is_rep, name_ko, name_en, country_code, phone, email)
-                      VALUES (:no, 1, 1, :nl, :ne, :cc, :ph, :em)""",
-                no=no, nl=r["nameLocal"].strip(), ne=r["nameEn"].strip().upper(), cc=r["countryCode"], ph=r["phone"], em=r["email"])
-            comps = req["companions"]
-            for i in range(people - 1):
-                name = (comps[i]["nameEn"].strip().upper() or None) if i < len(comps) else None
-                run(c, "INSERT INTO booking_member (booking_no, seq, name_en) VALUES (:no, :s, :n)", no=no, s=i + 2, n=name)
-            run(c, "UPDATE departure SET booked_count = booked_count + :n WHERE id = :id", n=people, id=d["id"])
-            run(c, "DELETE FROM seat_hold WHERE id = :id", id=hold["id"])
+        p = _pkg_of_dep(c, req["departureId"]) or fail("E-NOTFOUND")
+        _lock_departure(c, req["departureId"])
+        # 같은 회원이 다시 만드는 경우: 주문 전 결제 대기는 미결제로 (좌석 풀림). 주문을 만든 예약은 결제가 진행 중일 수 있어 그대로
+        run(c, "UPDATE booking SET status = 'UNPAID' WHERE member_id = :m AND status = 'PENDING_PAYMENT' AND order_id IS NULL", m=m.memberId)
+        d = one(c, DEP_SQL + " WHERE d.id = :id", id=req["departureId"])
+        if not is_bookable_date(sale_rule(p), d["dep_date"], clock.today(), d["status"]):
+            fail("E-CLOSED")
+        if dep_seats(d) < people:
+            fail("E-SEAT")
+        run(c, "INSERT INTO booking_seq (dep_date, last_no) VALUES (:d, LAST_INSERT_ID(1)) "
+               "ON DUPLICATE KEY UPDATE last_no = LAST_INSERT_ID(last_no + 1)", d=d["dep_date"])
+        seq = one(c, "SELECT LAST_INSERT_ID() n")["n"]
+        no = booking_no(d["dep_date"], int(seq))
+        run(c, """INSERT INTO booking (no, member_id, departure_id, hotel_option_id, people, single_count, unit_price, total_price, status, lang)
+                  VALUES (:no, :m, :d, :o, :n, :s, :u, :t, 'PENDING_PAYMENT', :lang)""",
+            no=no, m=m.memberId, d=d["id"], o=req.get("optionId"), n=people, s=(q["rooms"] or {}).get("singles", 0),
+            u=q["unitPrice"], t=q["total"], lang=req["lang"])
+        for s in stops:
+            run(c, """INSERT INTO booking_stop (booking_no, kind, place_name, place_id, address, lat, lng, area_id, memo, desired_time)
+                      VALUES (:no, :k, :n, :pid, :a, :lat, :lng, :area, :memo, :dt)""",
+                no=no, k=s["kind"], n=s["placeName"], pid=s.get("placeId"), a=s.get("address"), lat=s["lat"], lng=s["lng"], area=s["areaId"],
+                memo=s.get("memo"), dt=s.get("desiredTime") or None)
+        r = req["rep"]
+        run(c, """INSERT INTO booking_member (booking_no, seq, is_rep, name_ko, name_en, country_code, phone, email)
+                  VALUES (:no, 1, 1, :nl, :ne, :cc, :ph, :em)""",
+            no=no, nl=r["nameLocal"].strip(), ne=r["nameEn"].strip().upper(), cc=r["countryCode"], ph=r["phone"], em=r["email"])
+        comps = req["companions"]
+        for i in range(people - 1):
+            run(c, "INSERT INTO booking_member (booking_no, seq, name_en) VALUES (:no, :s, :n)", no=no, s=i + 2, n=comps[i]["nameEn"].strip().upper())
+        exp = one(c, f"SELECT created_at + INTERVAL {S.HOLD_MINUTES} MINUTE e FROM booking WHERE no = :no", no=no)["e"]
+    return {"bookingNo": no, "status": "PENDING_PAYMENT", "total": q["total"], "expiresAt": exp}
 
-    if sold_out:
-        # L-08 3): 예약을 만들지 않고 전액 환불 + NO_SEAT 안내 (예약번호가 없어 notification 대신 로그)
-        payment.refund(req["paymentId"], q["total"], "no-seat")
-        fail("E-SOLDOUT")
+
+def _my_booking(c: Connection, m: Member, no: str, lock: bool = False) -> dict:
+    b = one(c, "SELECT * FROM booking WHERE no = :no" + (" FOR UPDATE" if lock else ""), no=no) or fail("E-NOTFOUND")
+    if b["member_id"] != m.memberId:
+        fail("E-FORBID")
+    return b
+
+
+def _orderless_expired(c: Connection, no: str) -> bool:
+    r = one(c, f"SELECT created_at < UTC_TIMESTAMP(3) - INTERVAL {S.HOLD_MINUTES} MINUTE x FROM booking WHERE no = :no", no=no)
+    return bool(r and r["x"])
+
+
+def abandon_pending(m: Member, no: str) -> None:
+    """결제 대기 예약을 손님이 그만둠 (S-10 뒤로 가기 등): 주문 전이면 미결제로 바꿔 좌석을 바로 풂. 주문 후는 결제가 진행 중일 수 있어 그대로"""
     with tx() as c:
-        notify(c, no, req["rep"]["email"], "CONFIRM", lang=req["lang"])
-    return {"bookingNo": no, "status": "CONFIRMED"}
+        b = _my_booking(c, m, no, lock=True)
+        if b["status"] == "PENDING_PAYMENT" and not b["order_id"]:
+            run(c, "UPDATE booking SET status = 'UNPAID' WHERE no = :no", no=no)
+
+
+def checkout(m: Member, no: str) -> dict:
+    """API-20 결제 시작: 본 사이트 주문 생성 (POST /api/partner/orders) → order_id 저장 → checkout_url 을 화면에.
+    같은 예약으로 두 번 눌러도 주문은 하나 (본 사이트 409 duplicate_reference → 응답의 기존 주문 사용)"""
+    with tx() as c:
+        b = _my_booking(c, m, no, lock=True)
+        if b["status"] != "PENDING_PAYMENT":
+            fail("E-STATE")
+        if not b["order_id"]:
+            if _orderless_expired(c, no):  # 주문 전 좌석 확보(10분)가 지남 → 미결제, 좌석 풀림
+                run(c, "UPDATE booking SET status = 'UNPAID' WHERE no = :no", no=no)
+                expired = True
+            else:
+                expired = False
+                p = _pkg_of_dep(c, b["departure_id"])
+                d = one(c, "SELECT dep_date, status FROM departure WHERE id = :id", id=b["departure_id"])
+                if not is_bookable_date(sale_rule(p), d["dep_date"], clock.today(), d["status"]):  # 그 사이 판정일이 지남
+                    run(c, "UPDATE booking SET status = 'UNPAID' WHERE no = :no", no=no)
+                    expired = None
+        else:
+            expired = False
+        info = one(c, """SELECT p.name_ja, p.name_ko, d.dep_date FROM departure d JOIN package p ON p.id = d.package_id WHERE d.id = :id""", id=b["departure_id"])
+    if expired:
+        fail("E-HOLD")
+    if expired is None:
+        fail("E-CLOSED")
+    amount = int(b["total_price"])  # 서버가 계산해 저장한 총액만 보냄 (본 사이트는 검증 없이 그대로 청구)
+    if amount < payment.MIN_AMOUNT:
+        fail("E-VALID", [{"field": "amount", "rule": "min-100"}])
+    o = payment.create_order(reference=no, amount=amount, title_ja=f"{info['name_ja']} {info['dep_date']}", title_ko=f"{info['name_ko']} {info['dep_date']}",
+                             user_id=m.memberId, departure_date=info["dep_date"], heads=int(b["people"]), return_url=payment.return_url(no))
+    with tx() as c:
+        run(c, """UPDATE booking SET order_id = COALESCE(order_id, :o), order_status = :st, order_checked_at = UTC_TIMESTAMP(3)
+                  WHERE no = :no""", o=o["order_id"], st=o.get("status"), no=no)
+    final = apply_order(no, o) if o.get("status") in (ORDER_PAID, *ORDER_FINAL_FAIL) else "PENDING_PAYMENT"
+    return {"bookingNo": no, "orderId": o["order_id"], "checkoutUrl": o.get("checkout_url"), "status": final}
+
+
+def payment_status(m: Member, no: str) -> dict:
+    """API-21 결제 결과 확인 (결과 화면이 부름): return_url 도착만으로 성공 처리하지 않고 본 사이트 주문 상태를 조회해 반영"""
+    with conn() as c:
+        b = _my_booking(c, m, no)
+    st, ost = b["status"], b["order_status"]
+    if st == "PENDING_PAYMENT" and b["order_id"]:
+        o = payment.get_order(b["order_id"])
+        ost = o.get("status")
+        st = apply_order(no, o)
+    return {"bookingNo": no, "status": st, "orderStatus": ost}
+
+
+def apply_order(no: str, order: dict) -> str:
+    """본 사이트 주문 상태를 예약에 반영. 여러 번(결과 화면·배치 동시) 불려도 한 번만: 출발편 행 잠금 → 예약 잠금 → 상태 다시 확인.
+    paid → CONFIRMED + 확정 인원 += 인원 (판정이 끝나 운행 취소된 출발편이면 OP_CANCEL 후 바로 환불)
+    failed·expired → UNPAID (좌석 풀림) / pending·authenticating → 결제 대기 유지 (좌석 유지)"""
+    st = order.get("status")
+    late_refund = False
+    with tx() as c:
+        dep_id = (one(c, "SELECT departure_id FROM booking WHERE no = :no", no=no) or fail("E-NOTFOUND"))["departure_id"]
+        run(c, "SELECT id FROM departure WHERE id = :id FOR UPDATE", id=dep_id)
+        b = one(c, "SELECT status, people, order_id FROM booking WHERE no = :no FOR UPDATE", no=no)
+        run(c, "UPDATE booking SET order_status = :st, order_checked_at = UTC_TIMESTAMP(3) WHERE no = :no", st=st, no=no)
+        if b["status"] != "PENDING_PAYMENT":
+            return b["status"]  # 이미 반영됨
+        if st == ORDER_PAID:
+            d = one(c, "SELECT status FROM departure WHERE id = :id", id=dep_id)
+            if d["status"] in ("OPEN", "GO"):
+                run(c, "UPDATE booking SET status = 'CONFIRMED' WHERE no = :no", no=no)
+                run(c, "UPDATE departure SET booked_count = booked_count + :n WHERE id = :id", n=b["people"], id=dep_id)
+                # 예약 확정(결제 완료) 메일은 본 사이트가 보냄 → 골프 CONFIRM 메일은 보내지 않음 (템플릿은 adapters/mail.py 에 남김)
+                return "CONFIRMED"
+            # 판정이 끝나 운행 취소(·완료)된 출발편: 판정은 확정 예약만 세므로 이 예약은 출발할 수 없음 → 운행 취소 + 바로 환불
+            run(c, "UPDATE booking SET status = 'OP_CANCEL', cancel_by = 'OP', canceled_at = UTC_TIMESTAMP(3) WHERE no = :no", no=no)
+            late_refund = True
+        elif st in ORDER_FINAL_FAIL:
+            run(c, "UPDATE booking SET status = 'UNPAID' WHERE no = :no", no=no)
+            return "UNPAID"
+        else:
+            return "PENDING_PAYMENT"
+    if late_refund:
+        refund_booking(no, "operator_cancel")
+    return "OP_CANCEL"
 
 
 def list_bookings(m: Member, departure_id: str | None = None) -> list[dict]:
@@ -288,6 +374,28 @@ def save_companions(m: Member, no: str, companions: list[dict]) -> dict:
     return {"saved": len(companions)}
 
 
+def refund_booking(no: str, reason: str) -> str:
+    """L-15 환불: 본 사이트 POST /api/partner/orders/{order_id}/cancel (reason = operator_cancel | customer_cancel).
+    paid 주문만·전액만. 409 refused · 502 등 실패 → refund_status = FAIL + 운영자 알림 (B-07 환불 재시도가 다시 시도).
+    돌려주는 값: refund_status (DONE · REQUESTED · FAIL) 또는 주문이 없으면 None"""
+    with conn() as c:
+        b = one(c, "SELECT order_id FROM booking WHERE no = :no", no=no)
+    if not b or not b["order_id"]:
+        return None
+    try:
+        r = payment.cancel_order(b["order_id"], reason)
+    except PartnerError as e:
+        with tx() as c:
+            run(c, "UPDATE booking SET refund_status = 'FAIL' WHERE no = :no", no=no)
+            alert_ops(c, no, f"환불 실패 ({reason}): 본 사이트 {e.status} {e.code}. 환불 재시도 배치(B-07)가 다시 시도")
+        return "FAIL"
+    st = "DONE" if r.get("status") == ORDER_CANCELED else "REQUESTED"
+    with tx() as c:
+        run(c, """UPDATE booking SET refund_status = :st, refund_id = COALESCE(refund_id, :rid), order_status = :os, order_checked_at = UTC_TIMESTAMP(3)
+                  WHERE no = :no""", st=st, rid=r.get("refund_id") or b["order_id"], os=r.get("status"), no=no)
+    return st
+
+
 def _booking_for_cancel(c: Connection, no: str) -> dict:
     return one(c, "SELECT status, departure_id, people, order_id, total_price FROM booking WHERE no = :no FOR UPDATE", no=no) or fail("E-NOTFOUND")
 
@@ -307,14 +415,13 @@ def cancel_by_user(no: str, note: str) -> dict:
         if b["status"] != "CONFIRMED":
             fail("E-STATE")
         _cancel_confirmed(c, no, b, note)
-    # L-15 환불 요청 (금액·수수료는 메인 사이트 규정 → 결제 전액을 넘기고 메인 사이트가 계산한다고 가정, 확인 필요)
-    rf = payment.refund(b["order_id"], b["total_price"], "user-cancel")
+    # L-15 환불: 본 사이트 customer_cancel (지금은 전액 환불만 가능, 고객 취소 수수료는 확인 대기)
+    rs = refund_booking(no, "customer_cancel")
     with tx() as c:
-        run(c, "UPDATE booking SET refund_id=:r, refund_status='REQUESTED' WHERE no=:no", r=rf, no=no)
         rep = one(c, "SELECT email FROM booking_member WHERE booking_no=:no AND seq=1", no=no)
         if rep:
             notify(c, no, rep["email"], "USER_CANCEL")
-    return {"status": "USER_CANCEL", "refundStatus": "REQUESTED"}
+    return {"status": "USER_CANCEL", "refundStatus": rs}
 
 
 def cancel_from_site(no: str, refund_id: str, refund_status: str, note: str | None) -> dict:

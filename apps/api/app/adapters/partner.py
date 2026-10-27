@@ -20,6 +20,7 @@ import logging
 import threading
 import urllib.error
 import urllib.request
+import uuid
 from dataclasses import dataclass, field
 from typing import Protocol
 
@@ -138,7 +139,7 @@ class FakePartner:
                 raise PartnerError(400, "invalid_amount")
             if body["reference"] in self.by_ref:
                 raise PartnerError(409, "duplicate_reference", {"error": "duplicate_reference", "order": dict(self.orders[self.by_ref[body["reference"]]])})
-            oid = f"ORD-{len(self.orders) + 1:05d}"
+            oid = f"ORD-{uuid.uuid4().hex[:12].upper()}"  # 초기화(reset)해도 겹치지 않게
             o = {"order_id": oid, "status": self.next_status, "checkout_url": body["return_url"], "reference": body["reference"], "amount": body["amount"]}
             self.orders[oid], self.by_ref[body["reference"]] = o, oid
             return dict(o)

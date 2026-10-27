@@ -6,8 +6,10 @@ import logging
 from .. import clock
 from .. import settings as S
 from ..adapters.mail import notify
-from ..adapters.payment import payment
+from ..adapters import payment
+from ..adapters.partner import PartnerError
 from ..db import one, rows, run, tx
+from ..services.booking import apply_order, refund_booking
 from ..services.departures import generate_departures
 
 log = logging.getLogger("golf.jobs")
@@ -31,16 +33,12 @@ def judge_departures() -> dict:
                     run(c, "UPDATE booking SET status='OP_CANCEL', cancel_by='OP', canceled_at=UTC_TIMESTAMP(3) WHERE departure_id=:id AND status='CONFIRMED'", id=dep_id)
                 run(c, "DELETE FROM seat_hold WHERE departure_id = :id", id=dep_id)  # 판정 후 예약 받지 않음
             with tx() as c:
-                bs = rows(c, """SELECT b.no, b.order_id, b.total_price, m.email FROM booking b
-                                JOIN booking_member m ON m.booking_no = b.no AND m.seq = 1
-                                WHERE b.departure_id = :id AND b.status = :st""", id=dep_id, st="CONFIRMED" if go else "OP_CANCEL")
-                for b in bs:
-                    if not go:  # L-15 전액 환불 요청
-                        try:
-                            rf, st = payment.refund(b["order_id"], b["total_price"], "op-cancel"), "REQUESTED"
-                        except Exception:  # noqa: BLE001
-                            rf, st = None, "FAIL"
-                        run(c, "UPDATE booking SET refund_id=:r, refund_status=:s WHERE no=:no", r=rf, s=st, no=b["no"])
+                bs = rows(c, """SELECT b.no, m.email FROM booking b JOIN booking_member m ON m.booking_no = b.no AND m.seq = 1
+                                WHERE b.departure_id = :id AND b.status = :st ORDER BY b.no""", id=dep_id, st="CONFIRMED" if go else "OP_CANCEL")
+            for b in bs:  # 운행 취소 환불은 주문별로 차례로. 한 건이 실패해도(FAIL 기록 + 운영자 알림) 다음 건은 계속
+                if not go:
+                    refund_booking(b["no"], "operator_cancel")
+                with tx() as c:
                     notify(c, b["no"], b["email"], "GO" if go else "CANCEL")
             out["go" if go else "cancel"] += 1
         except Exception:  # noqa: BLE001  TODO: 재시도 3회 후 운영 메일 (B-01)
@@ -72,4 +70,24 @@ def make_departures() -> int:
         return generate_departures(c)
 
 
-JOBS = {"B-01": judge_departures, "B-02": cleanup_holds, "B-03": complete_trips, "B-04": make_departures}
+def check_payments() -> dict:
+    """B-08 결제 확인 (10분마다): 결제 대기 예약을 정리
+    - 주문 전 결제 대기가 HOLD_MINUTES 분 지남 → UNPAID (좌석 풀림)
+    - 주문 후 결제 대기 → 본 사이트 주문 상태를 다시 조회해 반영 (paid 확정, failed·expired 미결제, pending·authenticating 그대로)"""
+    out = {"expired": 0, "confirmed": 0, "unpaid": 0, "waiting": 0, "error": 0}
+    with tx() as c:
+        out["expired"] = run(c, f"""UPDATE booking SET status = 'UNPAID' WHERE status = 'PENDING_PAYMENT' AND order_id IS NULL
+                                    AND created_at < UTC_TIMESTAMP(3) - INTERVAL {S.HOLD_MINUTES} MINUTE""")
+        targets = rows(c, "SELECT no, order_id FROM booking WHERE status = 'PENDING_PAYMENT' AND order_id IS NOT NULL ORDER BY created_at")
+    for t in targets:
+        try:
+            st = apply_order(t["no"], payment.get_order(t["order_id"]))
+        except PartnerError as e:  # 한 건이 실패해도 다음 건은 계속 (다음 주기에 다시)
+            log.warning("payment check failed %s %s %s", t["no"], e.status, e.code)
+            out["error"] += 1
+            continue
+        out[{"CONFIRMED": "confirmed", "UNPAID": "unpaid", "PENDING_PAYMENT": "waiting"}.get(st, "confirmed")] += 1
+    return out
+
+
+JOBS = {"B-01": judge_departures, "B-02": cleanup_holds, "B-03": complete_trips, "B-04": make_departures, "B-08": check_payments}

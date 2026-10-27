@@ -49,13 +49,14 @@ class CompanionIn(BaseModel):
 
 
 class BookingReq(BaseModel):
-    holdId: int
+    """API-10 결제 대기 예약 만들기 (S-09 '다음'). 결제는 이어서 API-20 checkout"""
+    departureId: str
+    people: int = People
     optionId: str | None = None
     singles: int | None = Field(default=None, ge=0, le=S.MAX_PEOPLE)
     stops: list[StopIn] = Field(min_length=2, max_length=2)
     rep: RepIn
     companions: list[CompanionIn] = Field(default_factory=list, max_length=S.MAX_PEOPLE - 1)
-    paymentId: str = Field(min_length=1, max_length=40)
     lang: Literal["ko", "ja"]
 
 

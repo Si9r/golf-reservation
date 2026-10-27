@@ -55,4 +55,5 @@ def reset():
         partner.reset()  # 가짜 본 사이트 상태 초기화
     with tx() as c:
         run(c, "DELETE FROM seat_hold")
+        run(c, "UPDATE booking SET status = 'UNPAID' WHERE status = 'PENDING_PAYMENT'")  # 앞 테스트의 결제 대기가 좌석을 잡지 않게
     yield
