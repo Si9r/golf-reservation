@@ -90,4 +90,18 @@ def check_payments() -> dict:
     return out
 
 
-JOBS = {"B-01": judge_departures, "B-02": cleanup_holds, "B-03": complete_trips, "B-04": make_departures, "B-08": check_payments}
+def retry_refunds() -> dict:
+    """B-07 환불 재시도: 환불 실패(refund_status = FAIL)한 운행 취소·고객 취소 예약을 본 사이트에 다시 환불 요청.
+    주문별로 차례로, 한 건이 또 실패해도(FAIL 유지 + 운영자 알림) 다음 건은 계속"""
+    with tx() as c:
+        targets = rows(c, """SELECT no, status FROM booking WHERE refund_status = 'FAIL' AND status IN ('OP_CANCEL', 'USER_CANCEL')
+                             AND order_id IS NOT NULL ORDER BY canceled_at, no""")
+    out = {"done": 0, "fail": 0}
+    for t in targets:
+        st = refund_booking(t["no"], "operator_cancel" if t["status"] == "OP_CANCEL" else "customer_cancel")
+        out["fail" if st == "FAIL" else "done"] += 1
+    return out
+
+
+JOBS = {"B-01": judge_departures, "B-02": cleanup_holds, "B-03": complete_trips, "B-04": make_departures,
+        "B-07": retry_refunds, "B-08": check_payments}

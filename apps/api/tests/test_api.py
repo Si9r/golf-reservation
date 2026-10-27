@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 
 from app import clock
 from app.db import one, run, tx
-from app.jobs import check_payments, cleanup_holds, judge_departures
+from app.jobs import check_payments, cleanup_holds, judge_departures, retry_refunds
 
 A = {"authorization": "Bearer demo:M0001"}
 B = {"authorization": "Bearer demo:M0002"}
@@ -628,3 +628,43 @@ def test_paid_after_departure_canceled_refunds(client):  # 판정 뒤 운행 취
     check_payments()
     assert db1("SELECT status, cancel_by, refund_status FROM booking WHERE no = :no", no=no) == {"status": "OP_CANCEL", "cancel_by": "OP", "refund_status": "DONE"}
     assert ("cancel_order", oid, "operator_cancel") in fake().calls and db1("SELECT booked_count n FROM departure WHERE id = :id", id=dep)["n"] == 0
+
+
+# ---------- 본 사이트 환불 (결제 연동 5단계) ----------
+def test_operator_cancel_refunds_continue_after_failure(client):  # 운행 취소 환불은 차례로, 중간 한 건이 실패해도 나머지 진행, 실패 건 FAIL → B-07 재시도
+    dep = "PKG-001-20261103"  # 판정일 10-27
+    set_booked(dep, 0)
+    nos = [book_confirmed(client, dep, 2, h=h) for h in (A, B, A)]
+    oids = [db1("SELECT order_id o FROM booking WHERE no = :no", no=n)["o"] for n in nos]
+    fake().fail_cancel[oids[1]] = (502, "bad_gateway")
+    clock.set_today("2026-10-27")
+    judge_departures()
+    st = {n: db1("SELECT status, refund_status FROM booking WHERE no = :no", no=n) for n in nos}
+    assert [st[n]["refund_status"] for n in nos] == ["DONE", "FAIL", "DONE"] and all(v["status"] == "OP_CANCEL" for v in st.values())
+    assert [c[1] for c in fake().calls if c[0] == "cancel_order" and c[1] in oids] == oids  # 주문별로 차례로 (다른 출발편 판정분은 제외)
+    assert db1("SELECT COUNT(*) n FROM notification WHERE booking_no = :no AND kind = 'OPS_ALERT'", no=nos[1])["n"] == 1  # 운영자 알림
+    assert db1("SELECT COUNT(*) n FROM notification WHERE booking_no = :no AND kind = 'CANCEL'", no=nos[1])["n"] == 1  # 손님 메일은 계속
+    del fake().fail_cancel[oids[1]]
+    assert retry_refunds()["done"] >= 1  # (앞 테스트가 남긴 다른 FAIL 건도 함께 다시 시도함)
+    assert db1("SELECT refund_status, order_status FROM booking WHERE no = :no", no=nos[1]) == {"refund_status": "DONE", "order_status": "canceled"}
+
+
+def test_partner_wrong_key_401(client, monkeypatch):  # 본 사이트가 잘못된 키로 401 → 골프는 502 E-PARTNER (예약은 결제 대기 그대로)
+    from app.config import env
+
+    set_booked(DEP, 0)
+    no = client.post(U + "/bookings", json=body(), headers=A).json()["bookingNo"]
+    fake().api_key = "right-key"
+    monkeypatch.setattr(env, "PARTNER_API_KEY", "wrong-key")
+    r = client.post(U + f"/bookings/{no}/checkout", headers=A)
+    assert r.status_code == 502 and r.json()["error"] == "E-PARTNER" and r.json()["partnerError"] == "unauthorized"
+    assert db1("SELECT status, order_id FROM booking WHERE no = :no", no=no) == {"status": "PENDING_PAYMENT", "order_id": None}
+
+
+def test_refund_unpaid_order_refused(client):  # 미결제 주문 환불 → 본 사이트 409 refused → refund_status FAIL + 운영자 알림 (취소는 그대로 처리)
+    set_booked(SITE_DEP, 0)
+    no = book_confirmed(client, SITE_DEP, 2)
+    fake().set_status(db1("SELECT order_id o FROM booking WHERE no = :no", no=no)["o"], "pending")  # 본 사이트에서 아직 paid 가 아닌 주문
+    r = client.post(U + f"/admin/bookings/{no}/cancel", json={"cancelNote": "고객 요청"}, headers=ADMIN).json()
+    assert r == {"status": "USER_CANCEL", "refundStatus": "FAIL"}
+    assert db1("SELECT error FROM notification WHERE booking_no = :no AND kind = 'OPS_ALERT'", no=no)["error"].startswith("환불 실패 (customer_cancel): 본 사이트 409 refused")
