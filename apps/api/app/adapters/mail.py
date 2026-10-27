@@ -1,7 +1,12 @@
 """안내 메일 발송 — 이 서비스가 직접 보냄 (운영사 확정 10/26, 질문 Q-30). 메일 보내는 곳은 여기 한 곳.
 - MAIL_BACKEND=log (기본): 실제로 보내지 않고 로그만 남김
 - MAIL_BACKEND=smtp: SMTP로 실제 발송 (보내는 주소 MAIL_FROM 은 TRAVENDER 홋카이도 도메인으로 새로 만들 예정 → .env 설정값)
-발송 결과는 notification 테이블에 OK / FAIL 로 기록. 실패해도 예약 처리는 되돌리지 않음"""
+발송 결과는 notification 테이블에 OK / FAIL 로 기록. 실패해도 예약 처리는 되돌리지 않음
+
+누가 보내나 (본 사이트 결제 연동 10/27)
+- 예약 확정(결제 완료) CONFIRM: 본 사이트가 보냄 → 골프는 보내지 않음 (apply_order 에서 부르지 않음, 템플릿은 남김)
+- 출발 확정 GO · 승차 시간 PICKUP: 골프가 보냄 (PICKUP 은 승차 시간 등록 API-17 이 구현되면 그곳에서 부름)
+- 운행 취소 CANCEL · 고객 취소 USER_CANCEL: 누가 보낼지 확인 중 → 지금은 골프가 그대로 보냄"""
 from __future__ import annotations
 
 import logging
@@ -93,7 +98,7 @@ def _summary(b: dict) -> str:
 
 
 def render(kind: str, b: dict) -> tuple[str, str]:
-    """메일 4종의 제목·본문. b: no · package_name · dep_date · people · total · judge_date · name"""
+    """메일 제목·본문. b: no · package_name · dep_date · people · total · judge_date · name (PICKUP 은 pickup_time · pick_place 도)"""
     hello = f"{b['name']} 님, 안녕하세요. TRAVENDER 홋카이도 골프입니다." if b.get("name") else "안녕하세요. TRAVENDER 홋카이도 골프입니다."
     if kind == "CONFIRM":
         subject = f"[TRAVENDER 골프] 예약이 확정되었습니다 ({b['no']})"
@@ -113,6 +118,12 @@ def render(kind: str, b: dict) -> tuple[str, str]:
                  "", _summary(b), "",
                  f"결제하신 금액 {_yen(b['total'])}은 전액 환불됩니다. 환불은 결제하신 수단으로 처리되며, "
                  "카드사에 따라 반영까지 시간이 걸릴 수 있습니다."]
+    elif kind == "PICKUP":
+        subject = f"[TRAVENDER 골프] 승차 시간 안내 ({b['no']})"
+        lines = [hello, "", "출발일의 승차 시간과 장소를 알려 드립니다.", "",
+                 f"승차: {_day(b['dep_date'])} {b.get('pickup_time') or '-'}", f"장소: {b.get('pick_place') or '-'}", "", _summary(b), "",
+                 "합승 버스는 여러 그룹을 차례로 태우므로 승차 시간 5분 전까지 장소에 와 주세요. "
+                 "도로 상황에 따라 버스가 조금 늦을 수 있습니다."]
     elif kind == "USER_CANCEL":
         subject = f"[TRAVENDER 골프] 예약 취소가 처리되었습니다 ({b['no']})"
         lines = [hello, "", "요청하신 예약 취소가 처리되었습니다.", "", _summary(b), "",
@@ -123,9 +134,11 @@ def render(kind: str, b: dict) -> tuple[str, str]:
 
 
 def _booking_info(c: Connection, booking_no: str) -> dict:
-    r = one(c, """SELECT b.no, b.people, b.total_price total, d.dep_date, d.judge_date, p.name_ko package_name, m.name_ko name
+    r = one(c, """SELECT b.no, b.people, b.total_price total, d.dep_date, d.judge_date, p.name_ko package_name, m.name_ko name,
+                         s.pickup_time, s.place_name pick_place
                   FROM booking b JOIN departure d ON d.id = b.departure_id JOIN package p ON p.id = d.package_id
                   LEFT JOIN booking_member m ON m.booking_no = b.no AND m.seq = 1
+                  LEFT JOIN booking_stop s ON s.booking_no = b.no AND s.kind = 'PICK'
                   WHERE b.no = :no""", no=booking_no)
     if not r:
         raise LookupError(f"예약 없음 {booking_no}")

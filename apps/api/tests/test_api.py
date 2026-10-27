@@ -421,6 +421,8 @@ def test_mail_templates():  # 4종 제목·본문에 예약번호·패키지·�
         for x in ("GT-261030-0001", "삿포로 시내 숙박 2박 3일", "2026년 10월 30일(금)", "3명", "¥221,400", "10:00-17:00"):
             assert x in body, (kind, x)
     assert "전액 환불" in render("CANCEL", b)[1] and "2026년 10월 23일(금)" in render("CONFIRM", b)[1]
+    s, body_ = render("PICKUP", {**b, "pickup_time": "10:20", "pick_place": "JR 삿포로역 남쪽 출구"})  # 승차 시간 안내 (골프가 보냄)
+    assert "승차 시간 안내" in s and "2026년 10월 30일(금) 10:20" in body_ and "JR 삿포로역 남쪽 출구" in body_
 
 
 def test_mail_failure_keeps_booking(client, monkeypatch):  # 발송 실패해도 예약은 그대로, 기록은 FAIL
