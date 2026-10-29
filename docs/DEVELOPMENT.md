@@ -16,7 +16,7 @@
 | L-03 패키지 검색 | `services/catalog.py` `search_packages` | 완료 |
 | L-04 출발 확정 현황 | `rules.py` `departure_view` | 완료 |
 | L-05 금액 계산 (+ 객실 구성) | `rules.py` `quote` `rooms_of` | 완료 |
-| L-06 승하차 범위 | `rules.py` `in_area`, `services/booking.py` `check_area` | 완료 (범위 기준 T-1 대기) |
+| L-06 승하차 범위 (반경 5km) | 값 `settings.py` `SERVICE_AREA` (화면 `packages/shared` 같은 값), 판정 `rules.py` `in_area`, `services/booking.py` `check_area` | 완료 (운영사 확정 10/29) |
 | L-07 좌석 임시확보 / API-08·09 | `services/booking.py` `create_hold` | 완료 (10/27부터 화면은 쓰지 않음, 결제 대기 예약이 좌석을 잡음) |
 | L-08 예약: 결제 대기 생성 / API-10 | `services/booking.py` `create_booking` (PENDING_PAYMENT, 좌석을 잡음), `abandon_pending` | 완료 |
 | 본 사이트 연동 (로그인 세션·주문·조회·환불) | `adapters/partner.py` (`PAYMENT_BACKEND=fake\|partner`, 파일 맨 위 '가정' 목록), `adapters/auth.py`, `adapters/payment.py` | 완료 (**사양서 원본 받기 전 가정으로 구현**, 받으면 `partner.py`만 맞춤) |
@@ -27,7 +27,7 @@
 | L-14 고객 취소 / API-16 | `services/booking.py` `cancel_by_user` (공통 처리 `_cancel_confirmed`) | 완료 (본 사이트 연동 API-19 전 임시·운영 예비용) |
 | API-19 고객 취소·환불 결과 받기 (본 사이트 → 이 서비스) | `routes.py` `site_cancel`, `services/booking.py` `cancel_from_site` | 완료 (인증은 `X-Site-Key` 임시, 결제 연동 협의 때 확정) |
 | L-15 환불 요청 | `services/booking.py` `refund_booking` → `adapters/payment.py` `cancel_order` (reason `operator_cancel` · `customer_cancel`, 실패 → `refund_status=FAIL` + 운영자 알림 `alert_ops`) | 완료 (전액 환불만) |
-| L-16 승차 시간 등록 / API-17 | — | 틀만 (Q-23 답변 대기) |
+| L-16 승차 시간 등록 / API-17 | 등록 기한 `settings.py` `PICKUP_REGISTER_DAYS` (출발 확정 후 7일) | 틀만 (기한은 운영사 10/29 설정값으로) |
 | B-02 좌석 확보 정리 | `jobs` `cleanup_holds` | 완료 |
 | B-03 여행 완료 | `jobs` `complete_trips` | 완료 |
 | B-04 출발편 만들기 | `services/departures.py` `generate_departures` | 완료 |
@@ -89,7 +89,7 @@ API를 빼면(`VITE_USE_API` 없음) 지금처럼 브라우저 안 데이터로�
 | 출발편 정원 30 → **20명** (`BUS_SEATS = 20`), 한 예약 인원 상한도 20 (`MAX_PEOPLE = 20`, API 인원 범위·동반자 수 상한도 이 값). 최소 출발 인원 20은 그대로라 20석이 다 차야 출발 | 운영사 확정 (2026-10-19) |
 | 정원 = 최소 출발 인원이라 '인원 충족'이면 정원도 다 참 → 출발 현황에 `full` 추가(`rules.py` `departure_view`, API-03 `view.full`), 화면은 '잔여 0석' 대신 '정원이 다 찼어요 · 판정일에 출발 확정' / '출발 확정 · 마감' | 운영사 확정 (2026-10-19) 정원 변경에 따른 표시 정리 |
 | Alembic `0002`: `departure.capacity` 기본값 20, `booking_stop.desired_time` 추가, 이미 만든 OPEN 출발편의 판정일을 7일 전으로·정원을 20으로 (확정 인원이 20을 넘는 출발편은 정원 유지). 데모 데이터 다른 그룹 인원은 0~17명(일부 18~20명) | 운영사 확정 (2026-10-19). `judge_date`·`capacity`는 출발편 행에 저장된 값이라 기존 출발편도 맞춰야 판정 배치(B-01)·상세 API가 새 규칙대로 동작 |
-| 승하차 장소와 함께 **희망 시간**(승차는 필수, 하차는 선택, 30분 단위, 참고용)을 받음: `booking_stop.desired_time`, API-10 `stops[].desiredTime`, API-12 응답 `stops[].desiredTime`. 실제 시간(`pickup_time`)은 운영이 정해 메일로 안내 | 운영사 답변(10/19): '손님이 서비스 화면에서 승하차 희망 장소를 시간과 함께 입력'까지. 합승 버스 정차 순서를 짜려면 희망 시간이 필요. **승차 필수·하차 선택(하차 장소는 필수)은 팀 결정**(10/21): 실제 하차 시간은 도로 상황·합승 인원에 따라 바뀌어 약속할 수 없음 → 운영사 확인 요청(질문표 4번) |
+| 승하차 장소와 함께 **희망 시간**(승차는 필수, 하차는 선택, 30분 단위, 참고용)을 받음: `booking_stop.desired_time`, API-10 `stops[].desiredTime`, API-12 응답 `stops[].desiredTime`. 실제 시간(`pickup_time`)은 운영이 정해 메일로 안내 | 운영사 답변(10/19): '손님이 서비스 화면에서 승하차 희망 장소를 시간과 함께 입력'까지. 합승 버스 정차 순서를 짜려면 희망 시간이 필요. **승차 필수·하차 선택(하차 장소는 필수)은 팀 결정**(10/21): 실제 하차 시간은 도로 상황·합승 인원에 따라 바뀌어 약속할 수 없음 → **운영사 확정 (10/29)** |
 | 희망 시간 범위: 승차 (첫날 티오프 − 2시간 30분, 06:00보다 이르면 06:00, 30분 올림) ~ (첫날 티오프 − 이동 − 30분, 30분 내림) / 하차 (마지막 라운드 티오프 + 5시간 + 이동, 30분 올림) ~ 21:00. 첫날 라운드가 없으면 첫 출발 시각 − 30분, 마지막 날 라운드가 없으면 11:00부터 (`NO_ROUND_DROP_FROM`, 화면 일정표의 체크아웃 후 하차와 같게). 서버는 지역별 대략값 표 `TRAVEL_MIN`(화면 `TRAVEL`과 같은 값), 화면은 Google 경로 시간이 있으면 그것을 씀 | **범위는 모두 팀이 정한 안** (운영사 답변은 '시간과 함께 입력'까지. '06:00부터'·'승차·하차 모두 필수'도 운영사 확정이 아니라 처음 세운 팀 안이었음). 승차 시작 '티오프 − 2시간 30분'은 팀 결정(10/20, 합승 버스가 여러 그룹을 태우는 시간을 고려)으로 S-06에 '골프장에서 기다릴 수 있음' 안내를 함께 표시하고 '예상 승차 시간' 줄은 없앰 → 운영사 확인 요청(질문표 3번). 라운드 없는 날 기준(11:00)은 개발 중 정한 값. Google 경로가 표보다 짧으면 화면에서 고른 시간을 서버가 `V-12-range`로 거절할 수 있음 → 화면 API 연결(S-06·S-10) 때 서버 계산으로 맞출 것 |
 | 화면 상단: 본 사이트 헤더·푸터 흉내(로고·카테고리·골프 NEW·회원가입·햄버거 메뉴·푸터)를 없애고 서비스 자체 헤더(서비스명 `SERVICE_NAME` 'TRAVENDER Golf' 임시 · 언어 KO/JA · 로그인) + 주 메뉴(골프 홈·전체 패키지·예약 조회·고객센터). 푸터 없음 | 운영사 확정 (2026-10-19). 서비스 이름은 확정 전 |
 | 고객 사정 취소·환불은 본 사이트가 처리하고 결과를 **API-19** `POST /api/golf/site/bookings/{no}/cancel`(헤더 `X-Site-Key` = `.env` `SITE_KEY`)로 받음. CONFIRMED → USER_CANCEL(인원 되돌림·메일), USER_CANCEL → 환불 상태만 갱신, OP_CANCEL·DONE → E-STATE. 우리 쪽에서 환불 API를 다시 부르지 않음. API-16은 임시·운영 예비용으로 남김 | 운영사 확정 (2026-10-19). 실제 인증 방식은 결제 연동 협의 때 |
@@ -109,13 +109,13 @@ API를 빼면(`VITE_USE_API` 없음) 지금처럼 브라우저 안 데이터로�
 | 패키지 카드 높이 맞춤 (목록·홈): 사진 16:9 고정, 이름 2줄·숙소 1줄 말줄임, 가격 줄은 카드 아래 | 팀 테스트 10/23 (375px에서 카드 크기가 제각각) |
 | M-174 문구: 환불 대신 '예약이 되지 않았고 결제는 자동으로 취소'. 서버 처리(전액 환불 요청)는 그대로 | 팀 테스트 10/23 |
 | B-02 일정표(`logic.ts` `itinerary`): 2일차부터 승차·호텔 출발 = 그날 티오프 − 이동 − 30분(`PICK_MARGIN_MIN`), 30분 단위 내림. 이동은 받아 둔 Google 경로 시간(`gmaps.ts` `cachedDriveMin`), 없으면 `TRAVEL`. 첫날 승차·마지막 날 하차는 손님 희망 시간이 있으면 '희망 HH:MM' | 팀 테스트 10/23 ('호텔 없이' 승차가 티오프 1시간 전·호텔 출발이 50분 전 고정이라 늦거나 빠듯했고, 하차가 희망 시간과 달랐음). Google 시간은 다른 곳에서 한 번 받아 둔 뒤부터 반영 |
-| 동반자 영문 이름(인원 − 1명)을 예약 때 **모두 필수**로: S-09 '나중에 입력' 없음(팀원 KIM-TAEYEON 화면), 서버 V-24도 인원 − 1명 모두·형식 검사(예약 API-10, 명단 저장 API-13) | 팀 결정 (2026-10-23, 팀원 브랜치 합칠 때). 운영사 협의 중이던 항목이라 운영사 확인 필요 |
-| 영문 이름(V-21·V-24)에 단어 안 하이픈·아포스트로피 허용 (KIM MIN-JI, O'BRIEN SEAN). 성과 이름 모두 필수·60자 이하는 그대로. 화면은 성·이름 두 칸 입력 후 '성 이름'으로 합침 | 팀 결정 (2026-10-23). 여권 이름에 쓰일 수 있어 화면(팀원)과 서버 규칙을 맞춤 |
+| 동반자 영문 이름(인원 − 1명)을 예약 때 **모두 필수**로: S-09 '나중에 입력' 없음(팀원 KIM-TAEYEON 화면), 서버 V-24도 인원 − 1명 모두·형식 검사(예약 API-10, 명단 저장 API-13) | 팀 결정 (2026-10-23, 팀원 브랜치 합칠 때) → **운영사 확정 (10/29)** |
+| ~~영문 이름(V-21·V-24)에 단어 안 하이픈·아포스트로피 허용~~ → 10/29 **하이픈만** (아래 행). (이전: KIM MIN-JI, O'BRIEN SEAN 허용) 성과 이름 모두 필수·60자 이하는 그대로. 화면은 성·이름 두 칸 입력 후 '성 이름'으로 합침 | 팀 결정 (2026-10-23). 여권 이름에 쓰일 수 있어 화면(팀원)과 서버 규칙을 맞춤 |
 | S-06 마무리: '뒤로'·진행 단계 기준을 `hasHotelStep(p)`로 (호텔이 정해진 패키지는 '뒤로'가 S-05, '호텔' 칸 건너뜀 표시 없음). '다음'에 잔여석 재확인 `useSeatGuard` (바뀌었으면 M-128 → S-03, API 모드는 `refreshMonth`). '희망 하차 시간 (선택)' 아래 안내 `dropTimeNote` ('도로 상황과 합승 인원에 따라 실제 하차 시간은 달라질 수 있어요') | 팀 결정 10/23 |
 | 병합 후 쓰이지 않는 문구 키 삭제 (한·일): M-127·M-129·M-184·M-200, dupStop, later, proceed, minT, statusT, depRange, depLine, lineOpt, optCount, optFoot, golfT, hotelT, compDone, cancelT, supportBtn, mapPicked, mapPickedArea, depGo, stepSkip, mdCompNeed, mdCompInput. 설계서 메시지 대응: M-127 → `homeDateHint`, M-129 → `mdEnoughT`·`mdEnoughD`(S-13)·`depFull`(S-03), M-200 → `mdOpenT`·`mdOpenD`(S-13), M-184 → `compFixInfo`(S-11) | 팀 결정 10/23 (설계서 메시지 문구를 실제 화면 문장으로 맞출 것) |
 | 동반자 영문 이름은 예약 때 모두 받고, '나중에 입력'과 관련 기능을 없앰: B-06 명단 입력 요청 메일·알림 종류 COMPANION은 만들지 않음(코드에 없었음), 화면 `Info.later` 삭제, S-11 안내를 '동반자 이름은 출발 7일 전까지 예약 상세에서 고칠 수 있어요'(`compFixInfo`)로 | 팀 결정 10/23 (나중에 받으면 마감까지 안 들어온 예약 처리가 복잡해짐). 운영사 확인은 따로 |
 | 동반자 명단 수정(API-13, S-13)은 '오타 수정용'으로 남김: 마감 출발 7일 전(`COMPANION_DUE_DAYS`) 그대로, 인원 − 1명 모두 필수·빈 이름 저장 불가(서버·화면). S-13 제목 '동반자 이름 수정 (출발 7일 전까지)' | 팀 결정 10/23 |
-| 탑승자 정보는 영문 이름만 받음: 대표자·동반자 모두 여권 영문 성·이름만 (대문자, 성·이름 각각 필수, 하이픈·아포스트로피 허용, 출발 7일 전까지 오타 수정). 여권 번호·생년월일·국적·여권 만료일은 받지 않음 — 화면·서버 검사·DB 어디에도 없음을 확인. S-09의 '필수 수집 항목' 확인 필요 표시(Q-21) 삭제. 대표자 한글 이름·연락처·이메일은 예약 연락용으로 그대로 | 운영사 확정 10/26 (구두) |
+| 탑승자 정보는 영문 이름만 받음: 대표자·동반자 모두 여권 영문 성·이름만 (대문자, 성·이름 각각 필수, 하이픈만 허용(10/29), 출발 7일 전까지 오타 수정). 여권 번호·생년월일·국적·여권 만료일은 받지 않음 — 화면·서버 검사·DB 어디에도 없음을 확인. S-09의 '필수 수집 항목' 확인 필요 표시(Q-21) 삭제. 대표자 한글 이름·연락처·이메일은 예약 연락용으로 그대로 | 운영사 확정 10/26 (구두) |
 | 안내 메일은 이 서비스가 직접 보냄. 발송은 `adapters/mail.py` 한 곳: `MAIL_BACKEND=log`(기본, 기록만) / `smtp`(실제 발송, `MAIL_FROM`·`MAIL_FROM_NAME`·`SMTP_HOST`·`SMTP_PORT`·`SMTP_SECURITY`·`SMTP_USER`·`SMTP_PASSWORD`). 실패해도 예약은 되돌리지 않고 `notification`에 FAIL·오류 기록. 한국어 템플릿 4종(예약 확인 CONFIRM · 출발 확정 GO · 운행 취소 CANCEL · 고객 취소 USER_CANCEL)에 예약번호·패키지·출발일·인원·금액. 고객센터 전화·이메일은 `.env` `SUPPORT_TEL`·`SUPPORT_EMAIL`(비면 메일에 안 씀), 운영 시간 10:00~17:00 (`settings.SUPPORT`) | 운영사 확정 10/26 (구두). 보내는 주소는 TRAVENDER 홋카이도 도메인으로 새로 만들 예정이라 코드에 쓰지 않음. 일본어 메일은 아직 없음 (예약 언어 `booking.lang`으로 나눌 자리) |
 | 희망 시간 범위를 화면에서 계산할 때 이동 시간 = Google 경로 시간과 대략값 표(`TRAVEL` = 서버 `TRAVEL_MIN`) 중 **큰 쪽** (`logic.ts` `travelOf`). 화면 범위가 항상 서버 검사 범위 안에 듦. 서버 `stop_time_range`는 일정이 없는 패키지면 기본 범위(06:00~21:00) | 버그 수정 10/26: Google 시간이 표보다 짧으면 화면에서 고른 승차 시간을 서버가 V-12-range로 거절해 결제 단계에서 예약이 실패할 수 있었음 (예: 티오프 12:00, Google 25분·표 40분 → 화면 11:00까지, 서버 10:30까지) |
 | **결제 전에 예약을 만듦**: S-09 '다음'에서 `PENDING_PAYMENT`(결제 대기)로 저장하고 예약번호를 발급. 결제가 끝나면 `CONFIRMED`(+ `booked_count`), 실패·만료면 `UNPAID`(미결제). 두 상태는 S-12·S-13에 보이지 않음(CONFIRMED 이후만). 같은 회원이 새로 예약하면 주문 전 결제 대기는 UNPAID로. API-08·09 좌석 확보는 남아 있지만 화면은 쓰지 않음 | 본 사이트 결제 연동 작업 지시 (10/27): 본 사이트 주문에 `reference`(= 예약번호)가 필요 |
@@ -124,33 +124,48 @@ API를 빼면(`VITE_USE_API` 없음) 지금처럼 브라우저 안 데이터로�
 | 결제 후 출발편이 이미 운행 취소면 바로 OP_CANCEL + 전액 환불(`operator_cancel`). 운행 취소 환불은 주문별로 차례로, 한 건이 실패해도 계속(FAIL 기록 + 운영자 알림 → B-07 재시도). 운영자 알림은 `notification` `OPS_ALERT` + `.env` `OPS_EMAIL` | 작업 지시 (10/27) |
 | **예약 확인 메일(CONFIRM)은 본 사이트가 보냄** → 이 서비스는 보내지 않음(템플릿은 남김). 출발 확정 GO·승차 시간 안내 PICKUP은 이 서비스가 보냄(PICKUP 템플릿만, 보내는 곳은 API-17과 함께). 운행 취소 CANCEL·고객 취소 USER_CANCEL은 담당이 정해질 때까지 그대로 보냄 | 작업 지시 (10/27). CANCEL·USER_CANCEL 보내는 쪽은 답 대기 |
 | 결과 화면 재확인: 결제 대기(pending·authenticating)면 30초 간격 3번, 그래도 대기면 '결제를 확인하고 있어요' 안내(확정되면 예약 조회에 나옴) | 작업 지시 (10/27) |
-| 승하차 가능 범위를 삿포로 중심(TV탑 부근 43.0621, 141.3544) 반경 **12km → 3km**로: 서버 `service_area`(Alembic `0004`, `seed/demo_data.json`), 화면 `data.ts` `ZONES_STRICT`. 삿포로역·오도리·스스키노·나카지마 공원까지 들어가고 마루야마(약 3.2km)·삿포로돔·신삿포로는 빠짐. 이미 있는 예약은 다시 검사하지 않음 | 팀 결정 (2026-10-27): 합승 버스 정차를 도심에 모아 승차 시간을 줄임. 운영사 확인은 질문표 10번 |
+| 승하차 가능 범위를 삿포로 중심(TV탑 부근 43.0621, 141.3544) 반경 **12km → 3km**로 (10/29 **5km**로 바뀜, 아래 행): 서버 `service_area`(Alembic `0004`, `seed/demo_data.json`), 화면 `data.ts` `ZONES_STRICT`. 삿포로역·오도리·스스키노·나카지마 공원까지 들어가고 마루야마(약 3.2km)·삿포로돔·신삿포로는 빠짐. 이미 있는 예약은 다시 검사하지 않음 | 팀 결정 (2026-10-27): 합승 버스 정차를 도심에 모아 승차 시간을 줄임. 운영사 확인은 질문표 10번 |
+| **영문 이름은 하이픈만 허용**: 여권 표기 그대로, 이름 안 하이픈(-) 허용, 아포스트로피(') 불가, 하이픈으로 시작·끝 불가. 대문자·성·이름 각각 필수·합쳐서 60자 이하는 그대로. 대표자·동반자, 예약(API-10)·오타 수정(API-13, S-13) 모두 같은 규칙: 서버 `services/booking.py` `NAME_EN`, 화면 `screens/InfoForm.tsx` `V21`·`VPART`·`upper`. 안내 예시는 KIM MIN-JI. 이미 저장된 예약 데이터는 바꾸지 않음 | **운영사 답변 (2026-10-29)** |
+| **승하차 범위 반경 5km**: 중심은 그대로 43.0621, 141.3544 (삿포로 TV탑 부근, 오도리 공원 동쪽 끝). 값은 `settings.py` `SERVICE_AREA` · `packages/shared` `SETTINGS.SERVICE_AREA`(화면 `data.ts` `ZONES_STRICT`가 읽음, 홈 안내 {r}도 이 값) · `service_area`(시드, 이미 만든 DB는 Alembic `0005`). 판정 함수 `in_area`·`inArea`는 숫자 없이 범위 데이터를 읽음. 시드 = 설정값을 테스트로 확인. 삿포로역·오도리·스스키노·마루야마공원역(3.2km) 안, 삿포로돔(6.9km)·신치토세공항(40km) 밖. 공항·리조트 호텔 같은 예외 장소는 아직 없음 | **운영사 답변 (2026-10-29)** |
+| **승차 시간 등록 기한은 설정값** `PICKUP_REGISTER_DAYS = 7` (출발 확정 후 n일 안, `settings.py`·`packages/shared`). 지금 쓰는 곳은 없음: API-17은 틀만이고 예약 상세에 '안내 예정일' 계산이 없어 화면 문구는 늘리지 않음. 출발 확정(판정일)이 출발 7일 전이라 7일이면 기한이 출발일과 같아짐 → 실제로 쓸 때 값 확인 필요 | **운영사 답변 (2026-10-29)**: 그때 사정에 따라 달라 값을 정하지 않음 |
+| **고객센터 임시값**: 전화 00-0000-000, 이메일 golf@travender-hokkaido.com, 운영 시간 10:00~17:00. 서버 `settings.SUPPORT`(`.env` `SUPPORT_TEL`·`SUPPORT_EMAIL`이 있으면 그 값), 화면 `packages/shared` `SUPPORT`·`data.ts` `SUPPORT_TEL`·`SUPPORT_MAIL`. 화면 '예시 번호' 표시는 실제 번호를 받을 때까지 그대로. 메일 하단도 `settings.SUPPORT`를 읽어 임시값이 나옴 | **운영사 답변 (2026-10-29)** |
+| 패키지 데이터 구조는 지금 항목으로 진행: 기본 정보(이름·박 수·출발 요일·판매 기간·1인 가격), 일정, 숙박·객실 옵션과 1인실 추가 요금, 출발편 정원, 소개(사진·설명·태그). 항목을 더할 때 고칠 곳은 아래 '패키지 항목을 더할 때' | **운영사 답변 (2026-10-29)** |
 
 ## 4. 답을 기다리는 것 (막히는 곳)
 
 운영사에 보낸 질문표: [operator-questions-2026-10-26.md](operator-questions-2026-10-26.md) (13개). 번호는 질문표 번호. 15~19는 본 사이트 결제 연동(10/27)에서 생긴 질문 (질문표에 아직 없음).
+10/29 운영사 답변으로 확정된 항목은 아래 '정리됨'으로 옮김.
 
 | # | 질문 | 관련 코드 |
 |---|---|---|
-| 1 | 동반자 영문 이름을 예약 때 모두 받아도 되는지 (팀 결정 10/23) | 서버 `services/booking.py` `_validate`·`save_companions` (V-24), 화면 `screens/InfoForm.tsx`·`MyDetail.tsx` |
-| 2 | 영문 이름에 하이픈·아포스트로피 허용 (팀 결정 10/23) | 서버 `services/booking.py` `NAME_EN`, 화면 `screens/InfoForm.tsx` `V21`·`VPART` |
-| 3 | 희망 승차 시간 범위: 첫 티오프 2시간 30분 전 ~ 티오프 − 이동 − 30분 (팀 결정 10/20) | 서버 `settings.py` `PICK_EARLIEST_BEFORE_TEE_MIN`·`PICK_MARGIN_MIN`, `services/booking.py` `stop_time_range` / 화면 `data.ts`·`logic.ts` `stopTimeRange`, `packages/shared` 같은 값 |
-| 4 | 희망 하차 시간은 선택 (하차 장소는 필수, 팀 결정 10/21) | 서버 `services/booking.py` `_validate` (DROP 희망 시간 없으면 건너뜀) / 화면 `screens/Place.tsx` `done`, `screens/flow.ts` |
-| 5 | 정원 20 = 최소 출발 20 → 20석이 다 차야 출발하는 구조가 맞는지 | `settings.py` `BUS_SEATS`·`MIN_DEPARTURE` (화면 `data.ts`·`packages/shared`), `rules.py` `departure_view` |
-| 6 | 회원 로그인 연동 방식 (이전 Q-14) → 작업 지시(10/27)대로 구현: `user_session` 쿠키 → 본 사이트 `/api/partner/session` | `adapters/auth.py`, 화면 `api/sync.ts` `loadMe` |
-| 7 | 결제·환불 연동 → 작업 지시(10/27)대로 구현. **Partner API 사양서 원본**(`docs/partner-api-golf.md`는 작업 지시만 있음): 키 헤더 이름·응답 모양·오류 본문 | `adapters/partner.py` 맨 위 '가정' 목록 |
+| 5 | 최소 출발 인원 (**운영사 확인 중**, 지금은 20명. 정원 20 = 최소 20이라 20석이 다 차야 출발) | `settings.py` `BUS_SEATS`·`MIN_DEPARTURE` (화면 `data.ts`·`packages/shared`), `rules.py` `departure_view` |
+| 6 | 로그인 연동 자료 (**조교님과 상의 후 전달**). 지금은 작업 지시(10/27)대로 `user_session` 쿠키 → 본 사이트 `/api/partner/session` | `adapters/auth.py`, 화면 `api/sync.ts` `loadMe` |
+| 13 | Google 지도 키·비용 (**조교님과 상의 후 전달**) | 화면 `apps/web/.env.local` `VITE_GOOGLE_MAPS_API_KEY`, `gmaps.ts` `MAP_ID`, API-05 (틀만) |
+| 3 | 희망 승차 시간 범위: 첫 티오프 2시간 30분 전 ~ 티오프 − 이동 − 30분 (팀 결정 10/20). 10/29 답변에 없음 | 서버 `settings.py` `PICK_EARLIEST_BEFORE_TEE_MIN`·`PICK_MARGIN_MIN`, `services/booking.py` `stop_time_range` / 화면 `logic.ts` `stopTimeRange` |
+| 7 | 결제·환불 연동 **Partner API 사양서 원본** (`docs/partner-api-golf.md`는 작업 지시만 있음): 키 헤더 이름·응답 모양·오류 본문 | `adapters/partner.py` 맨 위 '가정' 목록 |
+| 14 | 리조트 패키지 승하차 범위·예외 장소 (10/29: 예외 장소는 지금 만들지 않음) | 아래 '리조트 패키지 승하차 범위' 참고 |
 | 15 | 본 사이트 주문 만료 시간 (그동안 좌석 유지) | `adapters/partner.py` 주문 상태, `jobs` `check_payments` |
 | 16 | 고객 취소 수수료 (지금은 전액 환불만) | `services/booking.py` `cancel_by_user` → `refund_booking("customer_cancel")` |
-| 17 | 운행 취소·고객 취소 메일(CANCEL·USER_CANCEL)을 누가 보내는지 (지금은 이 서비스가 보냄) | `adapters/mail.py` 맨 위 표, `jobs` `judge_departures`, `services/booking.py` |
-| 18 | API-19(본 사이트 → 고객 취소 결과)가 계속 필요한지 (고객 취소를 이 서비스가 본 사이트 cancel로 하면 필요 없을 수 있음) + 보안 방식 | `routes.py` `site_cancel` (`X-Site-Key` = `SITE_KEY`) |
+| 18 | API-19(본 사이트 → 고객 취소 결과)가 계속 필요한지 + 보안 방식 | `routes.py` `site_cancel` (`X-Site-Key` = `SITE_KEY`) |
 | 19 | 본 사이트 테스트 서버 주소·API 키 | `.env` `PARTNER_API_BASE`·`PARTNER_API_KEY` → `PAYMENT_BACKEND=partner` |
-| 8 | 상품 데이터 형식 + 출발편당 골프 팀 수·객실 수 상한 | API-15 / B-05 (틀만), `package.single_add`, 화면 `data.ts` 상품 데이터 (API-02 연결 대기) |
-| 9 | 실제 승차 시간·정차 순서를 정하는 주체·등록 시점 (이전 Q-23) | API-17 `routes.py` `admin_stops` (틀만), `booking_stop.stop_order`·`pickup_time` |
-| 10 | 승하차 가능 지역(삿포로 시내) 범위 (질문표에는 12km로 보냄 → 10/27 팀 결정으로 3km) | `service_area` 데이터 (`seed/demo_data.json`), 화면 `data.ts` `ZONES_STRICT` |
-| 11 | 안내 메일: **보내는 주소 확정 대기** (이 서비스가 직접 보내는 것은 운영사 확정 10/26, 이전 Q-30) | `.env` `MAIL_FROM`·`MAIL_FROM_NAME`·`SMTP_*` → `MAIL_BACKEND=smtp`로 켜기 (`adapters/mail.py`) |
-| 12 | 고객센터 전화번호·이메일 (운영 시간은 받음) | 서버 `.env` `SUPPORT_TEL`·`SUPPORT_EMAIL` → `settings.SUPPORT`(메일·API-14). 화면 `data.ts` `SUPPORT_TEL`·`SUPPORT_MAIL`, `packages/shared` `SUPPORT`는 아직 예시 값 |
-| 13 | Google 지도 비용·키 발급 부담 | 화면 `apps/web/.env.local` `VITE_GOOGLE_MAPS_API_KEY`, `gmaps.ts` `MAP_ID`, API-05 (틀만) |
-| 14 | 리조트 패키지 승하차 범위 (운영사 내부 결정 대기) | 지금은 모든 패키지가 삿포로 중심 반경 3km 하나를 씀 (`service_area`, 화면 `data.ts` `ZONES_STRICT`). 아래 '리조트 패키지 승하차 범위' 참고 |
+| 11 | 안내 메일 보내는 주소 — **다른 팀원 담당** | `adapters/mail.py` |
+| 17 | 운행 취소·고객 취소 메일(CANCEL·USER_CANCEL) 보내는 쪽 — **다른 팀원 담당** | `adapters/mail.py` |
+
+### 패키지 항목을 더할 때 고칠 곳 (10/29, 코드는 그대로)
+
+예: 패키지에 '태그'를 더한다면 아래를 차례로 고칩니다. 한 곳이라도 빠지면 서버와 화면 값이 어긋납니다.
+
+1. **테이블**: Alembic 새 버전으로 `package`에 칸 추가 (`schema_0001.sql`은 처음 만들 때만). 여러 개 값(태그·사진 여러 장)이면 `package_tag (package_id, tag)`처럼 표를 따로. 시드 `seed/demo_data.json` `packages`에도 값
+2. **상품 가져오기 검사**: API-15 / B-05 (`routes.py` `admin_import`, 지금 틀만). 운영 시트 칸 → 테이블 칸 대응과 필수·형식 검사를 여기에 추가
+3. **API 응답**: `services/catalog.py` `PKG_SQL`(SELECT), `list_item`(목록·상세 공통), `get_package`(상세만). 검색에 쓰려면 `PKG_SQL`의 `search_text`, 거르기에 쓰려면 `search_packages`. 응답 타입 `packages/shared/src/api.ts` `PackageListItem`·`PackageDetailRes`
+4. **화면**: 지금은 상품 내용이 아직 브라우저 데이터(`data.ts` `Pkg`·`PKGS`, 2장 '남은 순서' 1번)라 `Pkg` 타입·데이터와 쓰는 화면(`Detail.tsx` S-03, `List.tsx` 카드, `Compare.tsx` S-04)을 같이 고침. API-02 연결 후에는 응답 타입만 보면 됨
+5. **문구**: 새 항목 이름·라벨은 `i18n.ts` 한국어·일본어
+
+지금 구조와 다른 점 (항목은 확정됐지만 데이터 자리가 부족한 것):
+- **태그**: 칸이 없음 (`search_kw` 영문 검색어, `is_recommended` 추천만). 위 1~4로 추가 필요
+- **사진**: `photo_url` 한 장. 화면은 `photos[]` 여러 장 → 사진 표 또는 JSON 칸 필요
+- **출발편 정원**: 지금은 모든 출발편이 `settings.BUS_SEATS`(20). 패키지별로 다르면 `package.capacity`를 두고 `services/departures.py` `generate_departures`가 그 값을 쓰게 (출발편 행에는 이미 `departure.capacity`가 있어 판정·잔여석은 그대로 동작)
+- **판매 기간**: `season_from`·`season_to`(해마다 반복 MM-DD). 특정 연도 기간이 필요하면 칸 추가
 
 ### 리조트 패키지 승하차 범위 — 지금 구조와 바꾸는 방법 (구현 안 함)
 
@@ -176,3 +191,10 @@ API를 빼면(`VITE_USE_API` 없음) 지금처럼 브라우저 안 데이터로�
 | 서비스 이름 | 이번 질문에서 뺌. 임시 이름 'TRAVENDER Golf'(`data.ts` `SERVICE_NAME`)를 그대로 씀 |
 | 판정일과 동반자 명단 마감이 같은 날 | 명단 입력 요청 메일(B-06)을 없애 문제가 사라짐 (동반자 이름은 예약 때 모두 받음, 팀 결정 10/23) |
 | API-19 실제 인증 방식 | 질문표 7번(결제·환불 연동)에 합침 |
+| 1. 동반자 영문 이름 예약 때 모두 필수 | **운영사 확정 10/29** (3장) |
+| 2. 영문 이름 규칙 | **운영사 확정 10/29**: 하이픈만 허용 (3장) |
+| 4. 희망 하차 시간 선택 | **운영사 확정 10/29** (3장) |
+| 8. 상품 데이터 형식 | **운영사 확정 10/29**: 지금 항목으로 진행 (4장 '패키지 항목을 더할 때') |
+| 9. 승차 시간 등록 시점 | **운영사 10/29**: 설정값 `PICKUP_REGISTER_DAYS` (3장) |
+| 10. 승하차 범위 | **운영사 확정 10/29**: 반경 5km (3장) |
+| 12. 고객센터 연락처 | **운영사 10/29**: 임시값 (3장). 실제 번호 받으면 설정값만 바꿈 |
