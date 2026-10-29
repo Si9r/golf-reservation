@@ -194,7 +194,7 @@ $env:VITE_USE_API="1"; npm run dev:web
 | `node` / `npm`을 찾을 수 없음 | Node 설치 전에 열린 터미널. VS Code·터미널을 새로 열기 |
 | `[Errno 10048] ... 8787` | 이미 API 서버가 떠 있음. 기존 서버를 쓰거나 끄고 다시 실행 |
 
-배치(B-xx)는 `apps/api`에서 `python -m app.jobs B-01` 처럼 실행합니다 (B-01 출발 판정, B-02 좌석 확보 정리, B-03 여행 완료, B-04 출발편 만들기).
+배치(B-xx)는 `apps/api`에서 `python -m app.jobs B-01` 처럼 실행합니다 (B-01 출발 판정, B-02 좌석 확보 정리, B-03 여행 완료, B-04 출발편 만들기, B-07 환불 재시도, B-08 결제 확인, B-09 안내 메일 재발송).
 
 ## 테스트
 
@@ -222,7 +222,7 @@ npm test                  # 화면 쪽 규칙 (packages/shared)
   - 환불: 운행 취소 `operator_cancel`, 고객 취소 `customer_cancel`. 실패하면 `refund_status=FAIL` + 운영자 알림(`OPS_EMAIL`), 배치 B-07이 다시 시도
 - 결제 확인 배치 B-08(10분마다): 주문 전 결제 대기 10분 만료, 주문 후 결제 대기는 본 사이트에 다시 조회
 - 본 사이트 Partner API 사양서 원본을 받기 전이라 요청·응답 모양은 가정입니다. `partner.py` 맨 위 '가정' 목록만 맞추면 됩니다
-- 메일: 이 서비스가 직접 보냄 (`apps/api/app/adapters/mail.py`). `.env` `MAIL_BACKEND=log`(기본)는 보내지 않고 로그만, `smtp`는 `MAIL_FROM`·`SMTP_*` 설정으로 실제 발송. 결과는 `notification` 테이블에 OK/FAIL로 기록 (보내는 주소는 확정 대기). 예약 확인(CONFIRM)은 본 사이트가 보냄
+- 메일: 이 서비스가 직접 보냄 (`apps/api/app/adapters/mail.py`). `.env` `MAIL_BACKEND=smtp`(`.env.example` 기본, 팀 공용 Resend 계정)는 실제 발송, `log`는 보내지 않고 로그만. Resend API 키(`SMTP_PASSWORD`)는 `.env`에만 넣고 git에 올리지 않음. 결과는 `notification` 테이블에 OK/FAIL로 기록. 보내는 주소는 모든 메일이 `golf-test@resend.dev` (테스트용 Resend: `SMTP_HOST=smtp.resend.com`, `SMTP_USER=resend`, `SMTP_PASSWORD`=API 키). 시험 발송: `python -m app.mail_samples <받는 주소>`. 예약 확인(CONFIRM)은 본 사이트가 보냄. 보낼 대상은 `services/booking.py` `send_due_mails`가 고르고(판정 직후·판정 뒤 결제·B-09), 실패한 메일은 B-09가 3회까지 다시 보냄
 
 ### 본 사이트 → 이 서비스 (API-19)
 

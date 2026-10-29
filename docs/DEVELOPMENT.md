@@ -23,7 +23,7 @@
 | 결제 시작 / API-20 `POST /bookings/{no}/checkout` | `services/booking.py` `checkout` | 완료 |
 | 결제 결과 확인 / API-21 `GET /bookings/{no}/payment` | `services/booking.py` `payment_status` → `apply_order` (출발편 잠금 후 다시 확인 → 두 번 불러도 확정 한 번) | 완료 |
 | L-09 예약번호 | `rules.py` `booking_no` + `booking_seq` 테이블 | 완료 |
-| L-10 출발 판정 / B-01 | `jobs/__init__.py` `judge_departures` | 완료 (재시도·운영 메일 TODO) |
+| L-10 출발 판정 / B-01 | `jobs/__init__.py` `judge_departures` · `_judge_one` | 완료 (출발편별 3회 재시도 → 운영자 알림, 중간에 멈춰도 남은 환불·메일만 다시) |
 | L-14 고객 취소 / API-16 | `services/booking.py` `cancel_by_user` (공통 처리 `_cancel_confirmed`) | 완료 (본 사이트 연동 API-19 전 임시·운영 예비용) |
 | API-19 고객 취소·환불 결과 받기 (본 사이트 → 이 서비스) | `routes.py` `site_cancel`, `services/booking.py` `cancel_from_site` | 완료 (인증은 `X-Site-Key` 임시, 결제 연동 협의 때 확정) |
 | L-15 환불 요청 | `services/booking.py` `refund_booking` → `adapters/payment.py` `cancel_order` (reason `operator_cancel` · `customer_cancel`, 실패 → `refund_status=FAIL` + 운영자 알림 `alert_ops`) | 완료 (전액 환불만) |
@@ -35,6 +35,7 @@
 | B-06 명단 입력 요청 | — | 없앰 (동반자 이름을 예약 때 모두 받음, 팀 결정 10/23) |
 | B-07 환불 재시도 | `jobs` `retry_refunds` (`refund_status=FAIL`인 취소 예약) | 완료 |
 | B-08 결제 확인 (10분마다) | `jobs` `check_payments`: 주문 전 결제 대기 10분 지남 → UNPAID, 주문 후 결제 대기 → 본 사이트 조회 | 완료 |
+| B-09 안내 메일 재발송 (개발 추가, 1시간마다 정도) | `jobs` `resend_mails` → `services/booking.py` `send_due_mails`: 못 보낸 GO·CANCEL·USER_CANCEL, 실패는 `MAIL_TRIES`(3)회까지 | 완료 |
 | API-01 ~ 04, 06 ~ 14, 18 ~ 21 | `routes.py` | 동작 (`/api/golf/docs`에서 확인) |
 | API-05 장소 검색 | — | 틀만 (지금은 화면이 Google을 직접 호출) |
 | V-01 ~ V-24 입력 검사 | `schemas.py`(pydantic) + `services/booking.py` `_validate` | 서버 쪽 완료 |
@@ -121,8 +122,9 @@ API를 빼면(`VITE_USE_API` 없음) 지금처럼 브라우저 안 데이터로�
 | **결제 전에 예약을 만듦**: S-09 '다음'에서 `PENDING_PAYMENT`(결제 대기)로 저장하고 예약번호를 발급. 결제가 끝나면 `CONFIRMED`(+ `booked_count`), 실패·만료면 `UNPAID`(미결제). 두 상태는 S-12·S-13에 보이지 않음(CONFIRMED 이후만). 같은 회원이 새로 예약하면 주문 전 결제 대기는 UNPAID로. API-08·09 좌석 확보는 남아 있지만 화면은 쓰지 않음 | 본 사이트 결제 연동 작업 지시 (10/27): 본 사이트 주문에 `reference`(= 예약번호)가 필요 |
 | **주문을 만든 뒤에는 결과가 나올 때까지 좌석 유지** (잔여석 = 정원 − 확정 − 결제 대기 − 주문 전 확보). 10분 만료는 주문 전 결제 대기·확보에만. 결제 확인 배치 B-08이 10분마다 본 사이트 주문을 다시 조회 | 작업 지시 (10/27). 카드 인증(authenticating)이 길어져도 결제된 손님의 자리가 없어지지 않게. **본 사이트 주문 만료 시간은 답 대기** |
 | Alembic `0003`: `booking.status`에 `PENDING_PAYMENT`·`UNPAID` 추가, `payment_id` → `order_id`(중복 불가), `order_status`·`order_checked_at` 추가 | 작업 지시 (10/27) |
-| 결제 후 출발편이 이미 운행 취소면 바로 OP_CANCEL + 전액 환불(`operator_cancel`). 운행 취소 환불은 주문별로 차례로, 한 건이 실패해도 계속(FAIL 기록 + 운영자 알림 → B-07 재시도). 운영자 알림은 `notification` `OPS_ALERT` + `.env` `OPS_EMAIL` | 작업 지시 (10/27) |
+| 결제 후 출발편이 이미 운행 취소면 바로 OP_CANCEL + 전액 환불(`operator_cancel`). 운행 취소 환불은 주문별로 차례로, 한 건이 실패해도 계속(FAIL 기록 + 운영자 알림 → B-07 재시도). 운영자 알림은 `notification` `OPS_ALERT` + `.env` `OPS_EMAIL`. 알림 메일(`adapters/mail.py` `render_ops`)에는 발생 시각·무슨 일(본 사이트 오류 코드와 원인 짐작)·고객(대표자 이름·이메일·전화·회원 ID)·예약(상태·패키지·출발일·인원·금액·본 사이트 주문·환불 상태) 또는 출발편(상태·확정 인원)·해야 할 일 | 작업 지시 (10/27). 알림 내용 보강 10/29 |
 | **예약 확인 메일(CONFIRM)은 본 사이트가 보냄** → 이 서비스는 보내지 않음(템플릿은 남김). 출발 확정 GO·승차 시간 안내 PICKUP은 이 서비스가 보냄(PICKUP 템플릿만, 보내는 곳은 API-17과 함께). 운행 취소 CANCEL·고객 취소 USER_CANCEL은 담당이 정해질 때까지 그대로 보냄 | 작업 지시 (10/27). CANCEL·USER_CANCEL 보내는 쪽은 답 대기 |
+| **빠졌던 메일 보완**: ① 판정 뒤에 결제가 끝난 예약 — 출발 확정 출발편이면 GO, 운행 취소 출발편이면 환불 후 CANCEL (`apply_order`, 결과 화면 '안내 메일을 확인해 주세요'와 맞춤) ② B-01 판정 오류 — 출발편별 `JUDGE_TRIES`(3)회 다시, 그래도 실패하면 운영자 알림(`OPS_EMAIL`, 예약번호가 없어 `notification`에는 못 남기고 로그·메일) ③ B-01이 판정만 하고 멈춘 경우 — 다음 실행에서 환불 못 한 운행 취소 예약을 다시 환불하고 메일 ④ 발송 실패 메일 — B-09가 다시 보냄. 보낼 대상은 `send_due_mails` 한 곳에서 고르고 `notification`에 OK가 있으면 다시 보내지 않음. 운행 취소 메일은 환불 요청 뒤에만 ('전액 환불' 안내). 출발일이 지난 예약은 보내지 않음 | 개발 결정 (10/29). B-09 실행 주기는 배포 때 정함 |
 | 결과 화면 재확인: 결제 대기(pending·authenticating)면 30초 간격 3번, 그래도 대기면 '결제를 확인하고 있어요' 안내(확정되면 예약 조회에 나옴) | 작업 지시 (10/27) |
 | 승하차 가능 범위를 삿포로 중심(TV탑 부근 43.0621, 141.3544) 반경 **12km → 3km**로 (10/29 **5km**로 바뀜, 아래 행): 서버 `service_area`(Alembic `0004`, `seed/demo_data.json`), 화면 `data.ts` `ZONES_STRICT`. 삿포로역·오도리·스스키노·나카지마 공원까지 들어가고 마루야마(약 3.2km)·삿포로돔·신삿포로는 빠짐. 이미 있는 예약은 다시 검사하지 않음 | 팀 결정 (2026-10-27): 합승 버스 정차를 도심에 모아 승차 시간을 줄임. 운영사 확인은 질문표 10번 |
 | **영문 이름은 하이픈만 허용**: 여권 표기 그대로, 이름 안 하이픈(-) 허용, 아포스트로피(') 불가, 하이픈으로 시작·끝 불가. 대문자·성·이름 각각 필수·합쳐서 60자 이하는 그대로. 대표자·동반자, 예약(API-10)·오타 수정(API-13, S-13) 모두 같은 규칙: 서버 `services/booking.py` `NAME_EN`, 화면 `screens/InfoForm.tsx` `V21`·`VPART`·`upper`. 안내 예시는 KIM MIN-JI. 이미 저장된 예약 데이터는 바꾸지 않음 | **운영사 답변 (2026-10-29)** |
