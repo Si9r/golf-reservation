@@ -113,8 +113,12 @@ def test_quote_no_hotel(client):
     assert r["rooms"] is None and r["total"] == (69800 - 9000) * 3
 
 
-def test_area_check(client):  # API-06
-    assert client.post(U + "/places/check", json={"lat": 43.1979, "lng": 140.9937}).json()["inArea"] is False
+def test_area_check(client):  # API-06: DB service_area 로 판정 (반경 5km, 운영사 확정 10/29)
+    from test_rules import SAPPORO_PLACES  # tests 폴더는 pytest 가 sys.path 에 넣음
+
+    assert client.post(U + "/places/check", json={"lat": 43.1979, "lng": 140.9937}).json()["inArea"] is False  # 오타루
+    for name, ((lat, lng), want) in SAPPORO_PLACES.items():
+        assert client.post(U + "/places/check", json={"lat": lat, "lng": lng}).json()["inArea"] is want, name
 
 
 # ---------- 예약 흐름 (L-07, L-08) ----------

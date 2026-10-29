@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bookingNo, departureView, inArea, inClosedSeason, isBookableDate, isSaleDate, quote, roomsOf, seatsLeft } from "../src";
+import { bookingNo, departureView, inArea, inClosedSeason, isBookableDate, isSaleDate, quote, roomsOf, seatsLeft, SETTINGS } from "../src";
 
 const pkg = { depWeekdays: "TUE,FRI", seasonFrom: "04-20", seasonTo: "11-15" };
 
@@ -48,8 +48,18 @@ describe("L-05 금액 · 객실 구성", () => {
 
 describe("L-06 · L-09", () => {
   it("범위 검사 (원·다각형)", () => {
-    expect(inArea({ lat: 43.0675, lng: 141.3508 }, { type: "circle", lat: 43.0621, lng: 141.3544, r: 12000 })).toBe(true);
-    expect(inArea({ lat: 43.1979, lng: 140.9937 }, { type: "circle", lat: 43.0621, lng: 141.3544, r: 12000 })).toBe(false);
+    // 승하차 범위 반경 5km (운영사 확정 10/29): 중심에서 4.9km 안, 5.1km 밖 (북·동·남·서)
+    const a = SETTINGS.SERVICE_AREA;
+    const circle = { type: "circle" as const, lat: a.lat, lng: a.lng, r: a.r };
+    expect(a.r).toBe(5000);
+    const kmLat = 1 / 111.195, kmLng = kmLat / Math.cos((a.lat * Math.PI) / 180);
+    for (const [dl, dg] of [[kmLat, 0], [0, kmLng], [-kmLat, 0], [0, -kmLng]]) {
+      expect(inArea({ lat: a.lat + dl * 4.9, lng: a.lng + dg * 4.9 }, circle)).toBe(true);
+      expect(inArea({ lat: a.lat + dl * 5.1, lng: a.lng + dg * 5.1 }, circle)).toBe(false);
+    }
+    // 실제 장소: 삿포로역·오도리·스스키노·마루야마공원역 안, 삿포로돔·신치토세공항 밖
+    for (const [lat, lng] of [[43.0675, 141.3508], [43.0596, 141.3485], [43.0554, 141.3532], [43.0543, 141.3165]]) expect(inArea({ lat, lng }, circle)).toBe(true);
+    for (const [lat, lng] of [[43.0151, 141.4096], [42.788, 141.681]]) expect(inArea({ lat, lng }, circle)).toBe(false);
     const sq = { type: "polygon" as const, points: [[43, 141.3], [43.1, 141.3], [43.1, 141.4], [43, 141.4]] as [number, number][] };
     expect(inArea({ lat: 43.05, lng: 141.35 }, sq)).toBe(true);
     expect(inArea({ lat: 43.2, lng: 141.35 }, sq)).toBe(false);

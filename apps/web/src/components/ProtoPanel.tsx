@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Blueprint } from "@phosphor-icons/react";
 import { useApp, useAuth, useDb, useDraft, useToast, type Theme } from "../store";
-import { PKGS } from "../data";
+import { PKGS, ZONES_STRICT } from "../data";
 import { firstAvailable, stopTimeRange } from "../logic";
 import { Sheet } from "./ui";
 
@@ -120,7 +120,7 @@ export function ProtoPanel() {
             <span className="text-[13px] font-semibold text-muted">다음 결제 결과</span>
             <Seg value={app.payResult} items={[["ok", "성공"], ["fail", "실패 (M-173)"], ["soldout", "결제 후 자리 없음 (M-174)"]]} onChange={(v) => app.set({ payResult: v })} />
             <span className="text-[13px] font-semibold text-muted">승하차 가능 범위 (SERVICE_AREA, 확인 필요)</span>
-            <Seg value={app.wideArea ? 1 : 0} items={[[0, "삿포로 중심 3km"], [1, "넓은 범위: 공항 포함"]]} onChange={(v) => app.set({ wideArea: v === 1 })} />
+            <Seg value={app.wideArea ? 1 : 0} items={[[0, `삿포로 중심 ${ZONES_STRICT[0].r / 1000}km`], [1, "넓은 범위: 공항 포함"]]} onChange={(v) => app.set({ wideArea: v === 1 })} />
             <span className="text-[13px] font-semibold text-muted">테마</span>
             <Seg<Theme> value={app.theme} items={[["system", "시스템"], ["light", "라이트"], ["dark", "다크"]]} onChange={(v) => app.set({ theme: v })} />
             <span className="text-[13px] font-semibold text-muted">데모 예약 데이터</span>

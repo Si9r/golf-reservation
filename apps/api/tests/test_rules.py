@@ -1,4 +1,6 @@
-from app.rules import booking_no, booking_tab, departure_view, in_area, in_closed_season, is_bookable_date, is_sale_date, quote, rooms_of, seats_left
+import math
+
+from app.rules import distance_m, booking_no, booking_tab, departure_view, in_area, in_closed_season, is_bookable_date, is_sale_date, quote, rooms_of, seats_left
 
 PKG = {"dep_weekdays": "TUE,FRI", "season_from": "04-20", "season_to": "11-15"}
 
@@ -34,10 +36,40 @@ def test_rooms_and_quote():  # L-05 객실 구성
     assert quote(16900, 0, 3, False)["total"] == 16900 * 3
 
 
+SAPPORO_PLACES = {  # 실제 장소 → 반경 5km 안 여부 (중심 43.0621, 141.3544 에서 직선거리)
+    "JR 삿포로역 남쪽 출구": ((43.0675, 141.3508), True),  # 0.67km
+    "오도리공원": ((43.0596, 141.3485), True),  # 0.55km
+    "스스키노역": ((43.0554, 141.3532), True),  # 0.75km
+    "마루야마공원역": ((43.0543, 141.3165), True),  # 3.2km
+    "삿포로돔": ((43.0151, 141.4096), False),  # 6.9km
+    "신치토세공항 국제선 터미널": ((42.788, 141.681), False),  # 40.5km
+}
+
+
+def test_service_area_5km():  # L-06 승하차 범위 반경 5km (운영사 확정 10/29)
+    import json
+    from pathlib import Path
+
+    from app import settings as S
+
+    a = S.SERVICE_AREA
+    assert a["r"] == 5000
+    circle = {"type": "circle", "lat": a["lat"], "lng": a["lng"], "r": a["r"]}
+    km_lat = 1 / 111.195  # 위도 1km
+    km_lng = km_lat / math.cos(math.radians(a["lat"]))  # 이 위도에서 경도 1km
+    for d_lat, d_lng in ((km_lat, 0), (0, km_lng), (-km_lat, 0), (0, -km_lng)):  # 북·동·남·서
+        inside = {"lat": a["lat"] + d_lat * 4.9, "lng": a["lng"] + d_lng * 4.9}
+        outside = {"lat": a["lat"] + d_lat * 5.1, "lng": a["lng"] + d_lng * 5.1}
+        assert 4890 < distance_m(inside, a) < 4910 and in_area(inside, circle)
+        assert 5090 < distance_m(outside, a) < 5110 and not in_area(outside, circle)
+    for name, ((lat, lng), want) in SAPPORO_PLACES.items():
+        assert in_area({"lat": lat, "lng": lng}, circle) is want, name
+    # 시드 데이터도 같은 값 (새 DB). 이미 만든 DB는 Alembic 0005
+    seed = json.loads((Path(__file__).resolve().parents[1] / "seed" / "demo_data.json").read_text(encoding="utf-8"))
+    assert next(x["shape"] for x in seed["areas"] if x["id"] == a["id"]) == circle
+
+
 def test_area_and_no():  # L-06, L-09
-    circle = {"type": "circle", "lat": 43.0621, "lng": 141.3544, "r": 12000}
-    assert in_area({"lat": 43.0675, "lng": 141.3508}, circle)
-    assert not in_area({"lat": 43.1979, "lng": 140.9937}, circle)
     sq = {"type": "polygon", "points": [[43, 141.3], [43.1, 141.3], [43.1, 141.4], [43, 141.4]]}
     assert in_area({"lat": 43.05, "lng": 141.35}, sq) and not in_area({"lat": 43.2, "lng": 141.35}, sq)
     assert booking_no("2026-10-23", 7) == "GT-261023-0007"

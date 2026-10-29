@@ -1,5 +1,7 @@
 // 프로토타입 데이터. 패키지 구성·가격·사진은 예시 (요건 정의서 Q-02·Q-08·Q-14: 운영사 확정 전)
 // 골프장·호텔 이름은 프로토타입 v9(TRAVENDER /hotels 실존 호텔)과 같게 유지
+import { SETTINGS } from "@golf/shared";
+
 export type Lang = "ko" | "ja";
 export type L2 = { ko: string; ja: string };
 export type Zone = "SAPPORO" | "KITAHIROSHIMA" | "CHITOSE";
@@ -71,10 +73,10 @@ export const AREA_NAME: Record<Area, L2> = {
   MAP: { ko: "지도에서 고른 위치", ja: "地図で選んだ位置" },
 };
 
-// 승하차 가능 범위 SERVICE_AREA (중심 반경 3km, 팀 결정 10/27 · 운영사 확인 질문표 10번. 실서비스는 다각형 가능). 서버 service_area 와 같은 값
+// 승하차 가능 범위 SERVICE_AREA: 중심 반경 5km (운영사 확정 10/29). 값은 packages/shared settings.ts SERVICE_AREA (서버 settings.py·service_area 와 같음)
 // 공항 포함 여부는 회사 확인 필요 → 설계 도구에서 '넓은 범위'(이전 프로토타입: 기타히로시마·치토세·공항 포함)로 비교
 export type ZoneCircle = { zone: Zone; lat: number; lng: number; r: number };
-export const ZONES_STRICT: ZoneCircle[] = [{ zone: "SAPPORO", lat: 43.0621, lng: 141.3544, r: 3000 }];
+export const ZONES_STRICT: ZoneCircle[] = [{ zone: SETTINGS.SERVICE_AREA.id, lat: SETTINGS.SERVICE_AREA.lat, lng: SETTINGS.SERVICE_AREA.lng, r: SETTINGS.SERVICE_AREA.r }];
 export const ZONES_WIDE: ZoneCircle[] = [
   { zone: "SAPPORO", lat: 43.055, lng: 141.375, r: 13000 },
   { zone: "KITAHIROSHIMA", lat: 42.98, lng: 141.56, r: 7000 },

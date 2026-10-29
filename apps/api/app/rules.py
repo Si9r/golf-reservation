@@ -114,7 +114,8 @@ def distance_m(a: dict, b: dict) -> float:
 
 
 def in_area(p: dict, shape: dict) -> bool:
-    """L-06 승하차 범위 (원 {type:circle,lat,lng,r} 또는 다각형 {type:polygon,points:[[lat,lng],...]}). 기준은 팀 논의 T-1"""
+    """L-06 승하차 범위 (원 {type:circle,lat,lng,r} 또는 다각형 {type:polygon,points:[[lat,lng],...]}).
+    지금은 원 하나 (settings.SERVICE_AREA, 반경 5km, 운영사 확정 10/29). 범위 값은 service_area 데이터에 있고 이 함수에는 숫자가 없음"""
     if shape["type"] == "circle":
         return distance_m(p, shape) <= shape["r"]
     pts, inside, j = shape["points"], False, len(shape["points"]) - 1
