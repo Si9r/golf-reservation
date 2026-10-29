@@ -301,18 +301,18 @@ export const itinerary = (p: Pkg, optId: string | null, pick: Place | null, drop
   const last = p.days.length - 1;
   return p.days.map((r, i) => {
     const items: ItinItem[] = [];
-    if (i === 0) items.push({ kind: "bus", at: pAt, time: confirmedPickup ?? pickTime ?? undefined, wish: !confirmedPickup && !!pickTime, tbd: !confirmedPickup && !pickTime, title: { ko: `버스 승차 · ${pickName.ko}`, ja: `バス乗車・${pickName.ja}` }, note: { ko: "확정 승차 시간은 출발 확정 후 이메일로 안내", ja: "確定乗車時刻は催行決定後にメールでご案内" } });
+    if (i === 0) items.push({ kind: "bus", at: pAt, time: confirmedPickup ?? pickTime ?? undefined, wish: !confirmedPickup && !!pickTime, tbd: !confirmedPickup && !pickTime, title: { ko: `버스 승차 · ${pickName.ko}`, ja: `バス乗車・${pickName.ja}` }, note: { ko: "확정 시간은 메일로 안내", ja: "確定時刻はメールでご案内" } });
     else if (h && !h.onsite) items.push({ kind: "bus", at: hAt, time: r ? leaveAt(r.tee, h, h.area, courseOf(r.course)) : "09:00", title: { ko: `${h.name.ko} 출발`, ja: `${h.name.ja} 出発` } });
     else if (!h && i > 0) items.push({ kind: "bus", at: pAt, time: r && pick ? leaveAt(r.tee, pick, placeZone(pick), courseOf(r.course)) : "09:00", title: { ko: `버스 승차 · ${pickName.ko}`, ja: `バス乗車・${pickName.ja}` } });
     if (r) {
       const c = courseOf(r.course);
-      items.push({ kind: "golf", at: { lat: c.lat, lng: c.lng }, time: r.tee, title: { ko: `${c.name.ko} · 18홀`, ja: `${c.name.ja}・18ホール` }, note: { ko: `${c.caddie ? "캐디 동반" : "셀프"} · ${c.holes}홀 코스 · 렌탈은 골프장 현장 문의`, ja: `${c.caddie ? "キャディ付き" : "セルフ"}・${c.holes}ホール・レンタルはゴルフ場に直接お問い合わせ` }, course: c.id });
+      items.push({ kind: "golf", at: { lat: c.lat, lng: c.lng }, time: r.tee, title: { ko: `${c.name.ko} · 18홀`, ja: `${c.name.ja}・18ホール` }, note: { ko: `${c.caddie ? "캐디 동반" : "셀프"} · ${c.holes}홀 코스`, ja: `${c.caddie ? "キャディ付き" : "セルフ"}・${c.holes}ホール` }, course: c.id });
     } else {
       items.push({ kind: "free", title: { ko: "자유 일정 · 체크아웃", ja: "自由行動・チェックアウト" } });
     }
     if (i < last && h) items.push({ kind: "hotel", at: hAt, time: r?.back, title: { ko: `숙박 · ${h.name.ko}`, ja: `宿泊・${h.name.ja}` }, note: { ko: "체크인 15:00 이후 · 조식 포함", ja: "チェックイン15:00以降・朝食付き" } });
     if (i < last && !h) items.push({ kind: "drop", at: dAt, time: r?.back, title: { ko: `버스 하차 · ${dropName.ko}`, ja: `バス降車・${dropName.ja}` }, note: { ko: "숙박은 직접 준비 (호텔 없이 옵션)", ja: "宿泊はご自身で手配（ホテルなし）" } });
-    if (i === last) items.push({ kind: "drop", at: dAt, time: dropTime ?? (r ? r.back : "11:00"), wish: !!dropTime, title: { ko: `버스 하차 · ${dropName.ko}`, ja: `バス降車・${dropName.ja}` }, ...(dropTime ? { note: { ko: "실제 하차 시간은 출발 확정 후 이메일로 안내", ja: "実際の降車時刻は催行決定後にメールでご案内" } } : {}) });
+    if (i === last) items.push({ kind: "drop", at: dAt, time: dropTime ?? (r ? r.back : "11:00"), wish: !!dropTime, title: { ko: `버스 하차 · ${dropName.ko}`, ja: `バス降車・${dropName.ja}` }, ...(dropTime ? { note: { ko: "확정 시간은 메일로 안내", ja: "確定時刻はメールでご案内" } } : {}) });
     return items;
   });
 };

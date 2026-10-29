@@ -1,7 +1,7 @@
 import { Suspense, lazy, useEffect } from "react";
 import { HashRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { MotionConfig } from "motion/react";
-import { useApp, useDb } from "./store";
+import { DESIGN_TOOLS, useApp, useDb } from "./store";
 import { loadMe } from "./api/sync";
 import { Header } from "./components/Shell";
 import { ProtoPanel } from "./components/ProtoPanel";
@@ -138,7 +138,7 @@ export default function App() {
       <HashRouter>
         <Header />
         <Pages />
-        <ProtoPanel />
+        {DESIGN_TOOLS && <ProtoPanel />}
         <Toast />
       </HashRouter>
     </MotionConfig>

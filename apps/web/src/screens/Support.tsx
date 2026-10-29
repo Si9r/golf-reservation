@@ -3,7 +3,7 @@ import { CaretDown, EnvelopeSimple, Phone } from "@phosphor-icons/react";
 import { SET } from "../data";
 import { useT } from "../i18n";
 import { useAuth, useDb } from "../store";
-import { Anno, Collapse, Q, ScreenTag } from "../components/ui";
+import { Anno, Collapse, ScreenTag } from "../components/ui";
 
 // 일본 시간 기준 운영 중인지 (설정 SUPPORT.hours 10:00-17:00)
 const openNowJST = () => {
@@ -31,7 +31,7 @@ export default function Support() {
           <Anno n={1} t="연락처·운영 시간 (설정 SUPPORT): 10:00~17:00 (JST), 전화·이메일 바로 연결" />
           {[
             [t("hours"), t("hoursV")],
-            [t("tel"), <span key="tel" className="num">{SET.SUPPORT_TEL} <span className="text-[12px] font-normal text-muted">({t("telNote")})</span></span>],
+            [t("tel"), <span key="tel" className="num">{SET.SUPPORT_TEL}</span>],
             [t("mailL"), <span key="m" className="break-all">{SET.SUPPORT_MAIL}</span>],
           ].map(([k, v], i) => (
             <div key={i} className="flex gap-3 px-4 py-3.5 text-[14.5px]">
@@ -40,7 +40,7 @@ export default function Support() {
             </div>
           ))}
         </section>
-        <p className={`mt-2 text-[13px] font-semibold ${isOpen ? "text-ok" : "text-warn"}`}>{isOpen ? t("openNow") : t("closedNow")} <Q id="Q-13" t="연락처 미수령" /></p>
+        {!isOpen && <p className="mt-2 text-[13px] font-semibold text-warn">{t("closedNow")}</p>}
         <div className="mt-3 grid grid-cols-2 gap-2">
           <a className="btn btn-primary" href={`tel:${SET.SUPPORT_TEL.replace(/-/g, "")}`}><Phone size={20} weight="fill" /> {t("call")}</a>
           <a className="btn btn-ghost" href={`mailto:${SET.SUPPORT_MAIL}${recent ? `?subject=${encodeURIComponent(recent.no)}` : ""}`}><EnvelopeSimple size={20} /> {t("mail")}</a>

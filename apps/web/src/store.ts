@@ -7,6 +7,9 @@ import { syncToken } from "./api/sync";
 import { addDays, booked, departuresIn, judgeDate, monthsAhead, stopTimeRange, todayISO, tripEnd, type Extra, type SearchFilters } from "./logic";
 
 // ---------- 앱 설정 (언어·테마·프로토타입 도구) ----------
+// 설계·데모 도구 (설계 버튼·시트, 설계 번호·Q·단계 배지, 데모 로그인·결제 결과·상태 바꾸기): 실서비스 빌드에서는 숨김 (팀 결정 10/29).
+// VITE_DESIGN_TOOLS=1 이면 켬, 0 이면 끔, 비우면 개발 서버(npm run dev)에서만 켬
+export const DESIGN_TOOLS = import.meta.env.VITE_DESIGN_TOOLS ? import.meta.env.VITE_DESIGN_TOOLS === "1" : import.meta.env.DEV;
 export type Theme = "system" | "light" | "dark";
 export type PayResult = "ok" | "fail" | "soldout";
 interface AppState {

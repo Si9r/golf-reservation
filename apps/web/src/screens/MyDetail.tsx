@@ -3,7 +3,7 @@ import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ArrowSquareOut, Bed, Bus, CaretRight, Copy, FileText, Flag, Headset, Printer, UsersThree } from "@phosphor-icons/react";
 import { AREA_NAME, SET, courseOf, pkgOf } from "../data";
 import { useT } from "../i18n";
-import { useApp, useAuth, useDb, useToast, viewOf, type Booking } from "../store";
+import { DESIGN_TOOLS, useApp, useAuth, useDb, useToast, viewOf, type Booking } from "../store";
 import { addDays, coursesOf, fDate, fDayLong, fShort, itinerary, judgeDate, optionOf, pickupWindow, stayHotel, todayISO, tripEnd, yen } from "../logic";
 import { Anno, Img, Q, ScreenTag, Sheet, gmapLink } from "../components/ui";
 import { useDrive } from "../gmaps";
@@ -74,8 +74,8 @@ export default function MyDetail() {
     v.label === "ENOUGH" ? { tone: "ok", title: t("mdEnoughT"), desc: t("mdEnoughD", { d: judge }) } :
     v.label === "GO" ? { tone: "brand", title: t("mdGoT"), desc: confirmedPickup ? t("mdGoD", { t: `${fShort(b.dep, L)} ${confirmedPickup}`, p: b.pick ? n(b.pick.name) : "-" }) : t("M-201") } :
     v.label === "OP_CANCEL" ? { tone: "bad", title: t("mdOpCancelT"), desc: t("M-202") } :
-    v.label === "USER_CANCEL" ? { tone: "mute", title: t("mdUserCancelT"), desc: t("M-203") } :
-    { tone: "mute", title: t("mdDoneT"), desc: t("M-204") };
+    v.label === "USER_CANCEL" ? { tone: "mute", title: t("mdUserCancelT"), desc: "" } : // 상태 이름만 (10/29)
+    { tone: "mute", title: t("mdDoneT"), desc: "" };
   const TONE: Record<string, { box: string; ink: string }> = {
     warn: { box: "border-warn-line bg-warn-soft", ink: "text-warn" },
     ok: { box: "border-ok-bg bg-ok-soft", ink: "text-ok" },
@@ -118,7 +118,7 @@ export default function MyDetail() {
           <Anno n={1} t="상태 띠: 상태마다 제목 1개 + 설명 1문장 (모집 중 / 인원 다 모임·출발 확정 대기 / 출발 확정+승차 시간 / 운행 취소 / 고객 취소 / 완료), 살아 있는 예약은 인원 막대. 취소 예약은 취소 주체·환불 상태" />
           <div>
             <h2 className={`text-[17px] font-extrabold lg:text-[19px] ${tone.ink}`}>{st.title}</h2>
-            <p className="mt-1 text-[14px] leading-relaxed text-ink lg:text-[15px]">{st.desc}</p>
+            {st.desc && <p className="mt-1 text-[14px] leading-relaxed text-ink lg:text-[15px]">{st.desc}</p>}
             {(v.status === "OP_CANCEL" || v.status === "USER_CANCEL") && (
               <dl className="mt-3 grid gap-1 border-t border-line pt-3 text-[13.5px]">
                 <div className="flex gap-2"><dt className="w-20 flex-none text-muted">{t("cancelByL")}</dt><dd className="font-semibold">{t(`cancelBy_${v.cancelBy ?? "USER"}`)}</dd></div>
@@ -135,7 +135,7 @@ export default function MyDetail() {
         </section>
 
         {/* 데모 (설계 패널을 켰을 때만): 판정 B-01·고객 취소 API-16·승차 시간 등록 API-17·완료 B-03 */}
-        {anno && (
+        {DESIGN_TOOLS && anno && (
           <div className="mt-3 grid gap-2 rounded-2xl border border-dashed p-3" style={{ borderColor: "var(--anno)" }}>
             <span className="text-[12.5px] font-bold" style={{ color: "var(--anno)" }}>{t("demoState")}</span>
             <div className="flex flex-wrap gap-1.5">
@@ -280,14 +280,14 @@ export default function MyDetail() {
             <section className="relative card divide-y divide-line overflow-hidden">
               <Anno n={5} t="바로가기: 예약 확인서(인쇄·저장) / 고객센터(S-14, T-24) — 변경·취소는 고객센터로 (M-207)" />
               {[
-                { icon: FileText, title: t("docBtn"), sub: t("mdDocSub"), on: () => setDoc(true) },
+                { icon: FileText, title: t("docBtn"), sub: "", on: () => setDoc(true) },
                 { icon: Headset, title: t("mdSupT"), sub: t("mdSupSub"), on: () => nav("/golf/support") },
               ].map(({ icon: I, title, sub, on }) => (
                 <button key={title} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-surface-2" onClick={on}>
                   <span className="grid h-9 w-9 flex-none place-items-center rounded-full bg-brand-soft text-brand"><I size={18} /></span>
                   <span className="min-w-0 flex-1">
                     <b className="block text-[14px]">{title}</b>
-                    <span className="block truncate text-[12.5px] text-muted">{sub}</span>
+                    {sub && <span className="block truncate text-[12.5px] text-muted">{sub}</span>}
                   </span>
                   <CaretRight size={16} className="flex-none text-muted" />
                 </button>

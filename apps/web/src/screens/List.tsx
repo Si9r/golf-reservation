@@ -87,17 +87,6 @@ export default function List() {
         <Q id="Q-08" t="가격·통화" />
       </p>
 
-      {/* 12 유형 안내 (피드백 4) */}
-      <details className="relative mb-4 rounded-2xl bg-surface-2 px-4 py-3 text-[13px]" open>
-        <Anno n={12} t="패키지 유형 안내: n색 골프·체류형·당일 뜻을 한 줄씩 (접기 가능)" />
-        <summary className="cursor-pointer font-bold text-ink">{t("typeGuideT")}</summary>
-        <ul className="mt-2 grid gap-1.5 text-ink-2">
-          {(["multi", "stay", "day"] as const).map((k) => (
-            <li key={k}><b className="text-ink">{t(`type_${k}`)}</b> · {t(`typeLong_${k}`)}</li>
-          ))}
-        </ul>
-      </details>
-
       {load.error && <ErrorBanner onRetry={load.retry} />}
 
       {load.loading ? (

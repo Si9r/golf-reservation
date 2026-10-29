@@ -329,7 +329,6 @@ export default function Place() {
           {tabRange?.options.map((x) => <option key={x} value={x}>{x}</option>)}
         </select>
       </label>
-      {tab === "pick" && pickRange?.base && pickRange.options.length > 0 && <p className="flex gap-1.5 text-[13px] text-ink-2"><Clock size={16} className="mt-0.5 flex-none text-brand" />{t("pickWait")}</p>}
       {tab === "drop" && <p className="flex gap-1.5 text-[13px] text-ink-2"><Clock size={16} className="mt-0.5 flex-none text-brand" />{t("dropTimeNote")}</p>}
       <p className="help">{t("wishNote")}</p>
     </section>
@@ -473,12 +472,11 @@ export default function Place() {
     </section>
   );
   const feeEl = (
-    <section className="relative flex gap-3 rounded-2xl bg-surface-2 p-4">
-      <Anno n={8} t="포함 요금 안내 (M-142) + 합승 버스 안내" />
-      <Bus size={22} weight="duotone" className="mt-0.5 flex-none text-brand" />
+    <section className="relative flex items-center gap-3 rounded-2xl bg-surface-2 p-4">
+      <Anno n={8} t="버스 안내: 정원·골프백 적재 (팀 결정 10/29: 포함 요금 문구 M-142 삭제)" />
+      <Bus size={22} weight="duotone" className="flex-none text-brand" />
       <div className="text-[13.5px]">
-        <b className="block">{t("M-142")}</b>
-        <span className="text-ink-2">{L === "ko" ? `버스 정원 ${SET.BUS_SEATS}명, 골프백 적재 가능. 합승 버스는 같은 출발편 그룹의 승차 장소를 차례로 들러요.` : `バス定員${SET.BUS_SEATS}名、ゴルフバッグ積載可。相乗りバスは同じ出発便の各グループの乗車場所を順に回ります。`}</span> <Q id="Q-23" t="합승 시 경유 방식" />
+        <span className="text-ink-2">{L === "ko" ? `버스 정원 ${SET.BUS_SEATS}명 · 골프백 적재 가능` : `送迎バス定員${SET.BUS_SEATS}名・ゴルフバッグ積載可`}</span> <Q id="Q-23" t="합승 시 경유 방식" />
       </div>
     </section>
   );

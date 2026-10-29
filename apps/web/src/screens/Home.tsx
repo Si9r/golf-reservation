@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
 import { Bus, CalendarBlank, CaretDown, CaretRight, MagnifyingGlass, MapPinLine, Sparkle, UsersThree, X } from "@phosphor-icons/react";
-import { PHOTOS, SET, ZONES_STRICT } from "../data";
+import { PHOTOS, SET } from "../data";
 import { useT } from "../i18n";
 import { fullReset, useDb, useDraft } from "../store";
 import { fShort, searchPkgs, upcomingDepartures } from "../logic";
@@ -38,9 +38,9 @@ export default function Home() {
   const soon = useMemo(() => upcomingDepartures(people, extra, 6), [people, extra, apiV]);
 
   const guides = [
-    { icon: Bus, t: t("guide1T"), s: t("guide1S") },
-    { icon: MapPinLine, t: t("guide2T"), s: t("guide2S", { r: Math.round(ZONES_STRICT[0].r / 1000) }) }, // 반경은 승하차 범위 설정값 (T-1 확정되면 자동 반영)
-    { icon: UsersThree, t: t("guide3T"), s: t("guide3S") },
+    { icon: Bus, t: t("guide1T") },
+    { icon: MapPinLine, t: t("guide2T") },
+    { icon: UsersThree, t: t("guide3T") },
   ];
   const openPkg = (id: number, dep?: string) => {
     choosePkg(id);
@@ -58,7 +58,6 @@ export default function Home() {
             <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(17,19,26,0.05) 20%, rgba(17,19,26,0.72) 100%)" }} />
             <motion.div className="absolute inset-x-0 bottom-0 p-5 pb-12 text-white lg:p-10" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}>
               <h1 className="whitespace-pre-line text-[27px] font-bold leading-[1.25] tracking-tight lg:whitespace-normal lg:text-[44px]">{t("s01Title")}</h1>
-              <p className="mt-2 max-w-[38ch] text-[14.5px] leading-relaxed text-white/85 lg:max-w-none lg:text-[16px]">{t("s01Sub")}</p>
             </motion.div>
           </div>
 
@@ -94,7 +93,7 @@ export default function Home() {
             <PeopleInput label={t("people")} value={people} onChange={(v) => patch({ people: v })} anno={<Anno n={4} t="인원 (V-02): 1~20명, 바꾸면 결과 수 즉시 갱신" />} />
             <div className="relative grid gap-2">
               <Anno n={5} t="조건 결과 수 + 패키지 보기 (T-01): 출발일을 고르기 전에는 비활성 + homeDateHint, 0개여도 이동" />
-              <p className="text-center text-[13.5px] font-semibold text-ink-2" aria-live="polite">{date ? t("M-111", { n: results.length }) : <span className="font-normal text-muted">{t("homeDateHint")}</span>}</p>
+              {date && <p className="text-center text-[13.5px] font-semibold text-ink-2" aria-live="polite">{t("M-111", { n: results.length })}</p>}
               <button className="btn btn-primary w-full" disabled={!date} onClick={() => nav("/golf/packages")}>{t("seeBtn")}</button>
             </div>
           </motion.div>
@@ -104,13 +103,10 @@ export default function Home() {
         <section className="relative mt-8" aria-label={L === "ko" ? "이용 안내" : "ご利用案内"}>
           <Anno n={6} t="이용 안내 3칸 (버스·픽업 포함 / 승하차 시내 어디든 / 최소 20명)" />
           <div className="grid grid-cols-3 gap-2 lg:gap-6">
-            {guides.map(({ icon: I, t: tt, s }, i) => (
+            {guides.map(({ icon: I, t: tt }, i) => (
               <div key={i} className="flex flex-col items-center text-center lg:flex-row lg:items-start lg:gap-4 lg:text-left">
                 <span className="mb-2 grid h-12 w-12 flex-none place-items-center rounded-2xl bg-brand-soft text-brand lg:mb-0"><I size={24} weight="duotone" /></span>
-                <span>
-                  <b className="block whitespace-pre-line text-[13.5px] leading-snug lg:whitespace-normal lg:text-[15px]">{tt}</b>
-                  <span className="mt-1 hidden text-[13px] leading-relaxed text-muted lg:block">{s}</span>
-                </span>
+                <b className="block whitespace-pre-line text-[13.5px] leading-snug lg:self-center lg:whitespace-normal lg:text-[15px]">{tt}</b>
               </div>
             ))}
           </div>
@@ -142,8 +138,7 @@ export default function Home() {
         {/* 8 곧 출발하는 투어 (2단계) */}
         {stage >= 2 && <section className="relative mt-10">
           <Anno n={8} t="곧 출발하는 투어 6개 (2단계): 출발일·패키지명·잔여석·인원 충족 → S-03 (출발일 선택된 상태)" />
-          <h2 className="sec-title flex items-center gap-2">{t("soonT")} <StageTag s={2} /></h2>
-          <p className="mb-3 text-[13px] text-muted">{t("soonSub")}</p>
+          <h2 className="sec-title mb-3 flex items-center gap-2">{t("soonT")} <StageTag s={2} /></h2>
           <div className="hscroll -mx-4 px-4 lg:mx-0 lg:grid lg:grid-cols-3 lg:gap-3 lg:overflow-visible lg:px-0">
             {soon.map(({ p, d, seats, enough }) => (
               <button key={`${p.id}-${d}`} onClick={() => openPkg(p.id, d)} className="card flex w-[240px] flex-col gap-2 p-4 text-left transition-colors hover:border-brand lg:w-auto">
@@ -170,7 +165,6 @@ export default function Home() {
               <span className="grid h-12 w-12 flex-none place-items-center rounded-2xl bg-brand text-brand-ink"><Sparkle size={24} weight="fill" /></span>
               <span className="min-w-0 flex-1">
                 <span className="flex items-center gap-2"><b className="text-[15.5px]">{t("aiT")}</b><StageTag s={3} /></span>
-                <span className="block text-[13px] text-ink-2">{t("aiS")}</span>
               </span>
               <CaretRight size={18} className="text-brand" />
             </button>

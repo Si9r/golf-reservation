@@ -1,13 +1,13 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowLeft, CheckCircle, Minus, Plus, WarningCircle, X } from "@phosphor-icons/react";
-import { useApp, useToast } from "../store";
+import { DESIGN_TOOLS, useApp, useToast } from "../store";
 import { useT } from "../i18n";
 import { SET } from "../data";
 
 // ---------- 설계 주석: 설계서의 주황 번호 / 확인 필요(Q) / MVP 단계 ----------
 export function Anno({ n, t }: { n: number | string; t: string }) {
-  const on = useApp((s) => s.anno);
+  const on = useApp((s) => s.anno) && DESIGN_TOOLS;
   if (!on) return null;
   return (
     <span className="anno" title={`${n}. ${t}`} aria-label={`설계 항목 ${n}: ${t}`}>
@@ -16,19 +16,19 @@ export function Anno({ n, t }: { n: number | string; t: string }) {
   );
 }
 export function Q({ id, t }: { id: string; t: string }) {
-  const on = useApp((s) => s.anno);
+  const on = useApp((s) => s.anno) && DESIGN_TOOLS;
   if (!on) return null;
   return <span className="qtag" title={`확인 필요 ${id}: ${t}`}>{id} {t}</span>;
 }
-export const useStage = () => useApp((s) => s.stage);
+export const useStage = () => useApp((s) => (DESIGN_TOOLS ? s.stage : 3)); // 설계 도구가 꺼져 있으면 항상 전체(3단계)
 export function StageTag({ s }: { s: 2 | 3 }) {
-  const on = useApp((x) => x.anno);
+  const on = useApp((x) => x.anno) && DESIGN_TOOLS;
   const { L } = useT();
   if (!on) return null;
   return <span className="stagetag">{L === "ko" ? `${s}단계` : `第${s}段階`}</span>;
 }
 export function ScreenTag({ id, name, refs }: { id: string; name: string; refs?: string }) {
-  const on = useApp((s) => s.anno);
+  const on = useApp((s) => s.anno) && DESIGN_TOOLS;
   if (!on) return null;
   return (
     <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-dashed px-3 py-2 text-[12px]" style={{ borderColor: "var(--anno)", color: "var(--anno)" }}>
@@ -130,7 +130,7 @@ export function PeopleInput({ value, onChange, error, max = SET.MAX_PEOPLE, labe
           className="num h-12 min-w-0 flex-1 border-0 bg-transparent text-center text-[18px] font-bold outline-none"
           value={text}
           aria-invalid={!!msg}
-          aria-describedby={`${id}-h`}
+          aria-describedby={msg ? `${id}-h` : undefined}
           onChange={(e) => setText(e.target.value.replace(/[^0-9]/g, "").slice(0, 3))}
           onBlur={(e) => commit(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && commit((e.target as HTMLInputElement).value)}
@@ -140,7 +140,7 @@ export function PeopleInput({ value, onChange, error, max = SET.MAX_PEOPLE, labe
           <Plus size={18} weight="bold" />
         </button>
       </div>
-      <p id={`${id}-h`} className={msg ? "err" : "help"}>{msg ?? t("peopleHelp")}</p>
+      {msg && <p id={`${id}-h`} className="err">{msg}</p>}
     </div>
   );
 }

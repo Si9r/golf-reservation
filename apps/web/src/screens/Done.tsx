@@ -1,8 +1,8 @@
 import { useEffect } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { motion, useReducedMotion } from "motion/react";
-import { Bus, CalendarCheck, Check, Copy, EnvelopeSimple, UsersThree } from "@phosphor-icons/react";
-import { SET, pkgOf } from "../data";
+import { CalendarCheck, Check, Copy, EnvelopeSimple, UsersThree } from "@phosphor-icons/react";
+import { pkgOf } from "../data";
 import { useT } from "../i18n";
 import { fullReset, useDb, useToast } from "../store";
 import { fDate, fDayLong, judgeDate, yen } from "../logic";
@@ -30,8 +30,7 @@ export default function Done() {
   };
   const nexts = [
     { icon: EnvelopeSimple, text: t("M-181", { e: b.info.email }) },
-    { icon: CalendarCheck, text: t("M-182", { d: fDayLong(judgeDate(b.dep), L), m: SET.MIN_DEPARTURE }) },
-    { icon: Bus, text: t("M-183") },
+    { icon: CalendarCheck, text: t("M-182", { d: fDayLong(judgeDate(b.dep), L) }) },
     ...(b.people > 1 ? [{ icon: UsersThree, text: t("compFixInfo") }] : []), // 동반자 이름은 예약 때 모두 받음 → 고칠 수 있는 기간만 안내 (팀 결정 10/23)
   ];
   return (

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Bed, CaretLeft, CaretRight, Check, Plus, Snowflake } from "@phosphor-icons/react";
+import { Bed, CaretLeft, CaretRight, Check, Plus, Question, Snowflake } from "@phosphor-icons/react";
 import { motion } from "motion/react";
 import { PKGS, SET, hotelOf, type Pkg } from "../data";
 import { useT } from "../i18n";
@@ -126,8 +126,7 @@ export function DatePeopleSheet({ open, onClose, date, people, onDone }: { open:
             return { disabled: true, sub: passed ? t("closedDep") : undefined };
           }}
         />
-        <p className="mt-2 text-[12.5px] text-muted">{t("M-110")}</p>
-        {count !== null && <p className="mt-1 text-[13.5px] font-bold text-brand">{t("M-111", { n: count })}</p>}
+        {count !== null && <p className="mt-2 text-[13.5px] font-bold text-brand">{t("M-111", { n: count })}</p>}
       </div>
       <div className="mt-4">
         <PeopleInput label={t("people")} value={n} onChange={setN} anno={<Anno n="S-01 #4" t="인원 (V-02, 1~20명)" />} />
@@ -139,13 +138,15 @@ export function DatePeopleSheet({ open, onClose, date, people, onDone }: { open:
 export const dateLabel = (d: string | null, L: "ko" | "ja") => (d ? fShort(d, L) : "");
 
 // ---------- 패키지 카드 (S-02 #9) ----------
-export function PkgTags({ p }: { p: Pkg }) {
+// seats: 카드에서 출발일의 잔여석 배지 (수와 상관없이 항상, 팀 결정 10/29)
+export function PkgTags({ p, seats }: { p: Pkg; seats?: number }) {
   const { t } = useT();
   return (
     <div className="flex flex-wrap gap-1.5">
       <span className="chip">{p.nights ? t("nightsDays", { n: p.nights, d: p.nights + 1 }) : t("dayTrip")}</span>
       <span className="chip">{t("roundsN", { n: rounds(p) })}</span>
       <span className={`chip ${p.hotel ? "" : "gray"}`}>{p.hotel ? t("withHotel") : t("noHotel")}</span>
+      {seats !== undefined && <span className="badge brand">{t("seatsBadge", { s: seats })}</span>}
     </div>
   );
 }
@@ -159,6 +160,23 @@ export function TypeBadge({ p, onPhoto }: { p: Pkg; onPhoto?: boolean }) {
   );
 }
 
+// 카드 사진 위 유형 이름 + ? : 누르면 유형 설명 (휴대폰에서도 되게 누르기, 다른 곳을 누르면 닫힘)
+function TypeHelp({ p }: { p: Pkg }) {
+  const { t } = useT();
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="absolute left-3 top-3 z-[2] max-w-[calc(100%-24px)]">
+      <span className="flex items-center gap-1">
+        <TypeBadge p={p} />
+        <button type="button" className="grid h-6 w-6 place-items-center rounded-full bg-black/45 text-white" aria-label={t("typeGuideT")} aria-expanded={open} onClick={() => setOpen(!open)} onBlur={() => setOpen(false)}>
+          <Question size={14} weight="bold" />
+        </button>
+      </span>
+      {open && <p role="note" className="mt-1.5 rounded-xl bg-surface p-2.5 text-[12.5px] leading-relaxed text-ink-2" style={{ boxShadow: "var(--shadow)" }}>{t(`typeLong_${p.type}`)}</p>}
+    </div>
+  );
+}
+
 export function PkgCard({ p, date, d, seats, onOpen, cmp, onCmp, showCmp, i = 0 }: { p: Pkg; date?: string | null; d: string | null; seats?: number; onOpen: () => void; cmp?: boolean; onCmp?: () => void; showCmp?: boolean; i?: number }) {
   const { t, n, L } = useT();
   const h = hotelOf(p.hotel);
@@ -167,25 +185,25 @@ export function PkgCard({ p, date, d, seats, onOpen, cmp, onCmp, showCmp, i = 0 
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay: Math.min(i, 6) * 0.05, ease: [0.16, 1, 0.3, 1] }}
-      className="card group flex h-full flex-col overflow-hidden"
+      className="card group relative flex h-full flex-col overflow-hidden"
       style={{ boxShadow: "var(--shadow)" }}
     >
       {/* 10 (팀 테스트 10/23): 카드 높이 맞춤 — 사진 비율 고정, 이름 2줄·숙소 1줄 말줄임, 가격 줄은 카드 아래 */}
       <button onClick={onOpen} className="flex w-full flex-1 flex-col text-left">
         <div className="relative aspect-[16/9] w-full flex-none overflow-hidden">
           <Img src={p.photos[0]} alt={n(p.name)} className="transition-transform duration-500 group-hover:scale-[1.03]" />
-          <TypeBadge p={p} onPhoto />
         </div>
         <div className="grid gap-2 p-4 pb-2">
           <h3 className="line-clamp-2 min-h-[2.75em] text-[16.5px] font-bold leading-snug">{n(p.name)}</h3>
-          <PkgTags p={p} />
+          <PkgTags p={p} seats={d ? seats ?? 0 : undefined} />
           <p className="flex min-w-0 items-center gap-1.5 text-[13px] text-ink-2">
             <Bed size={15} className="flex-none text-muted" />
             <span className="truncate">{h ? `${n(h.name)} · ${n(h.near)}` : t("noHotel")}</span>
           </p>
-          <p className="text-[13px] text-muted">{d ? (date ? t("onDate", { d: fShort(d, L), s: seats ?? 0 }) : t("earliest", { d: fShort(d, L), s: seats ?? 0 })) : "-"}</p>
+          <p className="text-[13px] text-muted">{d ? (date ? t("onDate", { d: fShort(d, L) }) : t("earliest", { d: fShort(d, L) })) : "-"}</p>
         </div>
       </button>
+      <TypeHelp p={p} />
       <div className="mt-auto flex items-end justify-between gap-2 px-4 pb-4">
         <button onClick={onOpen} className="text-left">
           <span className="text-[12px] text-muted">{t("perPerson")} · {t("busIncl")}</span>

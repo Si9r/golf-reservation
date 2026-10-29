@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { CreditCard, Info, Lock, Timer, WarningCircle } from "@phosphor-icons/react";
 import { SET } from "../data";
 import { useT } from "../i18n";
-import { releaseHold, useApp, useAuth, useDb, useDraft, type Booking, type PayResult } from "../store";
+import { DESIGN_TOOLS, releaseHold, useApp, useAuth, useDb, useDraft, type Booking, type PayResult } from "../store";
 import { addDays, bookingNo, depView, fDayLong, fShort, hasHotelStep, itinerary, judgeDate, optionOf, stayHotel, todayISO, totalPrice, tripEnd, yen } from "../logic";
 import { Anno, BottomBar, Img, ScreenTag, StepHead } from "../components/ui";
 import { ItinList } from "./Detail";
@@ -67,7 +67,7 @@ export default function Pay() {
     if (paying || expired) return;
     setPaying(true);
     setError(null);
-    const result: PayResult = payResult;
+    const result: PayResult = DESIGN_TOOLS ? payResult : "ok"; // 데모 결제 결과는 설계 도구를 켰을 때만
     if (USE_API) {
       // API-20 결제 시작: 서버가 본 사이트 주문을 만들고 결제창 주소를 줌 → 그 주소로 이동 (결과는 결제 결과 화면이 서버에 조회)
       api.checkout(d.pendingNo!)
@@ -224,7 +224,7 @@ export default function Pay() {
           </section>
 
           {/* 테스트용 결제 결과 (프로토타입만. API 모드는 서버의 가짜 본 사이트 PAYMENT_BACKEND=fake 가 결과를 정함) */}
-          {!USE_API && (
+          {!USE_API && DESIGN_TOOLS && (
             <div className="grid gap-2 rounded-2xl border border-dashed p-3" style={{ borderColor: "var(--anno)" }}>
               <span className="text-[12.5px] font-bold" style={{ color: "var(--anno)" }}>{t("demoPay")}</span>
               <div className="grid grid-cols-3 gap-1 rounded-xl bg-surface-2 p-1">
@@ -254,7 +254,8 @@ export default function Pay() {
           {/* 출발 조건 (확인 화면과 같은 문장) */}
           <section className="flex gap-2.5 rounded-2xl border border-warn-line bg-warn-soft p-4">
             <Info size={20} className="mt-0.5 flex-none text-warn" />
-            <p className="text-[13.5px] leading-relaxed">{t("rvRule", { d: fDayLong(judgeDate(d.dep!), L), m: SET.MIN_DEPARTURE })}</p>
+            {/* 20명이 이미 모였으면 다른 문구 (확인 화면과 같은 분기) */}
+            <p className="text-[13.5px] leading-relaxed">{t(depView(p.id, d.dep!, d.people, db.extra).sum >= SET.MIN_DEPARTURE ? "rvRuleFull" : "rvRule", { d: fDayLong(judgeDate(d.dep!), L), m: SET.MIN_DEPARTURE })}</p>
           </section>
         </div>
       </div>

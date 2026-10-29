@@ -98,6 +98,10 @@ export default function InfoForm() {
           nav("/golf/book/pay"); // T-15
         })
         .catch(async (e) => {
+          if (e instanceof ApiError && e.body.error === "E-AREA") { // 승하차 범위 밖 (서버 L-06): 화면 검사와 같은 문구 M-141
+            const pl = String(e.body.fields?.[0]?.field ?? "").endsWith("DROP") ? (d.dropSame ? d.pick : d.drop) : d.pick;
+            return toast(t("M-141", { p: pl ? n(pl.name) : "" }), "bad");
+          }
           if (!(e instanceof ApiError && e.body.error === "E-SEAT")) return toast(t("M-900"), "bad");
           await refreshMonth(p.id, d.dep!.slice(0, 7));
           toast(t("M-120", { s: seatsLeft(p.id, d.dep!, extra), n: d.people }), "bad");

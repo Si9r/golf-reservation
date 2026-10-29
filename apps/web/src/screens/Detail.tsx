@@ -133,10 +133,7 @@ function DetailInner({ p }: { p: Pkg }) {
                     {full ? t("depEnough", { b: dv.booked }) : off ? t("depShort", { n: d.people }) : enough ? t("depEnough", { b: dv.booked }) : t("depNow", { b: dv.booked })}
                   </span>
                 </span>
-                <span className={`num text-[13px] font-semibold ${off ? "text-muted" : "text-ink-2"}`}>{full ? t("full") : t("seatsNow", { s: dv.seats })}
-                  {/* 결제 중(10분 확보) 자리: 정원 − 확정 인원 − 잔여석 */}
-                  {!full && SET.BUS_SEATS - dv.booked - dv.seats > 0 && <span className="block text-[11.5px] font-normal text-muted">{t("seatsHeld", { h: SET.BUS_SEATS - dv.booked - dv.seats })}</span>}
-                </span>
+                <span className={`num text-[13px] font-semibold ${off ? "text-muted" : "text-ink-2"}`}>{full ? t("full") : t("seatsNow", { s: dv.seats })}</span>
               </button>
             );
           })}
@@ -230,7 +227,7 @@ function DetailInner({ p }: { p: Pkg }) {
                 </div>
               ))}
             </div>
-            <p className="mt-2 text-[12.5px] text-muted">{t("M-205")} · {t("driveNote")}</p>
+            <p className="mt-2 text-[12.5px] text-muted">{t("driveNote")}</p>
           </section>
 
           {/* 7 골프장 정보 */}
@@ -295,7 +292,6 @@ function DetailInner({ p }: { p: Pkg }) {
                     </ul>
                   </div>
                 )}
-                <p className="text-[12.5px] text-muted">{t("hotelPhotoLater")} <Q id="Q-02" t="호텔 정보 범위 (패키지 데이터)" /></p>
               </div>
             </section>
           )}
@@ -321,10 +317,6 @@ function DetailInner({ p }: { p: Pkg }) {
           {/* 10 렌탈 안내·예약 전 확인 */}
           <section className="relative grid gap-3">
             <Anno n={10} t="렌탈 안내(M-124)·예약 전 확인: 최소 20명, 시내만 승하차, 그룹당 1곳, 변경·취소는 고객센터" />
-            <div className="flex gap-3 rounded-2xl bg-surface-2 p-4">
-              <Info size={20} className="mt-0.5 flex-none text-ink-2" />
-              <p className="text-[13.5px] text-ink-2">{t("M-124")}</p>
-            </div>
             <div className="rounded-2xl border border-warn-line bg-warn-soft p-4">
               <b className="mb-1.5 flex items-center gap-2 text-[14.5px] text-warn"><Warning size={18} weight="fill" /> {t("checksT")}</b>
               <ul className="grid list-disc gap-1 pl-5 text-[13.5px] text-ink-2">{list("checks").map((x) => <li key={x}>{x}</li>)}</ul>
@@ -351,9 +343,9 @@ export function DepStateText({ v, dep, go, showErr }: { v: ReturnType<typeof dep
   const { t, L } = useT();
   if (v.state === "unavailable") return showErr ? <p className="err text-[12.5px]">{t("M-120", { s: v.seats, n: v.sum - v.booked })}</p> : null;
   if (go) return <p className="text-[12.5px] font-semibold text-ok">{v.seatsAfter ? t("M-123", { s: v.seatsAfter }) : t("goFull")}</p>;
-  // 9: 출발일 목록은 '남은 자리'(지금), 출발 현황은 '예약하면 남는 자리'(우리 인원을 넣은 뒤) — 숫자 계산은 그대로
-  if (v.state === "enough") return <p className="text-[12.5px] font-semibold text-ok">{v.seatsAfter ? `${t("M-125", { d: fDayLong(judgeDate(dep), L) })} · ${t("seatsAfterBook", { s: v.seatsAfter })}` : t("depFull", { m: SET.BUS_SEATS, d: fDayLong(judgeDate(dep), L) })}</p>;
-  return <p className="text-[12.5px] font-semibold text-ink-2">{t("M-122", { n: v.need })} · {t("byDate", { d: fDayLong(judgeDate(dep), L) })} · {t("seatsAfterBook", { s: v.seatsAfter })}</p>;
+  // 20명이 모였으면 '인원 충족'·'정원이 다 찼어요', 아니면 한 줄 '{판정일}까지 n명 더 모이면 출발' (팀 결정 10/29)
+  if (v.state === "enough") return <p className="text-[12.5px] font-semibold text-ok">{v.seatsAfter ? t("M-125", { d: fDayLong(judgeDate(dep), L) }) : t("depFull", { m: SET.BUS_SEATS, d: fDayLong(judgeDate(dep), L) })}</p>;
+  return <p className="text-[12.5px] font-semibold text-ink-2">{t("needBy", { d: fDayLong(judgeDate(dep), L), n: v.need })}</p>;
 }
 
 // 일정 목록 (구간 이동 시간 포함)
