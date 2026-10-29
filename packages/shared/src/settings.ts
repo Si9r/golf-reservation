@@ -25,7 +25,7 @@ export const SETTINGS = {
   PICK_EARLIEST_BEFORE_TEE_MIN: 150, // 승차: 첫 티오프 − 2시간 30분부터 (가장 이른 승차). 합승이라 일찍 타면 골프장에서 대기
   ROUND_HOURS: 5, // 라운드 종료 예정 = 티오프 + 5시간
   NO_ROUND_DROP_FROM: "11:00", // 마지막 날 라운드가 없을 때 하차 기준
-  SUPPORT: { tel: "+81-11-200-4812", email: "golf@travender-hokkaido.com", hours: "10:00-17:00" }, // 예시 (Q-13)
+  SUPPORT: { tel: "00-0000-000", email: "golf@travender-hokkaido.com", hours: "10:00-17:00" }, // 전화·이메일 임시값 (운영사 10/29, 실제 번호 받기 전). 운영 시간 확정
   TERMS_URL: { terms: "https://travender-hokkaido.com/terms", privacy: "https://travender-hokkaido.com/privacy", cancel: "https://travender-hokkaido.com/cancel" }, // 예시
 } as const;
 export type Settings = typeof SETTINGS;

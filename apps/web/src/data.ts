@@ -29,8 +29,8 @@ export const SET = {
   NEAR_PLACE_M: 350, // 지도 탭 위치 근처의 알려진 장소 이름 사용 (L-06)
   MEMO_MAX: 100, // 만날 위치 메모 (V-11)
   SEARCH_MAX: 50, // 검색어 (V-01)
-  SUPPORT_TEL: "+81-11-200-4812", // 예시 번호 (Q-20 미수령)
-  SUPPORT_MAIL: "golf@travender-hokkaido.com", // 예시 주소
+  SUPPORT_TEL: "00-0000-000", // 임시값 (운영사 10/29, 실제 번호 받기 전. 화면 '예시 번호' 표시는 그대로)
+  SUPPORT_MAIL: "golf@travender-hokkaido.com", // 임시값 (운영사 10/29)
   SUPPORT_HOURS: "10:00-17:00",
   // 희망 승하차 시간 (V-12, 운영사 확정). 서버 apps/api/app/settings.py 와 같은 값
   STOP_TIME_FIRST: "06:00", // 가장 이른 승차·하차

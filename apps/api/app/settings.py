@@ -39,8 +39,10 @@ TRAVEL_MIN = {
 }
 TRAVEL_DEFAULT_MIN = 60
 HOLD_KEEP_AFTER_EXPIRE_MIN = 60  # B-02: 만료 후 이만큼 지난 확보만 삭제 (L-08 2) 용, 개발 결정)
-# 고객센터 (Q-13): 운영 시간은 운영사 답변 10:00~17:00. 전화번호·이메일은 확정 전이라 .env 설정값 (SUPPORT_TEL, SUPPORT_EMAIL)
-SUPPORT = {"tel": env.SUPPORT_TEL, "email": env.SUPPORT_EMAIL, "hours": "10:00-17:00"}
+# 고객센터 (Q-13): 운영 시간 10:00~17:00. 전화·이메일은 임시값 (운영사 10/29, 실제 번호 받기 전). .env SUPPORT_TEL·SUPPORT_EMAIL 이 있으면 그 값.
+# 화면 같은 값: packages/shared settings.ts SUPPORT, apps/web/src/data.ts SUPPORT_TEL·SUPPORT_MAIL
+SUPPORT_TEL_TMP, SUPPORT_EMAIL_TMP = "00-0000-000", "golf@travender-hokkaido.com"
+SUPPORT = {"tel": env.SUPPORT_TEL or SUPPORT_TEL_TMP, "email": env.SUPPORT_EMAIL or SUPPORT_EMAIL_TMP, "hours": "10:00-17:00"}
 TERMS_URL = {
     "terms": "https://travender-hokkaido.com/terms",
     "privacy": "https://travender-hokkaido.com/privacy",

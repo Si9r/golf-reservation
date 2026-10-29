@@ -31,7 +31,7 @@ class Env(BaseSettings):
     SMTP_SECURITY: str = "starttls"  # starttls | ssl | none
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
-    # 고객센터 연락처 (메일·화면 표시, 확정 대기). 운영 시간은 settings.SUPPORT
+    # 고객센터 연락처 (메일·화면 표시). 비우면 settings.SUPPORT 임시값 (운영사 10/29). 운영 시간은 settings.SUPPORT
     SUPPORT_TEL: str = ""
     SUPPORT_EMAIL: str = ""
     FIXED_TODAY: str = ""  # 테스트·데모용 오늘 날짜 고정 (YYYY-MM-DD)
