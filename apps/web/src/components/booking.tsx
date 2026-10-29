@@ -228,24 +228,23 @@ export function PriceDetail({ p, opt, people, singles }: { p: Pkg; opt: string |
   const price = totalPrice(p, opt, people, singles);
   const r = price.rooms ?? (h ? roomsOf(people, singles) : null);
   const add = o?.add ?? 0;
-  const Row = ({ k, sub, v, ok }: { k: string; sub?: string; v: string; ok?: boolean }) => (
+  const Row = ({ k, sub, v, ok }: { k: string; sub?: (string | null | undefined)[]; v: string; ok?: boolean }) => (
     <li className="flex justify-between gap-3">
-      <span className="min-w-0 text-ink-2">{k}{sub && <span className="block text-[12px] text-muted">{sub}</span>}</span>
+      <span className="min-w-0 text-ink-2">{k}{sub?.filter(Boolean).map((s, i) => <span key={i} className="block text-[12px] text-muted">{s}</span>)}</span>
       <span className={`num flex-none font-semibold ${ok ? "text-ok" : ""}`}>{v}</span>
     </li>
   );
   const incl = [t("pdGolf", { r: rounds(p) }), p.nights ? t("pdStay", { n: p.nights }) : null].filter(Boolean).join(" · ");
+  // 호텔 줄: 호텔·객실·방 구성은 설명 한 줄, 금액은 합계만 (1인 차액은 설명 둘째 줄). 1인실이 없으면 객실 줄은 숨김
+  const stay = h ? [n(h.name), o && !o.hotel ? n(o.sub) : n(h.room), r ? t("roomsSum0", { t: r.twins }) : null].filter(Boolean).join(" · ") : o ? n(o.sub) : null;
   return (
     <ul className="grid gap-2 text-[13.5px] lg:text-[14px]">
-      <Row k={t("lineBase", { p: yen(p.price), n: people })} sub={t("pdIncl", { s: incl })} v={yen(p.price * people)} />
-      {/* 호텔: 옵션이 있으면 고른 옵션과 차액(기본은 ¥0), 고정 호텔은 포함, 당일은 숙박 없음 ¥0 */}
-      {p.opts.length > 0 ? (
-        <Row k={`${t("rowHotel")} · ${n(o?.name ?? { ko: "-", ja: "-" })}`} sub={h ? `${n(h.name)} · ${o && !o.hotel ? n(o.sub) : n(h.room)}` : o ? n(o.sub) : undefined} v={add === 0 ? `${yen(0)} (${t("base")})` : `${yenDiff(add)} × ${people} = ${yenDiff(add * people)}`} />
-      ) : (
-        <Row k={`${t("rowHotel")} · ${h ? n(h.name) : t("noHotel")}`} v={`${yen(0)}${h ? ` (${t("included")})` : ""}`} />
-      )}
-      {r && <Row k={`${t("rowRooms")} · ${t(r.singles ? "roomsSum" : "roomsSum0", { t: r.twins, s: r.singles })}`} sub={r.singles ? t("lineSingle", { p: yen(SET.SINGLE_ADD), n: r.singles }) : t("pdNoSingle")} v={r.singles ? yen(r.singles * SET.SINGLE_ADD) : yen(0)} />}
-      <Row k={t("lineBus")} sub={t("pdBusSub")} v={`${yen(0)} (${t("included")})`} ok />
+      <Row k={t("lineBase", { p: yen(p.price), n: people })} sub={[t("pdIncl", { s: incl })]} v={yen(p.price * people)} />
+      <Row k={h || p.opts.length > 0 ? t("rowHotel") : `${t("rowHotel")} · ${t("noHotel")}`}
+           sub={[stay, add ? `${t("perPerson")} ${yenDiff(add)} × ${people}` : null]}
+           v={add ? yenDiff(add * people) : h ? t("included") : yen(0)} />
+      {r?.singles ? <Row k={t("rowSingle")} sub={[t("lineSingle", { p: yen(SET.SINGLE_ADD), n: r.singles })]} v={yen(r.singles * SET.SINGLE_ADD)} /> : null}
+      <Row k={t("lineBus")} sub={[t("pdBusSub")]} v={t("included")} ok />
     </ul>
   );
 }

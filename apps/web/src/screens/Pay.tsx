@@ -210,19 +210,6 @@ export default function Pay() {
             {!itinAll && <button className="link w-full border-t border-line px-4 py-2.5 text-left text-[13.5px] lg:hidden" onClick={() => setItinAll(true)}>{t("payItinAll", { n: itinerary(p, d.opt, d.pick, drop, { pickTime: d.pickTime, dropTime: d.dropTime }).length })}</button>}
           </section>
 
-          {/* 3 결제 수단 */}
-          <section className="relative card p-4">
-            <Anno n={3} t="결제 수단: 카드만, 메인 사이트 결제창으로 이동 (M-172, I-06)" />
-            <h2 className="mb-2 text-[15px] font-bold">{t("payMethod")}</h2>
-            <div className="opt" role="radio" aria-checked="true">
-              <span className="radio" />
-              <CreditCard size={22} className="text-brand" />
-              <b className="flex-1 text-[15px]">{t("card")}</b>
-              <span className="text-[12px] text-muted">TRAVENDER</span>
-            </div>
-            <p className="mt-2 flex items-start gap-1.5 text-[13px] text-muted"><Lock size={15} className="mt-0.5 flex-none" />{t("M-172")}</p>
-          </section>
-
           {/* 테스트용 결제 결과 (프로토타입만. API 모드는 서버의 가짜 본 사이트 PAYMENT_BACKEND=fake 가 결과를 정함) */}
           {!USE_API && DESIGN_TOOLS && (
             <div className="grid gap-2 rounded-2xl border border-dashed p-3" style={{ borderColor: "var(--anno)" }}>
@@ -248,7 +235,14 @@ export default function Pay() {
               <span className="num text-[26px] font-extrabold text-brand lg:text-[32px]">{yen(total)}</span>
             </div>
             <p className="mt-1 text-right text-[12px] text-muted">{t("perPerson")} {yen(unit)}</p>
-            {payBtn("mt-4 hidden w-full lg:flex")}
+            {/* 3 결제 수단: 카드 하나뿐이라 고르는 칸 없이 결제 버튼 바로 위에 한 줄 */}
+            <p className="relative mt-3 flex items-center gap-2 rounded-xl bg-surface-2 px-3 py-2.5 text-[13px] text-ink-2">
+              <Anno n={3} t="결제 수단: 카드만, 메인 사이트 결제창으로 이동 (M-172, I-06)" />
+              <CreditCard size={18} className="flex-none text-brand" />
+              <span className="flex-1">{t("M-172")}</span>
+              <Lock size={14} className="flex-none text-muted" />
+            </p>
+            {payBtn("mt-3 hidden w-full lg:flex")}
           </section>
 
           {/* 출발 조건 (확인 화면과 같은 문장) */}
