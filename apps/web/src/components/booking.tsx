@@ -190,15 +190,15 @@ export function PkgCard({ p, date, d, seats, onOpen, cmp, onCmp, showCmp, i = 0 
     >
       {/* 10 (팀 테스트 10/23): 카드 높이 맞춤 — 사진 비율 고정, 이름 2줄·숙소 1줄 말줄임, 가격 줄은 카드 아래 */}
       <button onClick={onOpen} className="flex w-full flex-1 flex-col text-left">
-        <div className="relative aspect-[16/9] w-full flex-none overflow-hidden">
-          <Img src={p.photos[0]} alt={n(p.name)} className="transition-transform duration-500 group-hover:scale-[1.03]" />
+        <div className="relative aspect-[16/10] w-full flex-none overflow-hidden">
+          <Img src={p.photos[0]} alt={n(p.name)} className="transition-transform duration-500 group-hover:scale-[1.04]" />
         </div>
         <div className="grid gap-2 p-4 pb-2">
-          <h3 className="line-clamp-2 min-h-[2.75em] text-[16.5px] font-bold leading-snug">{n(p.name)}</h3>
+          <h3 className="line-clamp-2 min-h-[2.75em] text-[17px] font-extrabold leading-snug">{n(p.name)}</h3>
           <PkgTags p={p} seats={d ? seats ?? 0 : undefined} />
           <p className="flex min-w-0 items-center gap-1.5 text-[13px] text-ink-2">
             <Bed size={15} className="flex-none text-muted" />
-            <span className="truncate">{h ? `${n(h.name)} · ${n(h.near)}` : t("noHotel")}</span>
+            <span className="min-w-0">{h ? `${n(h.name)} · ${n(h.near)}` : t("noHotel")}</span>
           </p>
           <p className="text-[13px] text-muted">{d ? (date ? t("onDate", { d: fShort(d, L) }) : t("earliest", { d: fShort(d, L) })) : "-"}</p>
         </div>
@@ -240,9 +240,12 @@ export function PriceDetail({ p, opt, people, singles }: { p: Pkg; opt: string |
   return (
     <ul className="grid gap-2 text-[13.5px] lg:text-[14px]">
       <Row k={t("lineBase", { p: yen(p.price), n: people })} sub={[t("pdIncl", { s: incl })]} v={yen(p.price * people)} />
-      <Row k={h || p.opts.length > 0 ? t("rowHotel") : `${t("rowHotel")} · ${t("noHotel")}`}
-           sub={[stay, add ? `${t("perPerson")} ${yenDiff(add)} × ${people}` : null]}
-           v={add ? yenDiff(add * people) : h ? t("included") : yen(0)} />
+      {/* 숙박 없는 당일 패키지는 호텔 줄을 빼요 (¥0 줄 없음) */}
+      {(h || p.opts.length > 0 || add) ? (
+        <Row k={t("rowHotel")}
+             sub={[stay, add ? `${t("perPerson")} ${yenDiff(add)} × ${people}` : null]}
+             v={add ? yenDiff(add * people) : h ? t("included") : yen(0)} />
+      ) : null}
       {r?.singles ? <Row k={t("rowSingle")} sub={[t("lineSingle", { p: yen(SET.SINGLE_ADD), n: r.singles })]} v={yen(r.singles * SET.SINGLE_ADD)} /> : null}
       <Row k={t("lineBus")} sub={[t("pdBusSub")]} v={t("included")} ok />
     </ul>

@@ -197,7 +197,7 @@ export function PriceBlock({ main, sub }: { main: string; sub: string }) {
   return (
     <div className="min-w-0 flex-1 leading-tight">
       <p className="num truncate text-[19px] font-extrabold">{main}</p>
-      <p className="truncate text-[12px] text-muted">{sub}</p>
+      <p className="text-[12px] text-muted">{sub}</p>
     </div>
   );
 }

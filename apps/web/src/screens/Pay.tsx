@@ -139,7 +139,7 @@ export default function Pay() {
     <div className="page step">
       <ScreenTag id="S-10" name="결제" refs="FN-22, FN-23 · L-07, L-08, L-09 · API-08~10 · I-06 · T-17, T-18" />
       <StepHead at={5} hasHotel={hasHotelStep(p)} onBack={back} disabled={paying} />
-      <h1 className="mb-4 text-[22px] font-bold">{t("payT")}</h1>
+      <h1 className="mb-4 text-[22px] font-black tracking-[-0.02em] lg:text-[26px]">{t("payT")}</h1>
 
       {/* 1 남은 시간 (결제 후 자리 없음이면 잡아 둔 자리가 이미 풀렸으므로 숨김) */}
       {error !== "M-174" && <section className={`relative mb-4 flex items-center gap-3 rounded-2xl border-[1.5px] p-4 ${expired ? "border-bad-line bg-bad-soft" : "border-brand-line bg-brand-soft"}`} role={expired ? "alert" : undefined}>
@@ -170,17 +170,19 @@ export default function Pay() {
       </AnimatePresence>
 
       {/* PC: 왼쪽 최종 확인 · 오른쪽 결제 금액과 버튼 (확인 화면과 같은 2칸) */}
-      <div className="grid gap-3 lg:grid-cols-[1.4fr_1fr] lg:items-start lg:gap-6">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start lg:gap-8">
         <div className="grid gap-3">
           {/* 2 최종 확인: 선택 내용 + 입력한 예약자·동반자 (결제 전 오타 확인) */}
-          <section className="relative card overflow-hidden">
+          <section className="relative card overflow-hidden rounded-[20px]">
             <Anno n={2} t="최종 확인: 패키지·날짜·인원·호텔·승하차 + 대표자·동반자 영문 이름 (결제 전 마지막 확인)" />
-            <p className="border-b border-line px-4 py-2.5 text-[13px] font-semibold text-muted">{t("payCheckT")}</p>
-            <div className="flex items-center gap-3 px-4 py-3">
-              <div className="relative h-[54px] w-[70px] flex-none overflow-hidden rounded-xl"><Img src={p.photos[0]} alt={n(p.name)} className="absolute inset-0 h-full w-full" /></div>
-              <div className="min-w-0 flex-1">
-                <b className="line-clamp-2 text-[14.5px] font-extrabold leading-snug">{n(p.name)}</b>
-                <p className="flex flex-wrap items-center gap-2 text-[13px] text-ink-2">{fShort(d.dep!, L)} ~ {fShort(tripEnd(p, d.dep!), L)} <span className="badge brand">{t("peopleN", { n: d.people })}</span></p>
+            {/* 사진 위에 패키지·일정·인원 (확인 화면과 같은 모양) */}
+            <div className="relative h-[150px] lg:h-[180px]">
+              <Img src={p.photos[0]} alt={n(p.name)} className="absolute inset-0 h-full w-full" />
+              <span className="absolute inset-0 bg-gradient-to-b from-black/35 via-transparent to-black/80" />
+              <span className="absolute left-4 top-3 text-[13px] font-semibold text-white/90">{t("payCheckT")}</span>
+              <div className="absolute inset-x-4 bottom-3 grid gap-0.5 text-white">
+                <b className="line-clamp-2 text-[17px] font-black leading-snug lg:text-[19px]">{n(p.name)}</b>
+                <span className="num text-[13.5px]">{fShort(d.dep!, L)}{p.nights ? ` ~ ${fShort(tripEnd(p, d.dep!), L)}` : ""} · {t("peopleN", { n: d.people })}</span>
               </div>
             </div>
             <dl className="grid gap-1.5 border-t border-line px-4 py-3 text-[13.5px]">
@@ -196,9 +198,9 @@ export default function Pay() {
           </section>
 
           {/* 일정표: 마지막 확인이라 전체 일정을 펼쳐서 보여 줌 (승하차·골프·숙박 시간 흐름) */}
-          <section className="relative card overflow-hidden">
+          <section className="relative card overflow-hidden rounded-[20px]">
             <Anno n={6} t="일정표 (L-11): 결제 전 마지막 확인이라 모든 일차를 펼친 상태, 고른 승하차 장소·호텔이 들어간 일정" />
-            <p className="border-b border-line px-4 py-2.5 text-[13px] font-semibold text-muted">{t("itin")} · {fShort(d.dep!, L)} ~ {fShort(tripEnd(p, d.dep!), L)}</p>
+            <p className="border-b border-line px-4 py-2.5 text-[13px] font-semibold text-muted">{t("itin")} · {fShort(d.dep!, L)}{p.nights ? ` ~ ${fShort(tripEnd(p, d.dep!), L)}` : ""}</p>
             <div className="grid gap-1 pt-2">
               {itinerary(p, d.opt, d.pick, drop, { pickTime: d.pickTime, dropTime: d.dropTime }).map((items, i) => (
                 <div key={i} className={!itinAll && i > 0 ? "hidden lg:block" : undefined}>
@@ -224,9 +226,9 @@ export default function Pay() {
           )}
         </div>
 
-        <div className="grid gap-3 lg:sticky lg:top-24">
+        <div className="grid gap-3 lg:sticky lg:top-32">
           {/* 4 결제 금액 (보라 테두리, 큰 총액) + PC 결제 버튼 */}
-          <section className="relative card border-[1.5px] p-4 lg:p-5" style={{ borderColor: "var(--brand)" }}>
+          <section className="relative card rounded-[20px] border-[1.5px] p-4 shadow-[var(--shadow-lg)] lg:p-5" style={{ borderColor: "var(--brand)" }}>
             <Anno n={4} t="결제 금액: 패키지 × 인원, 옵션, 1인실, 버스 포함, 총액 + 결제 버튼 (C-10 중복 탭 방지)" />
             <p className="mb-2 text-[13px] font-bold text-brand lg:text-[14px]">{t("payAmount", { n: d.people })}</p>
             <PriceDetail p={p} opt={d.opt} people={d.people} singles={d.singles} />
@@ -246,7 +248,7 @@ export default function Pay() {
           </section>
 
           {/* 출발 조건 (확인 화면과 같은 문장) */}
-          <section className="flex gap-2.5 rounded-2xl border border-warn-line bg-warn-soft p-4">
+          <section className="flex gap-2.5 rounded-[20px] border border-warn-line bg-warn-soft p-4">
             <Info size={20} className="mt-0.5 flex-none text-warn" />
             {/* 20명이 이미 모였으면 다른 문구 (확인 화면과 같은 분기) */}
             <p className="text-[13.5px] leading-relaxed">{t(depView(p.id, d.dep!, d.people, db.extra).sum >= SET.MIN_DEPARTURE ? "rvRuleFull" : "rvRule", { d: fDayLong(judgeDate(d.dep!), L), m: SET.MIN_DEPARTURE })}</p>

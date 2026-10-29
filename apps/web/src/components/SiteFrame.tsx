@@ -72,6 +72,7 @@ export function SiteFooter() {
   const { t } = useT();
   const loc = useLocation();
   if (loc.pathname.startsWith("/golf/book") || loc.pathname.startsWith("/login") || loc.pathname.startsWith("/golf/payment")) return null;
+  const hasBar = /^\/golf\/packages\/[^/]+$/.test(loc.pathname); // 패키지 상세: 휴대폰 아래 고정 바가 가리지 않게 여백
   const col = (title: string, items: [string, string][]) => (
     <div className="grid content-start gap-3">
       <b className="text-[14px] text-white">{title}</b>
@@ -80,9 +81,10 @@ export function SiteFooter() {
   );
   return (
     <footer className="mt-12 bg-[#1a1d24] text-white lg:mt-16">
-      <div className="mx-auto max-w-[1280px] px-4 pb-10 pt-12 sm:px-6 lg:pt-[72px]">
-        <div className="grid gap-10 sm:grid-cols-[2fr_1fr_1fr]">
-          <div className="grid content-start gap-5">
+      <div className={`mx-auto max-w-[1280px] px-4 pt-12 sm:px-6 lg:pb-10 lg:pt-[72px] ${hasBar ? "pb-32" : "pb-10"}`}>
+        {/* 휴대폰: 로고·소개 한 줄 + 메뉴 두 칸 나란히 (본 사이트와 같게) / PC: 세 칸 */}
+        <div className="grid grid-cols-2 gap-x-6 gap-y-10 sm:grid-cols-[2fr_1fr_1fr] sm:gap-10">
+          <div className="col-span-2 grid content-start gap-5 sm:col-span-1">
             <a href="#/golf" className="text-white"><GolfLogo big /></a>
             <p className="max-w-[340px] text-[14px] leading-relaxed text-[#b8bfcc]">{t("siteTagline")}</p>
             <span className="flex gap-2.5">

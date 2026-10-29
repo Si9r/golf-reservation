@@ -84,6 +84,8 @@ export default function MyDetail() {
     mute: { box: "border-line bg-surface-2", ink: "text-ink" },
   };
   const tone = TONE[st.tone];
+  const days = Math.round((Date.parse(b.dep) - Date.parse(todayISO())) / 864e5);
+  const dday = alive ? (days > 0 ? `D-${days}` : days === 0 ? "D-DAY" : "") : "";
   const copyNo = () => { navigator.clipboard?.writeText(b.no).then(() => toast(t("copied"))).catch(() => undefined); };
   const saveComps = async () => {
     const names = draft.map(joinEn);
@@ -105,16 +107,29 @@ export default function MyDetail() {
     <>
       <div className="page step pb-8 lg:pb-10">
         <ScreenTag id="S-13" name="예약 상세" refs="FN-20, FN-27, FN-29 · L-04, L-11 · API-12, API-13 · T-24" />
-        <div className="mb-3 flex items-center gap-3">
-          <button className="grid h-10 w-10 flex-none place-items-center rounded-full hover:bg-surface-2" onClick={() => nav("/golf/my")} aria-label={t("back")}><ArrowLeft size={20} weight="bold" /></button>
-          <h1 className="flex-1 text-[21px] font-bold">{t("bkT")}</h1>
-          <button className="flex flex-none items-center gap-1 text-[13px] text-muted hover:text-ink" onClick={copyNo} aria-label={t("copyNo")}>
-            <span className="num">{b.no}</span> <Copy size={15} />
-          </button>
-        </div>
+        {/* 사진 띠: 뒤로 · D-day · 상태 · 패키지 이름 · 일정 · 예약번호 (휴대폰은 화면 끝까지, PC는 둥근 띠) */}
+        <section className="relative -mx-4 -mt-4 h-[280px] overflow-hidden bg-[#1d2b22] lg:mx-0 lg:mt-0 lg:h-[320px] lg:rounded-[24px]">
+          <Img src={p.photos[0]} alt={n(p.name)} className="absolute inset-0 h-full w-full" />
+          <span className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/10 to-black/80" />
+          <div className="absolute inset-x-0 top-0 flex items-center gap-2 p-2 text-white lg:p-4">
+            <button className="grid h-11 w-11 flex-none place-items-center rounded-full hover:bg-white/15" onClick={() => nav("/golf/my")} aria-label={t("back")}><ArrowLeft size={22} weight="bold" /></button>
+            <span className="flex-1 text-[15px] font-bold">{t("bkT")}</span>
+            <button className="flex flex-none items-center gap-1 rounded-full px-3 py-2 text-[13px] font-semibold hover:bg-white/15" onClick={copyNo} aria-label={t("copyNo")}>
+              <span className="num">{b.no}</span> <Copy size={15} />
+            </button>
+          </div>
+          <div className="absolute inset-x-5 bottom-8 grid gap-2 text-white lg:inset-x-8 lg:bottom-12">
+            <span className="flex flex-wrap gap-2">
+              {dday && <span className="num rounded-full bg-white px-2.5 py-1 text-[13px] font-black text-[#14171f]">{dday}</span>}
+              <span className="rounded-full bg-white/20 px-2.5 py-1 text-[13px] font-bold">{t(`lab_${v.label}`)}</span>
+            </span>
+            <h1 className="line-clamp-2 text-[22px] font-black leading-snug lg:text-[32px]">{n(p.name)}</h1>
+            <span className="num text-[14px] lg:text-[16px]">{fShort(b.dep, L)}{p.nights ? ` ~ ${fShort(tripEnd(p, b.dep), L)}` : ""} · {t("peopleN", { n: b.people })}</span>
+          </div>
+        </section>
 
-        {/* 1 상태 띠 (PC: 왼쪽 문장 · 오른쪽 인원 막대) */}
-        <section className={`relative grid gap-3 rounded-[20px] border-[1.5px] p-5 lg:grid-cols-[1fr_260px] lg:items-center lg:gap-6 ${tone.box}`}>
+        {/* 1 상태 띠: 사진 위에 겹친 카드 (PC: 왼쪽 문장 · 오른쪽 인원 막대) */}
+        <section className={`relative -mt-5 grid gap-3 rounded-[20px] border-[1.5px] p-5 shadow-[var(--shadow-lg)] lg:mx-8 lg:-mt-8 lg:grid-cols-[1fr_280px] lg:items-center lg:gap-6 ${tone.box}`}>
           <Anno n={1} t="상태 띠: 상태마다 제목 1개 + 설명 1문장 (모집 중 / 인원 다 모임·출발 확정 대기 / 출발 확정+승차 시간 / 운행 취소 / 고객 취소 / 완료), 살아 있는 예약은 인원 막대. 취소 예약은 취소 주체·환불 상태" />
           <div>
             <h2 className={`text-[17px] font-extrabold lg:text-[19px] ${tone.ink}`}>{st.title}</h2>
@@ -146,20 +161,13 @@ export default function MyDetail() {
           </div>
         )}
 
-        <div className="mt-4 grid gap-3 lg:grid-cols-[1.4fr_1fr] lg:items-start lg:gap-6">
-          <div className="grid gap-3">
-            {/* 패키지 카드 */}
-            <section className="card flex items-center gap-3 p-3">
-              <div className="relative h-[60px] w-[78px] flex-none overflow-hidden rounded-xl"><Img src={p.photos[0]} alt={n(p.name)} className="absolute inset-0 h-full w-full" /></div>
-              <div className="min-w-0 flex-1">
-                <b className="line-clamp-2 text-[15px] font-extrabold leading-snug">{n(p.name)}</b>
-                <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-ink-2">
-                  {fShort(b.dep, L)} ~ {fShort(tripEnd(p, b.dep), L)}
-                  <span className="badge brand">{t("peopleN", { n: b.people })}</span>
-                </p>
-                <p className="truncate text-[12.5px] text-muted">{hotel ? `${n(hotel.name)} · ${opt && !opt.hotel ? n(opt.sub) : n(hotel.room)}` : opt?.none ? n(opt.name) : t("noHotel")}</p>
-              </div>
-            </section>
+        <div className="mt-4 grid gap-3 lg:mt-6 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-7">
+          <div className="grid gap-3 lg:gap-5">
+            {/* 숙소 한 줄 (패키지 이름·일정은 사진 띠에) */}
+            <p className="flex items-center gap-2 rounded-2xl bg-surface px-4 py-3 text-[13.5px] text-ink-2">
+              <Bed size={18} className="flex-none text-brand" />
+              <span className="min-w-0">{hotel ? `${n(hotel.name)} · ${opt && !opt.hotel ? n(opt.sub) : n(hotel.room)}` : opt?.none ? n(opt.name) : t("noHotel")}</span>
+            </p>
 
             {/* 2 버스 승하차 (지도 대신 지도 앱 링크, PC는 승차·하차 나란히) */}
             <section className="relative card overflow-hidden">
@@ -206,6 +214,7 @@ export default function MyDetail() {
                 <div className="grid gap-2 px-4 pb-4">
                   {p.days.map((r, i) => (r ? { r, c: courseOf(r.course), date: addDays(b.dep, i) } : null)).filter(Boolean).map((x, i) => (
                     <div key={i} className="flex items-start gap-3 rounded-xl bg-surface-2 p-3">
+                      <img src={x!.c.photo} alt="" loading="lazy" className="h-[72px] w-[72px] flex-none rounded-lg object-cover lg:h-20 lg:w-24" />
                       <div className="min-w-0 flex-1">
                         <b className="block text-[14px]">{n(x!.c.name)}</b>
                         <p className="text-[12.5px] text-muted">{n(x!.c.addr)}</p>
@@ -216,10 +225,10 @@ export default function MyDetail() {
                   ))}
                   {hotel && (
                     <div className="flex items-start gap-3 rounded-xl bg-surface-2 p-3">
-                      <Bed size={20} className="mt-0.5 flex-none text-brand" />
+                      <span className="grid h-[72px] w-[72px] flex-none place-items-center rounded-lg bg-brand-soft text-brand lg:h-20 lg:w-24"><Bed size={26} /></span> {/* 호텔 사진은 데이터에 없음 */}
                       <div className="min-w-0 flex-1 text-[13.5px]">
                         <b className="block text-[14px]">{n(hotel.name)}</b>
-                        <p className="text-ink-2">{t("nightsN", { n: p.nights })} · {fShort(b.dep, L)} ~ {fShort(tripEnd(p, b.dep), L)}</p>
+                        <p className="text-ink-2">{t("nightsN", { n: p.nights })} · {fShort(b.dep, L)}{p.nights ? ` ~ ${fShort(tripEnd(p, b.dep), L)}` : ""}</p>
                         <p className="text-muted">{n(AREA_NAME[hotel.area])} · {t("checkin")} · {opt && !opt.hotel ? n(opt.sub) : n(hotel.room)}</p>
                       </div>
                     </div>
@@ -229,7 +238,7 @@ export default function MyDetail() {
             </section>
           </div>
 
-          <div className="grid gap-3 lg:sticky lg:top-24">
+          <div className="grid gap-3 lg:sticky lg:top-36">
             {/* 4 동반자 명단 (손님이 할 일 → 오른쪽 위) */}
             {b.people > 1 && (
               <section className="relative card border-[1.5px] p-4" style={{ borderColor: canEdit ? "var(--brand)" : undefined }}>
@@ -267,7 +276,7 @@ export default function MyDetail() {
             )}
 
             {/* 결제 금액 */}
-            <section className="card p-4">
+            <section className="card p-4 lg:p-5 lg:shadow-[var(--shadow-lg)]">
               <p className="mb-2 text-[13px] font-bold text-brand">{t("mdPay")} · {t("peopleN", { n: b.people })}</p>
               <PriceDetail p={p} opt={b.opt} people={b.people} singles={b.singles ?? null} />
               <div className="mt-3 flex items-baseline justify-between border-t border-line pt-3">
@@ -287,7 +296,7 @@ export default function MyDetail() {
                   <span className="grid h-9 w-9 flex-none place-items-center rounded-full bg-brand-soft text-brand"><I size={18} /></span>
                   <span className="min-w-0 flex-1">
                     <b className="block text-[14px]">{title}</b>
-                    {sub && <span className="block truncate text-[12.5px] text-muted">{sub}</span>}
+                    {sub && <span className="block text-[12.5px] text-muted">{sub}</span>}
                   </span>
                   <CaretRight size={16} className="flex-none text-muted" />
                 </button>
@@ -310,7 +319,7 @@ export default function MyDetail() {
             [t("stateL"), t(`lab_${v.label}`)],
             [t("repT"), `${b.info.nameKo} (${b.info.nameEn}) · ${b.info.cc} ${b.info.phone} · ${b.info.email}`],
             [t("rowPkg"), n(p.name)],
-            [t("rowDep"), `${fDate(b.dep, L)} ~ ${fDate(tripEnd(p, b.dep), L)}`],
+            [t("rowDep"), p.nights ? `${fDate(b.dep, L)} ~ ${fDate(tripEnd(p, b.dep), L)}` : fDate(b.dep, L)],
             [t("rowPeople"), t("peopleN", { n: b.people })],
             [t("rowHotel"), hotel ? `${n(hotel.name)}${opt ? ` · ${n(opt.sub)}` : ""}` : t("noHotel")],
             [t("rowPick"), b.pick ? n(b.pick.name) : "-"],

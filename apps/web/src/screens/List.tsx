@@ -81,11 +81,11 @@ export default function List() {
       </div>
 
       {/* 8 결과 수 */}
-      <p className="relative mb-4 flex flex-wrap items-center gap-2 text-[13.5px] text-muted">
-        <Anno n={8} t="결과 수 '패키지 n개 · 가격은 모두 버스·픽업 포함'" />
-        {!load.loading && !load.error && t("resultCount", { n: rows.length })}
+      <div className="relative mb-4 flex flex-wrap items-center gap-2">
+        <Anno n={8} t="결과 수 '총 패키지 n개' (문구 결정 17번)" />
+        {!load.loading && !load.error && <h1 className="text-[18px] font-black tracking-tight lg:text-[22px]">{t("resultCount", { n: rows.length })}</h1>}
         <Q id="Q-08" t="가격·통화" />
-      </p>
+      </div>
 
       {load.error && <ErrorBanner onRetry={load.retry} />}
 
