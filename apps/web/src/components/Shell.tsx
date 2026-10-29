@@ -6,6 +6,7 @@ import { useApp, useAuth } from "../store";
 import { logoutUrl } from "../api/sync";
 import { useT } from "../i18n";
 import { Anno, Sheet } from "./ui";
+import { GolfLogo, SiteNav } from "./SiteFrame";
 
 // 예약 진행 중(S-02~S-10): 서비스명 탭 시 확인 창 (C-06, T-27, M-101)
 export const isBookingPath = (p: string) => p.startsWith("/golf/packages") || p.startsWith("/golf/compare") || p.startsWith("/golf/book");
@@ -43,7 +44,7 @@ function LangToggle() {
   );
 }
 
-// 공통 헤더 (운영사 확정: 본 사이트 헤더·푸터를 공유하지 않고 서비스 자체 헤더 + 주 메뉴, 푸터 없음)
+// 공통 헤더: 본 사이트 상단 틀(로고·주 메뉴·언어·로그인) + 골프 메뉴 (팀 결정 10/29, 로고만 골프용 GOLF)
 export function Header() {
   const { t } = useT();
   const nav = useNavigate();
@@ -68,11 +69,12 @@ export function Header() {
   return (
     <>
       <header className="sticky top-0 z-40 border-b border-line bg-surface/85 backdrop-blur-xl">
-        <div className="relative mx-auto flex h-16 max-w-[480px] items-center gap-2 px-4 lg:max-w-[1200px] lg:px-6">
-          <Anno n={1} t="공통 헤더: 서비스 자체 헤더(서비스명·언어·로그인) + 주 메뉴" />
-          <button onClick={goHome} className="mr-auto rounded-lg py-1 text-[17px] font-extrabold tracking-[0.02em] text-ink">
-            {SERVICE_NAME}
+        <div className="relative mx-auto flex h-16 max-w-[480px] items-center gap-2 px-4 lg:max-w-[1280px] lg:gap-3 lg:px-6">
+          <Anno n={1} t="공통 헤더: 본 사이트 상단(로고·주 메뉴·언어·로그인) + 골프 메뉴. 로고만 골프용" />
+          <button onClick={goHome} className="mr-auto rounded-lg py-1 text-ink lg:mr-0" aria-label={SERVICE_NAME}>
+            <GolfLogo />
           </button>
+          <SiteNav />
           <LangToggle />
           {user ? (
             <button onClick={() => nav("/golf/my")} className="max-w-[92px] truncate whitespace-nowrap rounded-full border-[1.5px] border-line px-2.5 py-1.5 text-[13px] font-bold" title={t("myBookings")}>
@@ -89,7 +91,7 @@ export function Header() {
         </div>
         {/* 주 메뉴 */}
         {showGolfTabs(loc.pathname) && (
-          <nav className="mx-auto flex max-w-[480px] gap-1 overflow-x-auto px-3 lg:max-w-[1200px] lg:px-5" aria-label={t("golfMenu")} style={{ scrollbarWidth: "none" }}>
+          <nav className="mx-auto flex max-w-[480px] gap-1 overflow-x-auto px-3 lg:max-w-[1280px] lg:gap-4 lg:border-t lg:border-line lg:px-5 lg:pt-2" aria-label={t("golfMenu")} style={{ scrollbarWidth: "none" }}>
             {tabs.map(([to, label, go]) => (
               <button key={to} onClick={go} aria-current={activeTab === to ? "page" : undefined} className={`relative flex-none px-2.5 pb-2.5 pt-1 text-[14px] font-bold ${activeTab === to ? "text-brand" : "text-muted hover:text-ink"}`}>
                 {label}

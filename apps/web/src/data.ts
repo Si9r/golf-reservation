@@ -9,6 +9,8 @@ export type Area = Zone | "ENIWA" | "TOMAKOMAI" | "OTARU" | "JOZANKEI" | "NOBORI
 
 // 서비스 이름 (임시, 운영사 확정 전). 헤더 왼쪽에 표시
 export const SERVICE_NAME = "TRAVENDER Golf";
+// 본 사이트 주소 (골프는 같은 도메인 travender-hokkaido.com/golf). 상단·하단 메뉴 링크에 씀
+export const SITE_URL = (import.meta.env.VITE_SITE_URL as string | undefined) ?? "https://travender-hokkaido.com";
 // 본 사이트 이용약관 주소. 서버 공개 설정 API(GET /api/golf/settings/public)의 terms.terms 와 같은 값 (화면 API 연결 전이라 상수로)
 export const TERMS_URL = "https://travender-hokkaido.com/terms";
 

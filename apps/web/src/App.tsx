@@ -4,6 +4,7 @@ import { MotionConfig } from "motion/react";
 import { DESIGN_TOOLS, useApp, useDb } from "./store";
 import { loadMe } from "./api/sync";
 import { Header } from "./components/Shell";
+import { SiteFooter } from "./components/SiteFrame";
 import { ProtoPanel } from "./components/ProtoPanel";
 import { Toast } from "./components/ui";
 import Home from "./screens/Home";
@@ -138,6 +139,7 @@ export default function App() {
       <HashRouter>
         <Header />
         <Pages />
+        <SiteFooter />
         {DESIGN_TOOLS && <ProtoPanel />}
         <Toast />
       </HashRouter>
