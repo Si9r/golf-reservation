@@ -86,3 +86,10 @@ def test_name_en_full_name():  # V-21·V-24: 성과 이름 모두
     # 하이픈만 허용 (운영사 확정 10/29): 아포스트로피, 하이픈으로 시작·끝은 거절
     assert not valid_en("O'BRIEN SEAN") and not valid_en("-KIM MINJI") and not valid_en("KIM MINJI-") and not valid_en("KIM -MINJI") and not valid_en("KIM MIN-")
     assert not valid_en("KIM") and not valid_en("KIM  MINJI") and not valid_en("KIM-MINJI") and not valid_en("KIM -MINJI") and not valid_en("A " * 30 + "B")
+
+
+def test_pickup_register_due():  # L-16 승차 시간 등록: 출발 확정(7일 전)부터 출발 3일 전까지 (10/29)
+    from app import settings as S
+
+    assert S.PICKUP_REGISTER_DUE_DAYS == 3 and 0 <= S.PICKUP_REGISTER_DUE_DAYS < S.JUDGE_DAYS  # 등록할 날이 있어야 함
+

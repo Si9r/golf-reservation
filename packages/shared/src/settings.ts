@@ -7,7 +7,7 @@ export const SETTINGS = {
   MIN_DEPARTURE: 20, // 최소 출발 인원 (F-043)
   JUDGE_DAYS: 7, // 출발 n일 전 판정 (운영사 확정, TBD-05). 동반자 명단 마감과 같은 날
   HOLD_MINUTES: 10, // 결제 중 좌석 확보 (TBD-14)
-  PICKUP_REGISTER_DAYS: 7, // L-16 운영이 승차 시간을 등록하는 기한: 출발 확정 후 n일 안 (운영사 10/29, 설정값). 서버 settings.py 와 같은 값
+  PICKUP_REGISTER_DUE_DAYS: 3, // L-16 운영이 승차 시간을 등록하는 기한: 출발 확정(출발 7일 전)부터 출발 n일 전까지 (운영사 10/29 설정값, 팀 결정 10/29). JUDGE_DAYS 보다 작아야 함. 서버 settings.py 와 같은 값
   COMPANION_DUE_DAYS: 7, // 동반자 이름 수정 마감 (오타 수정용, 이름은 예약 때 모두 받음 — 팀 결정 10/23, TBD-09)
   CLOSED_SEASON: { from: "11-16", to: "04-19" }, // 휴장기, 모든 골프장 공통 (운영사 확정, TBD-16)
   SINGLE_ADD: 12000, // 1인실 추가 요금 1명당 (예시, 화면설계 v2 · Q-02). 패키지별 값이 있으면 그 값

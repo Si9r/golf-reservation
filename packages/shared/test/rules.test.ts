@@ -66,3 +66,11 @@ describe("L-06 · L-09", () => {
   });
   it("예약번호", () => expect(bookingNo("2026-10-23", 7)).toBe("GT-261023-0007"));
 });
+
+describe("L-16", () => {
+  it("승차 시간 등록 마감(출발 n일 전)은 출발 확정(판정일)보다 뒤", () => {
+    expect(SETTINGS.PICKUP_REGISTER_DUE_DAYS).toBe(3);
+    expect(SETTINGS.PICKUP_REGISTER_DUE_DAYS).toBeLessThan(SETTINGS.JUDGE_DAYS);
+  });
+});
+

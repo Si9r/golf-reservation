@@ -27,7 +27,7 @@
 | L-14 고객 취소 / API-16 | `services/booking.py` `cancel_by_user` (공통 처리 `_cancel_confirmed`) | 완료 (본 사이트 연동 API-19 전 임시·운영 예비용) |
 | API-19 고객 취소·환불 결과 받기 (본 사이트 → 이 서비스) | `routes.py` `site_cancel`, `services/booking.py` `cancel_from_site` | 완료 (인증은 `X-Site-Key` 임시, 결제 연동 협의 때 확정) |
 | L-15 환불 요청 | `services/booking.py` `refund_booking` → `adapters/payment.py` `cancel_order` (reason `operator_cancel` · `customer_cancel`, 실패 → `refund_status=FAIL` + 운영자 알림 `alert_ops`) | 완료 (전액 환불만) |
-| L-16 승차 시간 등록 / API-17 | 등록 기한 `settings.py` `PICKUP_REGISTER_DAYS` (출발 확정 후 7일) | 틀만 (기한은 운영사 10/29 설정값으로) |
+| L-16 승차 시간 등록 / API-17 | 등록 기한 `settings.py` `PICKUP_REGISTER_DUE_DAYS` (출발 3일 전까지) | 틀만 (기한은 운영사 10/29 설정값으로) |
 | B-02 좌석 확보 정리 | `jobs` `cleanup_holds` | 완료 |
 | B-03 여행 완료 | `jobs` `complete_trips` | 완료 |
 | B-04 출발편 만들기 | `services/departures.py` `generate_departures` | 완료 |
@@ -127,7 +127,7 @@ API를 빼면(`VITE_USE_API` 없음) 지금처럼 브라우저 안 데이터로�
 | 승하차 가능 범위를 삿포로 중심(TV탑 부근 43.0621, 141.3544) 반경 **12km → 3km**로 (10/29 **5km**로 바뀜, 아래 행): 서버 `service_area`(Alembic `0004`, `seed/demo_data.json`), 화면 `data.ts` `ZONES_STRICT`. 삿포로역·오도리·스스키노·나카지마 공원까지 들어가고 마루야마(약 3.2km)·삿포로돔·신삿포로는 빠짐. 이미 있는 예약은 다시 검사하지 않음 | 팀 결정 (2026-10-27): 합승 버스 정차를 도심에 모아 승차 시간을 줄임. 운영사 확인은 질문표 10번 |
 | **영문 이름은 하이픈만 허용**: 여권 표기 그대로, 이름 안 하이픈(-) 허용, 아포스트로피(') 불가, 하이픈으로 시작·끝 불가. 대문자·성·이름 각각 필수·합쳐서 60자 이하는 그대로. 대표자·동반자, 예약(API-10)·오타 수정(API-13, S-13) 모두 같은 규칙: 서버 `services/booking.py` `NAME_EN`, 화면 `screens/InfoForm.tsx` `V21`·`VPART`·`upper`. 안내 예시는 KIM MIN-JI. 이미 저장된 예약 데이터는 바꾸지 않음 | **운영사 답변 (2026-10-29)** |
 | **승하차 범위 반경 5km**: 중심은 그대로 43.0621, 141.3544 (삿포로 TV탑 부근, 오도리 공원 동쪽 끝). 값은 `settings.py` `SERVICE_AREA` · `packages/shared` `SETTINGS.SERVICE_AREA`(화면 `data.ts` `ZONES_STRICT`가 읽음, 홈 안내 {r}도 이 값) · `service_area`(시드, 이미 만든 DB는 Alembic `0005`). 판정 함수 `in_area`·`inArea`는 숫자 없이 범위 데이터를 읽음. 시드 = 설정값을 테스트로 확인. 삿포로역·오도리·스스키노·마루야마공원역(3.2km) 안, 삿포로돔(6.9km)·신치토세공항(40km) 밖. 공항·리조트 호텔 같은 예외 장소는 아직 없음 | **운영사 답변 (2026-10-29)** |
-| **승차 시간 등록 기한은 설정값** `PICKUP_REGISTER_DAYS = 7` (출발 확정 후 n일 안, `settings.py`·`packages/shared`). 지금 쓰는 곳은 없음: API-17은 틀만이고 예약 상세에 '안내 예정일' 계산이 없어 화면 문구는 늘리지 않음. 출발 확정(판정일)이 출발 7일 전이라 7일이면 기한이 출발일과 같아짐 → 실제로 쓸 때 값 확인 필요 | **운영사 답변 (2026-10-29)**: 그때 사정에 따라 달라 값을 정하지 않음 |
+| **승차 시간 등록 기한은 설정값** `PICKUP_REGISTER_DUE_DAYS = 3`: 출발 확정(판정일, 출발 7일 전)부터 **출발 3일 전까지** 등록 (`settings.py`·`packages/shared`). 판정 일수(`JUDGE_DAYS`)보다 작아야 하고, 아니면 서버가 켜질 때 오류. 지금 쓰는 곳은 없음: API-17은 틀만이고 예약 상세에 '안내 예정일' 계산이 없어 화면 문구는 늘리지 않음. 판정일이 주말에 걸리면 실제 작업일이 4~5일보다 짧을 수 있음 | **운영사 답변 (2026-10-29)**: 그때 사정에 따라 달라 값을 정하지 않음. '확정 후 7일 안'은 마감이 출발일과 같아져서, 손님이 출발 3일 전에는 알도록 **팀 결정 (10/29)**. 운영사에 알릴 것 |
 | **고객센터 임시값**: 전화 00-0000-000, 이메일 golf@travender-hokkaido.com, 운영 시간 10:00~17:00. 서버 `settings.SUPPORT`(`.env` `SUPPORT_TEL`·`SUPPORT_EMAIL`이 있으면 그 값), 화면 `packages/shared` `SUPPORT`·`data.ts` `SUPPORT_TEL`·`SUPPORT_MAIL`. 화면 '예시 번호' 표시는 실제 번호를 받을 때까지 그대로. 메일 하단도 `settings.SUPPORT`를 읽어 임시값이 나옴 | **운영사 답변 (2026-10-29)** |
 | 패키지 데이터 구조는 지금 항목으로 진행: 기본 정보(이름·박 수·출발 요일·판매 기간·1인 가격), 일정, 숙박·객실 옵션과 1인실 추가 요금, 출발편 정원, 소개(사진·설명·태그). 항목을 더할 때 고칠 곳은 아래 '패키지 항목을 더할 때' | **운영사 답변 (2026-10-29)** |
 
@@ -195,6 +195,6 @@ API를 빼면(`VITE_USE_API` 없음) 지금처럼 브라우저 안 데이터로�
 | 2. 영문 이름 규칙 | **운영사 확정 10/29**: 하이픈만 허용 (3장) |
 | 4. 희망 하차 시간 선택 | **운영사 확정 10/29** (3장) |
 | 8. 상품 데이터 형식 | **운영사 확정 10/29**: 지금 항목으로 진행 (4장 '패키지 항목을 더할 때') |
-| 9. 승차 시간 등록 시점 | **운영사 10/29**: 설정값 `PICKUP_REGISTER_DAYS` (3장) |
+| 9. 승차 시간 등록 시점 | **운영사 10/29**: 설정값 `PICKUP_REGISTER_DUE_DAYS` = 출발 3일 전까지 (3장) |
 | 10. 승하차 범위 | **운영사 확정 10/29**: 반경 5km (3장) |
 | 12. 고객센터 연락처 | **운영사 10/29**: 임시값 (3장). 실제 번호 받으면 설정값만 바꿈 |

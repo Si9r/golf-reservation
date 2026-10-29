@@ -10,7 +10,11 @@ BUS_SEATS = 20  # 출발편 정원 = 버스 1대 (운영사 확정)
 MIN_DEPARTURE = 20  # 최소 출발 인원 (F-043)
 JUDGE_DAYS = 7  # 출발 n일 전 판정 (운영사 확정, TBD-05 / 질문 Q-17·Q-26). 동반자 명단 마감과 같은 날
 HOLD_MINUTES = 10  # 결제 중 좌석 확보 (TBD-14)
-PICKUP_REGISTER_DAYS = 7  # L-16 운영이 승차 시간을 등록하는 기한: 출발 확정(판정일) 후 n일 안 (운영사 10/29: 사정에 따라 달라 설정값으로). 쓰는 곳: API-17 (아직 틀만)
+# L-16 운영이 승차 시간을 등록하는 기한: 출발 확정(판정일, 출발 JUDGE_DAYS 일 전)부터 출발 n일 전까지 (운영사 10/29: 사정에 따라 달라 설정값으로.
+# 손님이 출발 3일 전에는 승차 시간을 알도록 팀 결정 10/29). 쓰는 곳: API-17 (아직 틀만)
+PICKUP_REGISTER_DUE_DAYS = 3
+if not 0 <= PICKUP_REGISTER_DUE_DAYS < JUDGE_DAYS:  # 등록 기간(판정일 ~ 마감)이 있어야 함. 값을 잘못 바꾸면 서버가 켜질 때 바로 알림
+    raise RuntimeError(f"PICKUP_REGISTER_DUE_DAYS({PICKUP_REGISTER_DUE_DAYS})는 0 이상, JUDGE_DAYS({JUDGE_DAYS})보다 작아야 합니다")
 COMPANION_DUE_DAYS = 7  # 동반자 이름 수정 마감 (오타 수정용, 이름은 예약 때 모두 받음 — 팀 결정 10/23, TBD-09 / 질문 Q-21)
 CLOSED_SEASON = {"from": "11-16", "to": "04-19"}  # 휴장기, 모든 골프장 공통 (운영사 확정, TBD-16 / 질문 Q-24)
 SINGLE_ADD = 12000  # 1인실 추가 요금 1명당 (예시, 화면설계 v2). 패키지별 값이 있으면 그 값

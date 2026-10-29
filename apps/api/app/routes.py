@@ -177,7 +177,7 @@ def admin_cancel(no: str, b: CancelReq):
 
 # API-17 승차 시간 등록 (L-16): 승차 시간 확정 주체(Q-23) 정해지면 구현.
 # 정차 순서(stop_order)·실제 시간(pickup_time)은 손님 희망 시간(booking_stop.desired_time)을 참고해 정함.
-# 등록 기한: 출발 확정(판정일) 후 settings.PICKUP_REGISTER_DAYS 일 안 (운영사 10/29). 구현할 때 기한 안내·기한 지난 출발편 운영 알림에 씀
+# 등록 기간: 출발 확정(판정일)부터 출발 settings.PICKUP_REGISTER_DUE_DAYS 일 전까지 (10/29). 구현할 때 기한 안내·기한 지난 출발편 운영 알림에 씀
 @router.put("/admin/departures/{dep_id}/stops", dependencies=[Depends(admin)])
 def admin_stops(dep_id: str):
     fail("E-STATE")
