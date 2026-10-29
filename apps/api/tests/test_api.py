@@ -362,13 +362,17 @@ def test_name_en_requires_full_name(client):  # V-21 대표자 · V-24 동반자
     rep = {"nameLocal": "김민지", "nameEn": "KIM", "countryCode": "+82", "phone": "10-1234-5678", "email": "a@example.com"}
     r = client.post(U + "/bookings", json=body(hid, rep=rep, companions=[{"nameEn": "PARK"}]), headers=A).json()
     assert r["error"] == "E-VALID" and [f["rule"] for f in r["fields"]] == ["V-21", "V-24"]
+    r = client.post(U + "/bookings", json=body(hid, rep={**rep, "nameEn": "O'BRIEN SEAN"}, companions=[{"nameEn": "-PARK SEOYEON"}]), headers=A).json()
+    assert r["error"] == "E-VALID" and [f["rule"] for f in r["fields"]] == ["V-21", "V-24"]  # 아포스트로피·하이픈 시작 거절 (10/29)
     r = client.post(U + "/bookings", json=body(hid, rep={**rep, "nameEn": "kim minji"}, companions=[{"nameEn": "PARK SEOYEON"}]), headers=A)
     assert r.status_code == 201, r.text
     no = r.json()["bookingNo"]
     assert pay(client, no)["status"] == "CONFIRMED"
     assert client.get(U + f"/bookings/{no}", headers=A).json()["members"][0]["nameEn"] == "KIM MINJI"
     assert client.put(U + f"/bookings/{no}/companions", json={"companions": [{"nameEn": "PARK"}]}, headers=A).json()["error"] == "E-VALID"
-    assert client.put(U + f"/bookings/{no}/companions", json={"companions": [{"nameEn": "O'BRIEN MIN-JI"}]}, headers=A).status_code == 200  # 하이픈·아포스트로피 허용
+    assert client.put(U + f"/bookings/{no}/companions", json={"companions": [{"nameEn": "KIM MIN-JI"}]}, headers=A).status_code == 200  # 하이픈 허용
+    assert client.put(U + f"/bookings/{no}/companions", json={"companions": [{"nameEn": "O'BRIEN SEAN"}]}, headers=A).json()["error"] == "E-VALID"  # 아포스트로피 불가 (10/29)
+    assert client.put(U + f"/bookings/{no}/companions", json={"companions": [{"nameEn": "PARK SEO-"}]}, headers=A).json()["error"] == "E-VALID"  # 하이픈으로 끝남
     assert client.put(U + f"/bookings/{no}/companions", json={"companions": []}, headers=A).json()["error"] == "E-VALID"  # 동반자 이름은 모두 필수
 
 

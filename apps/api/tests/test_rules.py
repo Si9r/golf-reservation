@@ -50,5 +50,7 @@ def test_booking_tab():  # S-12 탭 (팀 테스트 10/23)
 def test_name_en_full_name():  # V-21·V-24: 성과 이름 모두
     from app.services.booking import valid_en
 
-    assert valid_en("KIM MINJI") and valid_en("kim minji") and valid_en(" LEE JUNG HOON ") and valid_en("KIM MIN-JI") and valid_en("O'BRIEN SEAN")
+    assert valid_en("KIM MINJI") and valid_en("kim minji") and valid_en(" LEE JUNG HOON ") and valid_en("KIM MIN-JI")
+    # 하이픈만 허용 (운영사 확정 10/29): 아포스트로피, 하이픈으로 시작·끝은 거절
+    assert not valid_en("O'BRIEN SEAN") and not valid_en("-KIM MINJI") and not valid_en("KIM MINJI-") and not valid_en("KIM -MINJI") and not valid_en("KIM MIN-")
     assert not valid_en("KIM") and not valid_en("KIM  MINJI") and not valid_en("KIM-MINJI") and not valid_en("KIM -MINJI") and not valid_en("A " * 30 + "B")

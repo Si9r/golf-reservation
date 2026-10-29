@@ -14,17 +14,18 @@ import { refreshMonth } from "../api/sync";
 // 동의 항목 (V-25, 운영사 확정): 이 서비스에만 해당하는 취소 규정 · 합승 안내 2개. 이용약관·개인정보는 본 사이트 회원가입 때 동의
 const AGREE = ["cancel", "shared"] as const;
 const AGREE_LABEL = { cancel: "agreeCancel", shared: "agreeShared" } as const;
-// V-21·V-24: 성과 이름 모두 — 영문 대문자 단어 2개 이상, 단어 사이 공백 1칸, 단어 안 하이픈·아포스트로피 허용 (KIM MIN-JI, O'BRIEN SEAN), 60자 이하. 서버 NAME_EN 과 같음 (팀 테스트 10/23)
-export const V21 = /^[A-Z]+(?:['-][A-Z]+)*(?: [A-Z]+(?:['-][A-Z]+)*)+$/;
+// V-21·V-24: 여권 표기 그대로 성과 이름 모두 — 영문 대문자 단어 2개 이상, 단어 사이 공백 1칸, 단어 안 하이픈만 허용 (KIM MIN-JI), 60자 이하.
+// 아포스트로피 불가, 하이픈으로 시작·끝 불가 (운영사 확정 10/29). 서버 NAME_EN 과 같음
+export const V21 = /^[A-Z]+(?:-[A-Z]+)*(?: [A-Z]+(?:-[A-Z]+)*)+$/;
 const V22 = /^\+?[0-9][0-9 -]{7,}$/; // 국가번호 포함 숫자·공백·하이픈 8자 이상
 const V23 = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 export const validEn = (s: string) => s.length <= 60 && V21.test(s); // 성 + 이름 (영문 풀네임) — 단어 2개 이상은 V21이 검사
-// 영문 성·이름 칸 하나: 대문자 영문, 단어 사이 공백·하이픈·아포스트로피 1개, 1~30자
-const VPART = /^[A-Z]+(?:[ '-][A-Z]+)*$/;
+// 영문 성·이름 칸 하나: 대문자 영문, 단어 사이 공백·하이픈 1개, 1~30자
+const VPART = /^[A-Z]+(?:[ -][A-Z]+)*$/;
 export const validPart = (s: string) => s.length >= 1 && s.length <= 30 && VPART.test(s);
 export const splitEn = (s: string): [string, string] => { const w = s.trim().split(/\s+/); return [w[0] ?? "", w.slice(1).join(" ")]; };
 export const joinEn = ([a, b]: [string, string]) => `${a.trim()} ${b.trim()}`.trim();
-export const upper = (s: string) => s.toUpperCase().replace(/[^A-Z '-]/g, "");
+export const upper = (s: string) => s.toUpperCase().replace(/[^A-Z -]/g, ""); // 영문·공백·하이픈만 입력됨
 
 export default function InfoForm() {
   const { t, n, L, list } = useT();

@@ -17,9 +17,10 @@ from ..errors import fail
 from ..rules import add_days, booking_no, booking_tab, in_area, is_bookable_date, quote
 from .catalog import DEP_SQL, dep_seats, sale_rule, stay_info
 
-# V-21·V-24 영문 이름: 성과 이름을 모두 (영문 대문자 단어 2개 이상, 단어 사이 공백 1칸, 단어 안 하이픈·아포스트로피 허용, 60자 이하).
-# 소문자는 대문자로 바꿔 검사 (팀 테스트 10/23). 화면 apps/web/src/screens/InfoForm.tsx V21 과 같음
-NAME_EN = re.compile(r"[A-Z]+(?:['-][A-Z]+)*(?: [A-Z]+(?:['-][A-Z]+)*)+")
+# V-21·V-24 영문 이름: 여권 표기 그대로 성과 이름을 모두 (영문 대문자 단어 2개 이상, 단어 사이 공백 1칸, 단어 안 하이픈만 허용, 60자 이하).
+# 아포스트로피는 허용하지 않음, 하이픈으로 시작·끝 불가 (운영사 확정 10/29). 소문자는 대문자로 바꿔 검사 (팀 테스트 10/23).
+# 대표자·동반자, 예약(API-10)·명단 수정(API-13) 모두 이 규칙. 화면 apps/web/src/screens/InfoForm.tsx V21 과 같음
+NAME_EN = re.compile(r"[A-Z]+(?:-[A-Z]+)*(?: [A-Z]+(?:-[A-Z]+)*)+")
 NAME_EN_MAX = 60
 # 손님에게 보이는 예약 (S-12·S-13, API-11·12·13): 결제 대기(PENDING_PAYMENT)·미결제(UNPAID)는 보이지 않음
 VISIBLE = ("CONFIRMED", "USER_CANCEL", "OP_CANCEL", "DONE")
