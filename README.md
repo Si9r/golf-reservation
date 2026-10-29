@@ -147,6 +147,13 @@ $env:VITE_USE_API="1"; npm run dev:web    # Mac/Linux: VITE_USE_API=1 npm run de
 $env:VITE_USE_API="1"; npm run build      # → apps/web/dist (API 서버가 / 에서 이 파일을 내보냄)
 ```
 
+설계·데모 도구(설계 버튼·번호, 데모 로그인·결제 결과·상태 바꾸기)는 빌드에서 숨겨집니다. `npm run dev:web`(개발 서버)에서는 켜져 있습니다.
+빌드한 화면에서 가짜 본 사이트(`PAYMENT_BACKEND=fake`)로 로그인해 보려면 데모 로그인 버튼이 필요하니 `VITE_DESIGN_TOOLS`를 켜서 빌드합니다.
+
+```powershell
+$env:VITE_USE_API="1"; $env:VITE_DESIGN_TOOLS="1"; npm run build   # 0 이면 개발 서버에서도 끔
+```
+
 | 화면 | 주소 (위 주소 뒤에) |
 |---|---|
 | 홈 | `/#/golf` |
