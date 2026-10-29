@@ -1,5 +1,6 @@
 import math
 
+from app import settings as S
 from app.rules import distance_m, booking_no, booking_tab, departure_view, in_area, in_closed_season, is_bookable_date, is_sale_date, quote, rooms_of, seats_left
 
 PKG = {"dep_weekdays": "TUE,FRI", "season_from": "04-20", "season_to": "11-15"}
@@ -23,7 +24,8 @@ def test_bookable_date():  # L-01
 def test_seats_and_view():  # L-02, L-04
     assert seats_left(20, 12, 4) == 4  # 정원 20
     assert departure_view(18, 2, "OPEN", 2) == {"booked": 18, "sum": 20, "seats": 2, "need": 0, "seatsAfter": 0, "full": True, "state": "enough", "msg": "M-125"}
-    assert departure_view(10, 10, "OPEN", 2)["need"] == 8 and departure_view(10, 10, "OPEN", 2)["full"] is False
+    assert departure_view(10, 10, "OPEN", 2)["need"] == S.MIN_DEPARTURE - 12 and departure_view(10, 10, "OPEN", 2)["full"] is False
+    assert departure_view(10, 10, "OPEN", 2, min_people=20)["need"] == 8  # 최소 인원은 출발편 값 (min_people)
     assert departure_view(15, 5, "OPEN", 6)["state"] == "unavailable" and departure_view(15, 5, "OPEN", 6)["full"] is False
     assert departure_view(18, 2, "GO", 1)["state"] == "go"
 

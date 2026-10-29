@@ -24,9 +24,10 @@ describe("L-01 출발일", () => {
 
 describe("L-02 · L-04", () => {
   it("잔여석은 확보 인원까지 뺌 (정원 20)", () => expect(seatsLeft(20, 12, 4)).toBe(4));
-  it("판정 전 20명 이상은 '인원 충족'(상태는 OPEN), 정원 20이라 마감(full)도 같이", () => {
+  it("판정 전 최소 인원 이상은 '인원 충족'(상태는 OPEN), 남은 자리가 0이면 마감(full)", () => {
     expect(departureView({ bookedCount: 18, seats: 2, status: "OPEN", people: 2 })).toMatchObject({ state: "enough", seatsAfter: 0, full: true });
-    expect(departureView({ bookedCount: 10, seats: 10, status: "OPEN", people: 2 })).toMatchObject({ state: "need", need: 8, full: false });
+    expect(departureView({ bookedCount: 10, seats: 10, status: "OPEN", people: 2 })).toMatchObject({ state: "need", need: SETTINGS.MIN_DEPARTURE - 12, full: false });
+    expect(departureView({ bookedCount: 10, seats: 10, status: "OPEN", people: 2, minPeople: 20 }).need).toBe(8); // 최소 인원은 출발편 값
     expect(departureView({ bookedCount: 15, seats: 5, status: "OPEN", people: 6 })).toMatchObject({ state: "unavailable", full: false });
     expect(departureView({ bookedCount: 18, seats: 2, status: "GO", people: 1 }).state).toBe("go");
   });

@@ -16,7 +16,7 @@ export const SET = {
   MIN_PEOPLE: 1,
   MAX_PEOPLE: 20, // 한 예약도 출발편 정원을 넘을 수 없음 (운영사 확정)
   DEFAULT_PEOPLE: 2,
-  MIN_DEPARTURE: 20, // 최소 출발 인원 (Q-03 확정)
+  MIN_DEPARTURE: 15, // 최소 출발 인원 (Q-03). 테스트용 15 (팀 결정 10/29, 운영 값은 20)
   BUS_SEATS: 20, // 출발편 정원 = 버스 1대 (F-031, 운영사 확정)
   JUDGE_DAYS: 7, // 출발 판정일 = 출발 7일 전 (운영사 확정). 동반자 명단 마감과 같은 날
   HOLD_MINUTES: 10, // 결제 중 잔여석 확보 시간 (v0.2 S-10)

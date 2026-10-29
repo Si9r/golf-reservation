@@ -338,12 +338,12 @@ function DetailInner({ p }: { p: Pkg }) {
 }
 
 // L-04 상태 문구 (판정 전에는 20명 이상이어도 '인원 충족', 출발 확정은 판정일 B-01).
-// 정원 20 = 최소 출발 20명이라 인원 충족이면 정원도 다 참 → '잔여 0석' 대신 '정원이 다 찼어요' / '마감'으로
+// 남은 자리가 0이면 '잔여 0석' 대신 '정원이 다 찼어요' / '마감'으로
 export function DepStateText({ v, dep, go, showErr }: { v: ReturnType<typeof depView>; dep: string; go?: boolean; showErr?: boolean }) {
   const { t, L } = useT();
   if (v.state === "unavailable") return showErr ? <p className="err text-[12.5px]">{t("M-120", { s: v.seats, n: v.sum - v.booked })}</p> : null;
   if (go) return <p className="text-[12.5px] font-semibold text-ok">{v.seatsAfter ? t("M-123", { s: v.seatsAfter }) : t("goFull")}</p>;
-  // 20명이 모였으면 '인원 충족'·'정원이 다 찼어요', 아니면 한 줄 '{판정일}까지 n명 더 모이면 출발' (팀 결정 10/29)
+  // 최소 인원이 모였으면 '인원 충족'·'정원이 다 찼어요', 아니면 한 줄 '{판정일}까지 n명 더 모이면 출발' (팀 결정 10/29)
   if (v.state === "enough") return <p className="text-[12.5px] font-semibold text-ok">{v.seatsAfter ? t("M-125", { d: fDayLong(judgeDate(dep), L) }) : t("depFull", { m: SET.BUS_SEATS, d: fDayLong(judgeDate(dep), L) })}</p>;
   return <p className="text-[12.5px] font-semibold text-ink-2">{t("needBy", { d: fDayLong(judgeDate(dep), L), n: v.need })}</p>;
 }

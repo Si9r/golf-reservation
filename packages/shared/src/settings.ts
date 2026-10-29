@@ -4,7 +4,7 @@ export const SETTINGS = {
   MAX_PEOPLE: 20, // F-011. 한 예약도 출발편 정원을 넘을 수 없음 (운영사 확정)
   MIN_PEOPLE: 1,
   BUS_SEATS: 20, // 출발편 정원 = 버스 1대 (운영사 확정)
-  MIN_DEPARTURE: 20, // 최소 출발 인원 (F-043)
+  MIN_DEPARTURE: 15, // 최소 출발 인원 (F-043). 테스트용 15 (팀 결정 10/29, 운영 값은 20)
   JUDGE_DAYS: 7, // 출발 n일 전 판정 (운영사 확정, TBD-05). 동반자 명단 마감과 같은 날
   HOLD_MINUTES: 10, // 결제 중 좌석 확보 (TBD-14)
   PICKUP_REGISTER_DUE_DAYS: 3, // L-16 운영이 승차 시간을 등록하는 기한: 출발 확정(출발 7일 전)부터 출발 n일 전까지 (운영사 10/29 설정값, 팀 결정 10/29). JUDGE_DAYS 보다 작아야 함. 서버 settings.py 와 같은 값
