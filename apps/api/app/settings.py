@@ -34,6 +34,8 @@ TRAVEL_MIN = {
 }
 TRAVEL_DEFAULT_MIN = 60
 HOLD_KEEP_AFTER_EXPIRE_MIN = 60  # B-02: 만료 후 이만큼 지난 확보만 삭제 (L-08 2) 용, 개발 결정)
+JUDGE_TRIES = 3  # B-01: 출발편 하나의 판정이 오류로 끝나면 이만큼 다시 시도, 그래도 실패하면 운영자 알림
+MAIL_TRIES = 3  # 안내 메일: 발송 실패(FAIL)는 이 횟수까지 다시 보냄 (B-09, 개발 결정)
 # 고객센터 (Q-13): 운영 시간은 운영사 답변 10:00~17:00. 전화번호·이메일은 확정 전이라 .env 설정값 (SUPPORT_TEL, SUPPORT_EMAIL)
 SUPPORT = {"tel": env.SUPPORT_TEL, "email": env.SUPPORT_EMAIL, "hours": "10:00-17:00"}
 TERMS_URL = {

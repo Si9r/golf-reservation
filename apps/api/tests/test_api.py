@@ -3,8 +3,8 @@ import threading
 from fastapi.testclient import TestClient
 
 from app import clock
-from app.db import one, run, tx
-from app.jobs import check_payments, cleanup_holds, judge_departures, retry_refunds
+from app.db import one, rows, run, tx
+from app.jobs import check_payments, cleanup_holds, judge_departures, resend_mails, retry_refunds
 
 A = {"authorization": "Bearer demo:M0001"}
 B = {"authorization": "Bearer demo:M0002"}
@@ -630,6 +630,7 @@ def test_paid_after_departure_canceled_refunds(client):  # 판정 뒤 운행 취
     check_payments()
     assert db1("SELECT status, cancel_by, refund_status FROM booking WHERE no = :no", no=no) == {"status": "OP_CANCEL", "cancel_by": "OP", "refund_status": "DONE"}
     assert ("cancel_order", oid, "operator_cancel") in fake().calls and db1("SELECT booked_count n FROM departure WHERE id = :id", id=dep)["n"] == 0
+    assert db1("SELECT result FROM notification WHERE booking_no = :no AND kind = 'CANCEL'", no=no) == {"result": "OK"}  # 판정 메일을 못 받았으므로 운행 취소 메일
 
 
 # ---------- 본 사이트 환불 (결제 연동 5단계) ----------
@@ -691,3 +692,194 @@ def test_fake_checkout_page(client):
         assert client.get(f"/api/golf/bookings/{no}/payment", headers=A).json()["status"] == want
     assert client.post(co["checkoutUrl"], content="status=hack", headers={"content-type": "application/x-www-form-urlencoded"}).status_code == 400
 
+
+
+# ---------- 보내야 하는데 빠졌던 메일 (판정 뒤 결제 · 판정 실패 알림 · 실패 메일 재발송) ----------
+class MailRec:
+    """보낸 메일을 기록만 하는 가짜 발송 (fail=True 면 발송 실패)"""
+
+    def __init__(self, fail=False):
+        self.sent, self.fail = [], fail
+
+    def send(self, to, subject, body):
+        if self.fail:
+            raise OSError("smtp down")
+        self.sent.append((to, subject, body))
+
+
+def mails(no, kind):
+    with tx() as c:
+        return [r["result"] for r in rows(c, "SELECT result FROM notification WHERE booking_no = :no AND kind = :k ORDER BY id", no=no, k=kind)]
+
+
+def test_paid_after_departure_go_sends_go(client, monkeypatch):  # 출발 확정(GO) 뒤에 결제가 끝난 예약도 출발 확정 메일을 받음 (한 번만)
+    from app.adapters import mail as M
+
+    rec = MailRec()
+    monkeypatch.setattr(M, "mail", rec)
+    dep = "PKG-001-20261106"
+    set_booked(dep, 10)
+    no = client.post(U + "/bookings", json=body((dep, 2)), headers=A).json()["bookingNo"]
+    assert pay(client, no, "authenticating")["status"] == "PENDING_PAYMENT"
+    with tx() as c:
+        run(c, "UPDATE departure SET status = 'GO' WHERE id = :id", id=dep)  # 그 사이 판정에서 출발 확정
+    fake().set_status(db1("SELECT order_id o FROM booking WHERE no = :no", no=no)["o"], "paid")
+    assert check_payments()["confirmed"] == 1 and db1("SELECT status FROM booking WHERE no = :no", no=no)["status"] == "CONFIRMED"
+    assert mails(no, "GO") == ["OK"] and any(no in s and "출발이 확정" in s for _, s, _ in rec.sent)
+    assert client.get(U + f"/bookings/{no}/payment", headers=A).json()["status"] == "CONFIRMED"
+    assert resend_mails() >= 0 and mails(no, "GO") == ["OK"]  # 다시 돌려도 두 번 보내지 않음
+
+
+def test_judge_retry_then_ops_alert(client, monkeypatch):  # B-01: 출발편 판정이 오류면 JUDGE_TRIES 회까지 다시, 그래도 실패하면 운영자 알림 메일
+    import app.jobs as J
+    from app.adapters import mail as M
+    from app.config import env
+
+    rec = MailRec()
+    monkeypatch.setattr(M, "mail", rec)
+    monkeypatch.setattr(env, "OPS_EMAIL", "ops@example.jp")
+    dep = "PKG-001-20261106"  # 판정일 10-30
+    set_booked(dep, 0)
+    real, calls = J._judge_one, []
+
+    def flaky(dep_id, fails):
+        if dep_id == dep:
+            calls.append(dep_id)
+            if len(calls) <= fails:
+                raise RuntimeError("db gone")
+        return real(dep_id)
+
+    clock.set_today("2026-10-30")
+    monkeypatch.setattr(J, "_judge_one", lambda d: flaky(d, 99))  # 계속 실패
+    assert judge_departures()["failed"] == 1 and len(calls) == 3
+    assert db1("SELECT status FROM departure WHERE id = :id", id=dep)["status"] == "OPEN"  # 다음 실행 때 다시 판정
+    ops = [(to, s, b) for to, s, b in rec.sent if to == "ops@example.jp" and dep in s]  # (앞 테스트가 남긴 환불 실패 알림은 제외)
+    assert len(ops) == 1 and dep in ops[0][1] and "출발 판정 실패" in ops[0][2] and "db gone" in ops[0][2]
+    calls.clear()
+    monkeypatch.setattr(J, "_judge_one", lambda d: flaky(d, 2))  # 두 번 실패 후 성공
+    assert judge_departures()["failed"] == 0 and len(calls) == 3
+    assert db1("SELECT status FROM departure WHERE id = :id", id=dep)["status"] == "CANCEL"
+
+
+def test_judge_resumes_after_stop(client, monkeypatch):  # B-01 이 판정만 하고 멈춰도(환불·메일 전) 다시 돌리면 남은 환불·메일만 처리
+    import app.jobs as J
+    from app.adapters import mail as M
+
+    monkeypatch.setattr(M, "mail", MailRec())
+    dep = "PKG-001-20261106"
+    set_booked(dep, 0)
+    no = book_confirmed(client, dep, 2)
+    real = J.refund_booking
+    monkeypatch.setattr(J, "refund_booking", lambda *a: (_ for _ in ()).throw(RuntimeError("killed")))  # 환불 직전에 멈춤
+    clock.set_today("2026-10-30")
+    assert judge_departures()["failed"] == 1
+    assert db1("SELECT status, refund_status FROM booking WHERE no = :no", no=no) == {"status": "OP_CANCEL", "refund_status": None}
+    assert mails(no, "CANCEL") == []  # 환불 요청 전에는 '전액 환불' 메일을 보내지 않음
+    monkeypatch.setattr(J, "refund_booking", real)
+    judge_departures()  # 운행 취소 출발편에 환불 못 한 예약이 남아 있으므로 다시 대상
+    assert db1("SELECT refund_status FROM booking WHERE no = :no", no=no)["refund_status"] == "DONE" and mails(no, "CANCEL") == ["OK"]
+    judge_departures()
+    assert mails(no, "CANCEL") == ["OK"]
+
+
+def test_resend_failed_mails(client, monkeypatch):  # B-09: 발송 실패한 메일을 다시 보냄, MAIL_TRIES 회까지만
+    from app import settings as S
+    from app.adapters import mail as M
+
+    monkeypatch.setattr(M, "mail", MailRec(fail=True))
+    set_booked(SITE_DEP, 0)
+    uc = book_confirmed(client, SITE_DEP, 2)
+    client.post(U + f"/admin/bookings/{uc}/cancel", json={"cancelNote": "고객 요청"}, headers=ADMIN)  # USER_CANCEL 메일 실패
+    dep = "PKG-001-20261113"  # 판정일 11-06
+    set_booked(dep, 0)
+    no = book_confirmed(client, dep, 2)
+    clock.set_today("2026-11-06")
+    judge_departures()  # 운행 취소 메일 실패
+    assert mails(no, "CANCEL") == ["FAIL"] and mails(uc, "USER_CANCEL") == ["FAIL"]
+    for _ in range(S.MAIL_TRIES - 2):
+        resend_mails()  # 계속 실패
+    assert mails(uc, "USER_CANCEL") == ["FAIL"] * (S.MAIL_TRIES - 1)
+    with tx() as c:  # 고객 취소 메일은 한도까지 실패한 것으로
+        run(c, "INSERT INTO notification (booking_no, kind, result) VALUES (:no, 'USER_CANCEL', 'FAIL')", no=uc)
+    rec = MailRec()
+    monkeypatch.setattr(M, "mail", rec)
+    resend_mails()
+    assert mails(no, "CANCEL")[-1] == "OK" and mails(uc, "USER_CANCEL") == ["FAIL"] * S.MAIL_TRIES  # 한도에 이른 메일은 더 보내지 않음
+    assert any(no in s for _, s, _ in rec.sent) and not any(uc in s for _, s, _ in rec.sent)
+    n = len(rec.sent)
+    resend_mails()
+    assert not [s for _, s, _ in rec.sent[n:] if no in s]  # 보낸 메일은 다시 보내지 않음
+
+
+def test_mail_from_and_samples(monkeypatch):  # 모든 메일의 보내는 주소 = golf-test@resend.dev, 테스트 메일은 7종을 한 번씩 (SMTP 는 가짜)
+    import smtplib
+
+    from app import mail_samples
+    from app.adapters import mail as M
+    from app.config import Env, env
+
+    assert Env.model_fields["MAIL_FROM"].default == "golf-test@resend.dev"
+    msgs = []
+
+    class FakeSMTP:
+        def __init__(self, host, port, timeout=None):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def starttls(self):
+            pass
+
+        def send_message(self, msg):
+            msgs.append(msg)
+
+    monkeypatch.setattr(smtplib, "SMTP", FakeSMTP)
+    monkeypatch.setattr(env, "MAIL_FROM", Env.model_fields["MAIL_FROM"].default)
+    for k, v in {"SMTP_HOST": "smtp.example.jp", "SMTP_SECURITY": "starttls", "SMTP_USER": ""}.items():  # 로컬 .env 의 SMTP 설정과 상관없이
+        monkeypatch.setattr(env, k, v)
+    monkeypatch.setattr(M, "mail", M.SmtpMail())
+    res = mail_samples.send_samples("someone@example.com")
+    assert [k for k, _ in res] == ["CONFIRM", "GO", "CANCEL", "PICKUP", "USER_CANCEL", "OPS_REFUND", "OPS_JUDGE"] and all(r == "OK" for _, r in res)
+    assert len(msgs) == 7 and all("golf-test@resend.dev" in m["From"] and m["To"] == "someone@example.com" for m in msgs)
+    assert all(m["Subject"].startswith("[테스트] ") for m in msgs)
+
+
+def test_ops_alert_has_customer_and_booking(client, monkeypatch):  # 운영자 알림 메일: 어떤 고객의 어떤 예약이 어떻게 실패했는지 + 해야 할 일
+    from app.adapters import mail as M
+    from app.config import env
+
+    rec = MailRec()
+    monkeypatch.setattr(M, "mail", rec)
+    monkeypatch.setattr(env, "OPS_EMAIL", "ops@example.jp")
+    set_booked(SITE_DEP, 0)
+    no = book_confirmed(client, SITE_DEP, 2)
+    oid = db1("SELECT order_id o FROM booking WHERE no = :no", no=no)["o"]
+    fake().set_status(oid, "pending")  # 본 사이트에서 아직 paid 가 아닌 주문 → 409 refused
+    client.post(U + f"/admin/bookings/{no}/cancel", json={"cancelNote": "고객 요청"}, headers=ADMIN)
+    subject, body_ = next((s, b) for to, s, b in rec.sent if to == "ops@example.jp" and no in s)
+    assert "환불 실패 (customer_cancel)" in subject and "이정훈 님" in subject
+    for x in ("발생 시각:", "본 사이트 409 refused", "고객 취소 환불(customer_cancel)", "이미 환불·취소된 주문",  # 무슨 일 · 원인 짐작
+              "이정훈 (LEE JUNGHOON)", "a@example.com", "+82 10-1234-5678", "M0001",  # 고객
+              f"예약번호: {no} (고객 취소)", "삿포로", "2명", oid, "환불: 실패", "■ 해야 할 일", "B-07"):  # 예약 · 주문 · 환불 · 조치
+        assert x in body_, x
+    assert db1("SELECT error FROM notification WHERE booking_no = :no AND kind = 'OPS_ALERT'", no=no)["error"].startswith("환불 실패 (customer_cancel): 본 사이트 409 refused")
+
+
+def test_ops_alert_judge_has_departure(monkeypatch):  # 출발 판정 실패 알림: 출발편 상태·인원 (DB 조회가 실패해도 알림은 보냄)
+    from app.adapters import mail as M
+    from app.config import env
+    from app.db import tx as _tx
+
+    rec = MailRec()
+    monkeypatch.setattr(M, "mail", rec)
+    monkeypatch.setattr(env, "OPS_EMAIL", "ops@example.jp")
+    with _tx() as c:
+        M.alert_ops(c, None, "출발 판정 실패", "오류: RuntimeError: x", "B-01 을 다시 실행", about=SITE_DEP)
+        M.alert_ops(c, None, "출발 판정 실패", "오류: RuntimeError: y", about="NO-SUCH-DEP")
+    (s1, b1), (s2, b2) = [(s, b) for to, s, b in rec.sent if to == "ops@example.jp"][-2:]
+    assert SITE_DEP in s1 and "■ 출발편" in b1 and "최소 출발 20명" in b1 and "판정일" in b1 and "B-01 을 다시 실행" in b1
+    assert "NO-SUCH-DEP" in s2 and "오류: RuntimeError: y" in b2 and "■ 출발편" not in b2

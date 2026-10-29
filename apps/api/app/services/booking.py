@@ -290,9 +290,10 @@ def payment_status(m: Member, no: str) -> dict:
 def apply_order(no: str, order: dict) -> str:
     """본 사이트 주문 상태를 예약에 반영. 여러 번(결과 화면·배치 동시) 불려도 한 번만: 출발편 행 잠금 → 예약 잠금 → 상태 다시 확인.
     paid → CONFIRMED + 확정 인원 += 인원 (판정이 끝나 운행 취소된 출발편이면 OP_CANCEL 후 바로 환불)
-    failed·expired → UNPAID (좌석 풀림) / pending·authenticating → 결제 대기 유지 (좌석 유지)"""
+    failed·expired → UNPAID (좌석 풀림) / pending·authenticating → 결제 대기 유지 (좌석 유지)
+    판정 뒤에 결제가 끝난 예약은 B-01 판정 메일을 받지 못했으므로 여기서 보냄: 출발 확정(GO) 출발편 → GO, 운행 취소 → 환불 후 CANCEL"""
     st = order.get("status")
-    late_refund = False
+    late_refund = late_go = False
     with tx() as c:
         dep_id = (one(c, "SELECT departure_id FROM booking WHERE no = :no", no=no) or fail("E-NOTFOUND"))["departure_id"]
         run(c, "SELECT id FROM departure WHERE id = :id FOR UPDATE", id=dep_id)
@@ -306,10 +307,11 @@ def apply_order(no: str, order: dict) -> str:
                 run(c, "UPDATE booking SET status = 'CONFIRMED' WHERE no = :no", no=no)
                 run(c, "UPDATE departure SET booked_count = booked_count + :n WHERE id = :id", n=b["people"], id=dep_id)
                 # 예약 확정(결제 완료) 메일은 본 사이트가 보냄 → 골프 CONFIRM 메일은 보내지 않음 (템플릿은 adapters/mail.py 에 남김)
-                return "CONFIRMED"
-            # 판정이 끝나 운행 취소(·완료)된 출발편: 판정은 확정 예약만 세므로 이 예약은 출발할 수 없음 → 운행 취소 + 바로 환불
-            run(c, "UPDATE booking SET status = 'OP_CANCEL', cancel_by = 'OP', canceled_at = UTC_TIMESTAMP(3) WHERE no = :no", no=no)
-            late_refund = True
+                late_go = d["status"] == "GO"
+            else:
+                # 판정이 끝나 운행 취소(·완료)된 출발편: 판정은 확정 예약만 세므로 이 예약은 출발할 수 없음 → 운행 취소 + 바로 환불
+                run(c, "UPDATE booking SET status = 'OP_CANCEL', cancel_by = 'OP', canceled_at = UTC_TIMESTAMP(3) WHERE no = :no", no=no)
+                late_refund = True
         elif st in ORDER_FINAL_FAIL:
             run(c, "UPDATE booking SET status = 'UNPAID' WHERE no = :no", no=no)
             return "UNPAID"
@@ -317,7 +319,9 @@ def apply_order(no: str, order: dict) -> str:
             return "PENDING_PAYMENT"
     if late_refund:
         refund_booking(no, "operator_cancel")
-    return "OP_CANCEL"
+    if late_refund or late_go:
+        send_due_mails(no=no)  # 커밋 뒤에 보냄 (메일 서버가 느려도 출발편 잠금을 잡고 있지 않게)
+    return "OP_CANCEL" if late_refund else "CONFIRMED"
 
 
 def list_bookings(m: Member, departure_id: str | None = None) -> list[dict]:
@@ -374,6 +378,19 @@ def save_companions(m: Member, no: str, companions: list[dict]) -> dict:
     return {"saved": len(companions)}
 
 
+REFUND_REASON_KO = {"operator_cancel": "운행 취소 환불(operator_cancel, 전액)", "customer_cancel": "고객 취소 환불(customer_cancel)"}
+# 운영자 알림에 붙이는 원인 짐작 (본 사이트 오류 코드별)
+REFUND_HINT = {
+    "refused": "본 사이트가 환불을 거절했습니다. 결제가 끝나지 않은(paid 가 아닌) 주문이거나 이미 환불·취소된 주문일 수 있습니다.",
+    "not_found": "본 사이트에 이 주문이 없습니다. 주문번호가 맞는지 확인이 필요합니다.",
+    "unauthorized": "본 사이트 API 키가 맞지 않습니다. .env PARTNER_API_KEY 를 확인해 주세요.",
+    "unreachable": "본 사이트에 연결하지 못했습니다 (네트워크·시간 초과). 잠시 뒤 다시 시도하면 될 수 있습니다.",
+    "bad_gateway": "본 사이트 쪽 오류입니다. 잠시 뒤 다시 시도하면 될 수 있습니다.",
+    "not_configured": "본 사이트 연동 설정이 비어 있습니다. .env PARTNER_API_BASE · PARTNER_API_KEY 를 확인해 주세요.",
+}
+REFUND_HINT_DEFAULT = "본 사이트 오류 코드를 확인해 주세요."
+
+
 def refund_booking(no: str, reason: str) -> str:
     """L-15 환불: 본 사이트 POST /api/partner/orders/{order_id}/cancel (reason = operator_cancel | customer_cancel).
     paid 주문만·전액만. 409 refused · 502 등 실패 → refund_status = FAIL + 운영자 알림 (B-07 환불 재시도가 다시 시도).
@@ -387,13 +404,46 @@ def refund_booking(no: str, reason: str) -> str:
     except PartnerError as e:
         with tx() as c:
             run(c, "UPDATE booking SET refund_status = 'FAIL' WHERE no = :no", no=no)
-            alert_ops(c, no, f"환불 실패 ({reason}): 본 사이트 {e.status} {e.code}. 환불 재시도 배치(B-07)가 다시 시도")
+            msg = (e.body.get("message") or e.body.get("detail")) if isinstance(e.body, dict) else None
+            alert_ops(c, no, f"환불 실패 ({reason})",
+                      f"본 사이트 {e.status} {e.code}{f' ({msg})' if msg else ''}. "
+                      f"{REFUND_REASON_KO.get(reason, reason)}을 본 사이트 주문 {b['order_id']}에 요청했지만 처리되지 않았습니다. "
+                      f"{REFUND_HINT.get(e.code, REFUND_HINT_DEFAULT)}",
+                      "환불 재시도 배치(B-07)가 자동으로 다시 요청합니다. 같은 알림이 계속 오면 본 사이트 관리 화면에서 "
+                      f"주문 {b['order_id']}의 결제·환불 상태를 확인하고, 필요하면 고객에게 연락해 주세요. 고객이 문의하면 예약번호로 찾을 수 있습니다.")
         return "FAIL"
     st = "DONE" if r.get("status") == ORDER_CANCELED else "REQUESTED"
     with tx() as c:
         run(c, """UPDATE booking SET refund_status = :st, refund_id = COALESCE(refund_id, :rid), order_status = :os, order_checked_at = UTC_TIMESTAMP(3)
                   WHERE no = :no""", st=st, rid=r.get("refund_id") or b["order_id"], os=r.get("status"), no=no)
     return st
+
+
+def send_due_mails(no: str | None = None, dep_id: str | None = None, kinds: tuple[str, ...] = ("GO", "CANCEL", "USER_CANCEL")) -> int:
+    """보내야 하는데 아직 못 보낸 안내 메일을 보냄. 보낸(시도한) 건수를 돌려줌. 예약번호·출발편·메일 종류로 좁힐 수 있음.
+    B-01 판정 직후(출발편별) · 판정 뒤 결제가 끝난 예약(apply_order) · B-09 메일 재발송(전체)이 부름
+    - GO 출발 확정: 출발 확정(GO) 출발편의 확정 예약 (판정 뒤에 결제가 끝난 예약 포함)
+    - CANCEL 운행 취소: 운행 취소 예약. 결제한 예약은 환불을 요청한 뒤에만 (메일에 '전액 환불' 안내가 있으므로)
+    - USER_CANCEL 고객 취소: API-16·API-19 가 바로 보냄. 여기서는 실패분만 다시
+    OK 기록이 있으면 보내지 않음. 실패(FAIL)는 MAIL_TRIES 회까지 다시 보냄. 출발일이 지난 예약은 보내지 않음"""
+    with conn() as c:
+        due = rows(c, f"""SELECT x.no, x.email, x.kind FROM (
+                              SELECT b.no, m.email,
+                                     CASE b.status WHEN 'CONFIRMED' THEN 'GO' WHEN 'OP_CANCEL' THEN 'CANCEL' ELSE 'USER_CANCEL' END kind
+                              FROM booking b JOIN departure d ON d.id = b.departure_id
+                              JOIN booking_member m ON m.booking_no = b.no AND m.seq = 1
+                              WHERE d.dep_date >= :t AND m.email IS NOT NULL AND m.email <> ''
+                                AND ((b.status = 'CONFIRMED' AND d.status = 'GO') OR b.status = 'USER_CANCEL'
+                                     OR (b.status = 'OP_CANCEL' AND (b.order_id IS NULL OR b.refund_status IS NOT NULL)))
+                                {"AND b.no = :no" if no else ""} {"AND d.id = :d" if dep_id else ""}) x
+                          WHERE NOT EXISTS (SELECT 1 FROM notification n WHERE n.booking_no = x.no AND n.kind = x.kind AND n.result = 'OK')
+                            AND (SELECT COUNT(*) FROM notification n WHERE n.booking_no = x.no AND n.kind = x.kind) < :tries
+                          ORDER BY x.no""", t=clock.today(), no=no, d=dep_id, tries=S.MAIL_TRIES)
+    due = [r for r in due if r["kind"] in kinds]
+    for r in due:  # 한 건씩 기록 (notify 는 실패해도 예외를 내지 않고 FAIL 로 남김)
+        with tx() as c:
+            notify(c, r["no"], r["email"], r["kind"])
+    return len(due)
 
 
 def _booking_for_cancel(c: Connection, no: str) -> dict:
