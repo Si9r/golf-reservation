@@ -158,11 +158,11 @@ export function Steps({ at, hasHotel }: { at: number; hasHotel: boolean }) {
       <Anno n="C-04" t="예약 진행 단계: 칸마다 단계 이름(패키지·호텔·승하차·확인·정보·결제), 현재 단계 굵게, 호텔 옵션 없는 패키지는 호텔 단계 없이 5단계" />
       <div className="flex gap-1.5" aria-hidden="true">
         {steps.map((s, i) => (
-          <div key={s} className="min-w-0 flex-1">
+          <div key={s} className="min-w-max flex-1 basis-0"> {/* 칸은 단계 이름 길이 이상 (일본어 パッケージ) */}
             <div className="h-[5px] overflow-hidden rounded-full bg-line">
               <motion.div className="h-full rounded-full bg-brand" initial={false} animate={{ width: i <= cur ? "100%" : "0%" }} transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }} />
             </div>
-            <span className={`mt-1 block truncate text-center text-[11px] leading-tight ${i === cur ? "font-bold text-brand" : i < cur ? "text-ink-2" : "text-muted"}`}>{short[i]}</span>
+            <span className={`mt-1 block whitespace-nowrap text-center text-[10.5px] leading-tight sm:text-[11px] ${i === cur ? "font-bold text-brand" : i < cur ? "text-ink-2" : "text-muted"}`}>{short[i]}</span>
           </div>
         ))}
       </div>
@@ -197,7 +197,7 @@ export function PriceBlock({ main, sub }: { main: string; sub: string }) {
   return (
     <div className="min-w-0 flex-1 leading-tight">
       <p className="num truncate text-[19px] font-extrabold">{main}</p>
-      <p className="truncate text-[12px] text-muted">{sub}</p>
+      <p className="text-[12px] text-muted">{sub}</p>
     </div>
   );
 }

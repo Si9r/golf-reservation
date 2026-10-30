@@ -32,7 +32,7 @@ export default function HotelOption() {
       <div className="step-body">
       <section className="relative mb-5">
         <Anno n="S-05" t="제목·선택 요약 (패키지·출발일·인원)" />
-        <h1 className="text-[22px] font-bold leading-snug">{t("s05T")}</h1>
+        <h1 className="text-[22px] font-black leading-snug tracking-[-0.02em] lg:text-[26px]">{t("s05T")}</h1>
         <p className="mt-1 text-[14px] text-muted">{n(p.name)} · {fShort(d.dep!, L)} {L === "ko" ? "출발" : "出発"} · {t("peopleN", { n: d.people })}</p>
       </section>
       {fixed && hotel && (
@@ -52,7 +52,7 @@ export default function HotelOption() {
           const canOpen = !!h && !o.none;
           const show = sel && canOpen && !folded; // 고른 옵션만 펼침 (처음엔 기본 옵션이 펼친 상태). 고른 카드를 다시 누르면 접기·펼치기
           return (
-            <div key={id} className={`overflow-hidden rounded-xl border-[1.5px] transition-colors ${sel ? "border-brand bg-brand-soft" : "border-line-strong bg-surface"}`}>
+            <div key={id} className={`overflow-hidden rounded-2xl border-[1.5px] transition-colors ${sel ? "border-brand bg-brand-soft" : "border-line-strong bg-surface"}`}>
               <button
                 role="radio"
                 aria-checked={sel}
@@ -96,16 +96,16 @@ export default function HotelOption() {
       </section>}
       {/* 4 객실 구성 (피드백 5) */}
       {hotel && (
-        <section className="relative mt-5 card p-4">
+        <section className="relative mt-6 card rounded-2xl p-4 lg:p-5">
           <Anno n={4} t="객실 구성: 2인 1실 기본, 홀수 인원이면 1명은 1인실 자동. 1인실 인원 ± (2명 단위, 인원과 홀짝 같음), 1인실 추가 요금 × 1인실 인원 (M-131)" />
-          <h2 className="mb-1 flex items-center gap-2 text-[15px] font-bold"><Bed size={18} className="text-brand" /> {t("roomsT")}</h2>
+          <h2 className="mb-1 flex items-center gap-2 text-[17px] font-black"><Bed size={18} className="text-brand" /> {t("roomsT")}</h2>
           <p className="text-[13.5px] font-semibold">{t("peopleN", { n: d.people })} → {t(rooms.singles ? "roomsSum" : "roomsSum0", { t: rooms.twins, s: rooms.singles })}</p>
           <div className="mt-3 flex items-center justify-between gap-3">
             <span className="text-[13.5px] text-ink-2">{t("singlesL")}</span>
             <div className="flex items-center gap-2">
-              <button className="grid h-9 w-9 place-items-center rounded-full border border-line-strong disabled:opacity-40" aria-label="-" disabled={rooms.singles - 2 < d.people % 2} onClick={() => setSingles(rooms.singles - 2)}><Minus size={16} weight="bold" /></button>
+              <button className="grid h-11 w-11 place-items-center rounded-full border border-line-strong bg-surface disabled:opacity-40" aria-label="-" disabled={rooms.singles - 2 < d.people % 2} onClick={() => setSingles(rooms.singles - 2)}><Minus size={16} weight="bold" /></button>
               <b className="num w-10 text-center text-[16px]">{rooms.singles}</b>
-              <button className="grid h-9 w-9 place-items-center rounded-full border border-line-strong disabled:opacity-40" aria-label="+" disabled={rooms.singles + 2 > d.people} onClick={() => setSingles(rooms.singles + 2)}><Plus size={16} weight="bold" /></button>
+              <button className="grid h-11 w-11 place-items-center rounded-full border border-line-strong bg-surface disabled:opacity-40" aria-label="+" disabled={rooms.singles + 2 > d.people} onClick={() => setSingles(rooms.singles + 2)}><Plus size={16} weight="bold" /></button>
             </div>
           </div>
           <p className="mt-2 text-[12.5px] leading-relaxed text-muted">{t("M-131", { p: yen(SET.SINGLE_ADD) })}</p>

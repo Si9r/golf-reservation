@@ -549,7 +549,7 @@ export default function Place() {
       <p className="mb-4 mt-1 text-[14px] text-muted">{t("s06S")}</p>
       {tabsEl(false)}
       <div className="mb-4">{sameEl}</div>
-      <div className="mb-4">{timeEl}</div>
+      {/* 장소 먼저 고르고 그다음 시간 (10/29) */}
       {tab === "drop" && d.dropSame ? (
         <div className="mb-4">{dropSameEl}</div>
       ) : (
@@ -562,6 +562,7 @@ export default function Place() {
           {previewEl}
         </div>
       )}
+      <div className="mt-5">{timeEl}</div>
       <div className="mt-5">{summaryEl}</div>
       <div className="mt-4">{feeEl}</div>
       <p className="mt-2 text-[12px] text-muted">{!anno ? null : serviceArea.wide ? "SERVICE_AREA: 넓은 범위 (기타히로시마·치토세·공항 포함, 확인 필요)" : `SERVICE_AREA: 삿포로 중심 반경 ${ZONES_STRICT[0].r / 1000}km (운영사 확정 10/29)`}</p>
