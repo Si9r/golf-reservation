@@ -119,7 +119,7 @@ export default function InfoForm() {
     <div className="page step">
       <ScreenTag id="S-09" name="정보 입력" refs="FN-19~21 · V-20~V-25 · L-07 · API-08 · T-15, T-16" />
       <StepHead at={4} hasHotel={hasHotelStep(p)} onBack={() => nav("/golf/book/review")} />
-      <h1 className="mb-4 text-[22px] font-bold">{t("infoT")}</h1>
+      <h1 className="mb-4 text-[22px] font-black tracking-[-0.02em] lg:text-[26px]">{t("infoT")}</h1>
       {tried && !ok && (
         <p role="alert" className="mb-3 flex items-center gap-2 rounded-2xl border p-3 text-[14px] font-semibold text-bad" style={{ background: "var(--bad-soft)", borderColor: "var(--bad-line)" }}>
           <WarningCircle size={18} weight="fill" /> {t("M-160")}
@@ -127,9 +127,9 @@ export default function InfoForm() {
       )}
 
       {/* PC: 왼쪽 입력 · 오른쪽 예약 요약 (확인 화면과 같은 2칸) */}
-      <div className="grid lg:grid-cols-[1.4fr_1fr] lg:items-start lg:gap-6">
+      <div className="grid lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start lg:gap-8">
       <div>
-      <section className="relative card grid gap-4 p-5">
+      <section className="relative card grid gap-4 rounded-[20px] p-5">
         <div className="flex items-center justify-between">
           <h1 className="text-[18px] font-bold">{t("repT")}</h1>
           <span className="chip gray">{t("filled")}</span>
@@ -159,7 +159,7 @@ export default function InfoForm() {
       </section>
 
       {compN > 0 && (
-        <section ref={(el) => { refs.current.comps = el; }} className="relative mt-4 card grid gap-3 p-5">
+        <section ref={(el) => { refs.current.comps = el; }} className="relative mt-4 card grid gap-3 rounded-[20px] p-5">
           <Anno n={5} t="동반자 명단 × (인원−1) (V-24): 필수. 사람마다 영문 성·이름 두 칸 (자동 대문자)" />
           <h2 className="flex flex-wrap items-center gap-2 text-[16px] font-bold"><span>{t("compT")}<Req /></span> <span className="text-[13px] font-normal text-muted">{t("peopleN", { n: compN })}</span></h2>
           <p className="help -mt-1">{t("compNote")}</p>
@@ -181,7 +181,7 @@ export default function InfoForm() {
       )}
 
       {/* 대표자·동반자를 다 적은 뒤 총 인원 확인 */}
-      <div className="mt-4 flex items-center justify-between rounded-2xl bg-brand-soft px-5 py-3.5">
+      <div className="mt-4 flex items-center justify-between rounded-[20px] bg-brand-soft px-5 py-3.5">
         <span className="text-[14px] font-semibold text-ink-2">{t("totalPeople")}</span>
         <span className="text-right">
           <b className="num text-[16px]">{t("peopleN", { n: d.people })}</b>
@@ -189,7 +189,7 @@ export default function InfoForm() {
         </span>
       </div>
 
-      <section ref={(el) => { refs.current.agree = el; }} className="relative mt-4 card grid gap-1 p-5">
+      <section ref={(el) => { refs.current.agree = el; }} className="relative mt-4 card grid gap-1 rounded-[20px] p-5">
         <Anno n={6} t="동의 2개 (V-25): 전체 동의 / 취소 규정 / 합승 안내 (모두 필수). 이용약관·개인정보는 본 사이트 기준 → 아래 링크 (TERMS_URL)" />
         <h2 className="mb-1 text-[16px] font-bold">{t("termsT")}<Req /></h2>
         <label className="flex min-h-[48px] items-center gap-3 border-b border-line pb-2 text-[15px] font-bold">
@@ -212,12 +212,12 @@ export default function InfoForm() {
       </section>
 
       </div>
-      <aside className="hidden lg:sticky lg:top-24 lg:grid lg:gap-3">
-        <div className="card overflow-hidden">
-          <div className="relative aspect-[16/7]"><Img src={p.photos[0]} alt={n(p.name)} className="absolute inset-0 h-full w-full" /></div>
+      <aside className="hidden lg:sticky lg:top-32 lg:grid lg:gap-3">
+        <div className="card overflow-hidden rounded-[20px] shadow-[var(--shadow-lg)]">
+          <div className="relative aspect-[16/8]"><Img src={p.photos[0]} alt={n(p.name)} className="absolute inset-0 h-full w-full" /></div>
           <div className="grid gap-2 p-4 text-[13.5px]">
             <b className="text-[15px] font-extrabold leading-snug">{n(p.name)}</b>
-            <p className="flex flex-wrap items-center gap-2 text-ink-2">{fShort(d.dep!, L)} ~ {fShort(tripEnd(p, d.dep!), L)} <span className="badge brand">{t("peopleN", { n: d.people })}</span></p>
+            <p className="flex flex-wrap items-center gap-2 text-ink-2">{fShort(d.dep!, L)}{p.nights ? ` ~ ${fShort(tripEnd(p, d.dep!), L)}` : ""} <span className="badge brand">{t("peopleN", { n: d.people })}</span></p>
             {(() => { const h = stayHotel(p, d.opt); const o = optionOf(d.opt); return <p className="text-ink-2">{h ? `${n(h.name)} · ${o && !o.hotel ? n(o.sub) : n(h.room)}` : o?.none ? n(o.name) : t("noHotel")}</p>; })()}
             <p className="text-ink-2">{t("pick")} · {d.pick ? n(d.pick.name) : "-"} · {t("wishAt", { t: d.pickTime ?? "-" })}</p>
             <div className="mt-1 flex items-baseline justify-between border-t border-line pt-3">

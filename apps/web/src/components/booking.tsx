@@ -61,7 +61,7 @@ export function Calendar({ ym, onMonth, minYm, maxYm, cell, selected, onPick }: 
                 className={`relative mx-auto flex h-[54px] w-full max-w-[52px] flex-col items-center justify-center rounded-xl leading-tight transition-colors ${sel ? "bg-brand text-brand-ink" : c.disabled ? "text-line-strong" : "hover:bg-brand-soft"}`}
               >
                 <span className={`num text-[15px] font-bold ${d === today && !sel ? "underline decoration-2 underline-offset-4" : ""}`}>{i + 1}</span>
-                {c.sub && <span className={`num text-[10.5px] font-semibold ${sel ? "text-brand-ink" : "text-muted"}`}>{c.sub}</span>}
+                {c.sub && <span className={`num whitespace-nowrap text-[10.5px] font-semibold tracking-[-0.03em] ${sel ? "text-brand-ink" : "text-muted"}`}>{c.sub}</span>}
                 {c.dot && <span className={`absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full ${sel ? "bg-brand-ink" : "bg-ok-bg"}`} />}
               </button>
             );
@@ -190,15 +190,15 @@ export function PkgCard({ p, date, d, seats, onOpen, cmp, onCmp, showCmp, i = 0 
     >
       {/* 10 (팀 테스트 10/23): 카드 높이 맞춤 — 사진 비율 고정, 이름 2줄·숙소 1줄 말줄임, 가격 줄은 카드 아래 */}
       <button onClick={onOpen} className="flex w-full flex-1 flex-col text-left">
-        <div className="relative aspect-[16/9] w-full flex-none overflow-hidden">
-          <Img src={p.photos[0]} alt={n(p.name)} className="transition-transform duration-500 group-hover:scale-[1.03]" />
+        <div className="relative aspect-[16/10] w-full flex-none overflow-hidden">
+          <Img src={p.photos[0]} alt={n(p.name)} className="transition-transform duration-500 group-hover:scale-[1.04]" />
         </div>
         <div className="grid gap-2 p-4 pb-2">
-          <h3 className="line-clamp-2 min-h-[2.75em] text-[16.5px] font-bold leading-snug">{n(p.name)}</h3>
+          <h3 className="line-clamp-2 min-h-[2.75em] text-[17px] font-extrabold leading-snug">{n(p.name)}</h3>
           <PkgTags p={p} seats={d ? seats ?? 0 : undefined} />
           <p className="flex min-w-0 items-center gap-1.5 text-[13px] text-ink-2">
             <Bed size={15} className="flex-none text-muted" />
-            <span className="truncate">{h ? `${n(h.name)} · ${n(h.near)}` : t("noHotel")}</span>
+            <span className="min-w-0">{h ? `${n(h.name)} · ${n(h.near)}` : t("noHotel")}</span>
           </p>
           <p className="text-[13px] text-muted">{d ? (date ? t("onDate", { d: fShort(d, L) }) : t("earliest", { d: fShort(d, L) })) : "-"}</p>
         </div>
@@ -228,24 +228,26 @@ export function PriceDetail({ p, opt, people, singles }: { p: Pkg; opt: string |
   const price = totalPrice(p, opt, people, singles);
   const r = price.rooms ?? (h ? roomsOf(people, singles) : null);
   const add = o?.add ?? 0;
-  const Row = ({ k, sub, v, ok }: { k: string; sub?: string; v: string; ok?: boolean }) => (
+  const Row = ({ k, sub, v, ok }: { k: string; sub?: (string | null | undefined)[]; v: string; ok?: boolean }) => (
     <li className="flex justify-between gap-3">
-      <span className="min-w-0 text-ink-2">{k}{sub && <span className="block text-[12px] text-muted">{sub}</span>}</span>
+      <span className="min-w-0 text-ink-2">{k}{sub?.filter(Boolean).map((s, i) => <span key={i} className="block text-[12px] text-muted">{s}</span>)}</span>
       <span className={`num flex-none font-semibold ${ok ? "text-ok" : ""}`}>{v}</span>
     </li>
   );
   const incl = [t("pdGolf", { r: rounds(p) }), p.nights ? t("pdStay", { n: p.nights }) : null].filter(Boolean).join(" · ");
+  // 호텔 줄: 호텔·객실·방 구성은 설명 한 줄, 금액은 합계만 (1인 차액은 설명 둘째 줄). 1인실이 없으면 객실 줄은 숨김
+  const stay = h ? [n(h.name), o && !o.hotel ? n(o.sub) : n(h.room), r ? t("roomsSum0", { t: r.twins }) : null].filter(Boolean).join(" · ") : o ? n(o.sub) : null;
   return (
     <ul className="grid gap-2 text-[13.5px] lg:text-[14px]">
-      <Row k={t("lineBase", { p: yen(p.price), n: people })} sub={t("pdIncl", { s: incl })} v={yen(p.price * people)} />
-      {/* 호텔: 옵션이 있으면 고른 옵션과 차액(기본은 ¥0), 고정 호텔은 포함, 당일은 숙박 없음 ¥0 */}
-      {p.opts.length > 0 ? (
-        <Row k={`${t("rowHotel")} · ${n(o?.name ?? { ko: "-", ja: "-" })}`} sub={h ? `${n(h.name)} · ${o && !o.hotel ? n(o.sub) : n(h.room)}` : o ? n(o.sub) : undefined} v={add === 0 ? `${yen(0)} (${t("base")})` : `${yenDiff(add)} × ${people} = ${yenDiff(add * people)}`} />
-      ) : (
-        <Row k={`${t("rowHotel")} · ${h ? n(h.name) : t("noHotel")}`} v={`${yen(0)}${h ? ` (${t("included")})` : ""}`} />
-      )}
-      {r && <Row k={`${t("rowRooms")} · ${t(r.singles ? "roomsSum" : "roomsSum0", { t: r.twins, s: r.singles })}`} sub={r.singles ? t("lineSingle", { p: yen(SET.SINGLE_ADD), n: r.singles }) : t("pdNoSingle")} v={r.singles ? yen(r.singles * SET.SINGLE_ADD) : yen(0)} />}
-      <Row k={t("lineBus")} sub={t("pdBusSub")} v={`${yen(0)} (${t("included")})`} ok />
+      <Row k={t("lineBase", { p: yen(p.price), n: people })} sub={[t("pdIncl", { s: incl })]} v={yen(p.price * people)} />
+      {/* 숙박 없는 당일 패키지는 호텔 줄을 빼요 (¥0 줄 없음) */}
+      {(h || p.opts.length > 0 || add) ? (
+        <Row k={t("rowHotel")}
+             sub={[stay, add ? `${t("perPerson")} ${yenDiff(add)} × ${people}` : null]}
+             v={add ? yenDiff(add * people) : h ? t("included") : yen(0)} />
+      ) : null}
+      {r?.singles ? <Row k={t("rowSingle")} sub={[t("lineSingle", { p: yen(SET.SINGLE_ADD), n: r.singles })]} v={yen(r.singles * SET.SINGLE_ADD)} /> : null}
+      <Row k={t("lineBus")} sub={[t("pdBusSub")]} v={t("included")} ok />
     </ul>
   );
 }

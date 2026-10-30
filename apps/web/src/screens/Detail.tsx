@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { motion } from "motion/react";
 import { ArrowSquareOut, Bed, Bus, CaretDown, CheckCircle, Flag, Info, MapPin, MinusCircle, Star, Sun, Warning } from "@phosphor-icons/react";
-import { AREA_NAME, SET, hotelOf, pkgOf, type Pkg } from "../data";
+import { AREA_NAME, SET, courseOf, hotelOf, pkgOf, type Pkg } from "../data";
 import { useT } from "../i18n";
 import { useDb, useDraft } from "../store";
 import { useDepartures } from "../api/sync";
@@ -147,9 +147,7 @@ function DetailInner({ p }: { p: Pkg }) {
           <p className="num text-[14px] font-bold">{fDate(dep, L)} ~ {fShort(tripEnd(p, dep), L)}</p>
           {(
             <>
-              <div className="flex items-center justify-between gap-2 text-[12.5px]">
-                <span className="text-ink-2">{t("M-121", { a: v.booked, b: d.people, t: v.sum, m: SET.MIN_DEPARTURE })}</span>
-              </div>
+              <MeterHead total={v.sum} ours={d.people} />
               <Meter now={v.booked} add={Math.min(d.people, v.seats)} />
               <DepStateText v={v} dep={dep} />
             </>
@@ -177,7 +175,7 @@ function DetailInner({ p }: { p: Pkg }) {
               <span className="text-[12.5px] text-muted">{t(`typeDesc_${p.type}`)}</span>
             </div>
             <p className="rounded-xl bg-surface-2 px-3 py-2 text-[12.5px] leading-relaxed text-ink-2">{t(`typeLong_${p.type}`)}</p>
-            <h1 className="text-[23px] font-bold leading-snug tracking-tight lg:text-[30px]">{n(p.name)}</h1>
+            <h1 className="text-[24px] font-black leading-snug tracking-tight lg:text-[32px]">{n(p.name)}</h1>
             <PkgTags p={p} />
             <p className="text-[14.5px] leading-relaxed text-ink-2">{n(p.short)}</p>
           </section>
@@ -215,10 +213,11 @@ function DetailInner({ p }: { p: Pkg }) {
             <div className="grid gap-2">
               {itin.map((items, i) => (
                 <div key={i} className="card overflow-hidden">
-                  <button className="flex w-full items-center gap-3 px-4 py-3.5 text-left" aria-expanded={openDays[i]} onClick={() => setOpenDays(openDays.map((o, j) => (j === i ? !o : o)))}>
+                  <button className="flex w-full items-center gap-3 px-3 py-3 text-left" aria-expanded={openDays[i]} onClick={() => setOpenDays(openDays.map((o, j) => (j === i ? !o : o)))}>
+                    <span className="relative h-14 w-14 flex-none overflow-hidden rounded-xl"><Img src={p.days[i] ? courseOf(p.days[i]!.course).photo : p.photos[Math.min(i, p.photos.length - 1)]} alt="" className="absolute inset-0 h-full w-full" /></span>
                     <b className="text-[15px]">{t("dayN", { i: i + 1 })}</b>
                     {dep && <span className="num text-[13px] font-semibold text-brand">{fShort(addDays(dep, i), L)}</span>}
-                    <span className="min-w-0 flex-1 truncate text-[13px] text-muted">{items.filter((x) => x.kind === "golf").map((x) => x.title[L].split(/ · |・/)[0]).join(", ") || items[0]?.title[L]}</span>
+                    <span className="min-w-0 flex-1 text-[13px] text-muted">{items.filter((x) => x.kind === "golf").map((x) => x.title[L].split(/ · |・/)[0]).join(", ") || items[0]?.title[L]}</span>
                     <CaretDown size={16} className={`transition-transform ${openDays[i] ? "rotate-180" : ""}`} />
                   </button>
                   <Collapse open={openDays[i]}>
@@ -378,14 +377,25 @@ export function ItinList({ items, memo }: { items: ItinItem[]; memo?: string }) 
   );
 }
 
+// 모집 막대: 최소 출발 인원까지를 한 칸으로 (다 차면 출발). 진한 보라 = 이미 모인 인원, 연한 보라 = 우리 인원
 export function Meter({ now, add }: { now: number; add: number }) {
-  const pct = (x: number) => `${Math.min(100, (x / SET.BUS_SEATS) * 100)}%`;
+  const pct = (x: number) => `${Math.min(100, (x / SET.MIN_DEPARTURE) * 100)}%`;
   return (
-    <div className="meter" role="img" aria-label={`${now + add}/${SET.BUS_SEATS}`}>
-      <motion.div className="fill" initial={{ width: 0 }} animate={{ width: pct(now) }} transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }} />
-      <motion.div className="add" initial={false} animate={{ left: pct(now), width: pct(Math.min(add, SET.BUS_SEATS - now)) }} transition={{ duration: 0.5 }} />
-      <div className="goal" style={{ left: `min(${pct(SET.MIN_DEPARTURE)}, calc(100% - 2px))` }} />
+    <div className="relative h-2 overflow-hidden rounded-full bg-line" role="img" aria-label={`${now + add}/${SET.MIN_DEPARTURE}`}>
+      <motion.div className="absolute inset-y-0 left-0 rounded-full bg-brand-line" initial={false} animate={{ width: pct(now + add) }} transition={{ duration: 0.5 }} />
+      <motion.div className="absolute inset-y-0 left-0 rounded-full bg-brand" initial={{ width: 0 }} animate={{ width: pct(now) }} transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }} />
     </div>
+  );
+}
+
+// 모집 현황 한 줄: 왼쪽 '모집 현황 · 우리 n명 포함', 오른쪽 '모인 인원 / 최소 인원'
+export function MeterHead({ total, ours }: { total: number; ours: number }) {
+  const { t } = useT();
+  return (
+    <p className="flex items-center justify-between gap-2 text-[13px] font-bold">
+      <span>{t("recruitRow", { b: ours })}</span>
+      <span className="num flex-none">{total} / {SET.MIN_DEPARTURE}{t("peopleUnit")}</span>
+    </p>
   );
 }
 
@@ -400,17 +410,18 @@ function Gallery({ p, loading }: { p: Pkg; loading: boolean }) {
     root.querySelectorAll("[data-i]").forEach((el) => io.observe(el));
     return () => io.disconnect();
   }, [p.id, loading]);
-  if (loading) return <div className="skel -mx-4 aspect-[4/3] rounded-none lg:mx-0 lg:aspect-[16/9] lg:rounded-[20px]" />;
+  if (loading) return <div className="skel -mx-4 h-[320px] rounded-none lg:mx-0 lg:h-[440px] lg:rounded-[22px]" />;
   return (
     <div className="relative -mx-4 lg:mx-0">
-      <div ref={ref} className="hscroll gap-0 lg:rounded-[20px]" aria-roledescription="carousel">
+      <div ref={ref} className="hscroll gap-0 lg:gap-2 lg:rounded-[22px]" aria-roledescription="carousel">
         {p.photos.map((src, i) => (
-          <div key={src} data-i={i} className="aspect-[4/3] w-full lg:aspect-[16/9]">
+          <div key={src} data-i={i} className="h-[320px] w-full flex-none lg:h-[440px] lg:w-[calc(50%-4px)]">
             <Img src={src} alt={`${n(p.name)} ${t("photoN", { i: i + 1 })}`} eager={i === 0} />
           </div>
         ))}
       </div>
-      <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1.5" aria-hidden="true">
+      <span className="num absolute bottom-3 right-3 rounded-full bg-[rgba(20,23,31,0.7)] px-2.5 py-1 text-[12px] font-bold text-white">{t("photosN", { n: p.photos.length })}</span>
+      <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1.5 lg:hidden" aria-hidden="true">
         {p.photos.map((_, i) => <span key={i} className={`h-1.5 rounded-full bg-white transition-all ${i === idx ? "w-5 opacity-100" : "w-1.5 opacity-60"}`} />)}
       </div>
     </div>

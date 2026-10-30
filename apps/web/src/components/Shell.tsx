@@ -43,7 +43,7 @@ function LangToggle() {
   );
 }
 
-// 공통 헤더 (운영사 확정: 본 사이트 헤더·푸터를 공유하지 않고 서비스 자체 헤더 + 주 메뉴, 푸터 없음)
+// 공통 헤더 (운영사 확정: 본 사이트 헤더·푸터를 공유하지 않고 서비스 자체 헤더 + 주 메뉴, 푸터 없음). 본 사이트 틀은 10/30 일단 되돌림 (SiteFrame.tsx 보관)
 export function Header() {
   const { t } = useT();
   const nav = useNavigate();
@@ -60,7 +60,7 @@ export function Header() {
   const goMy = () => nav(user ? "/golf/my" : `/login?next=${encodeURIComponent("/golf/my")}`);
   const tabs: [string, string, () => void][] = [
     ["/golf", t("golfHome"), () => nav("/golf")],
-    ["/golf/packages", t("allPkgs"), () => nav("/golf/packages")],
+    ["/golf/packages", t("tabPkgs"), () => nav("/golf/packages")],
     ["/golf/my", t("myBookings"), goMy],
     ["/golf/support", t("support"), () => nav("/golf/support")],
   ];
@@ -75,7 +75,7 @@ export function Header() {
           </button>
           <LangToggle />
           {user ? (
-            <button onClick={() => nav("/golf/my")} className="max-w-[92px] truncate whitespace-nowrap rounded-full border-[1.5px] border-line px-2.5 py-1.5 text-[13px] font-bold" title={t("myBookings")}>
+            <button onClick={() => nav("/golf/my")} className="hidden max-w-[120px] truncate whitespace-nowrap rounded-full sm:block border-[1.5px] border-line px-2.5 py-1.5 text-[13px] font-bold" title={t("myBookings")}>
               {t("nameSuffix", { n: user.nameKo })}
             </button>
           ) : null}
@@ -89,9 +89,9 @@ export function Header() {
         </div>
         {/* 주 메뉴 */}
         {showGolfTabs(loc.pathname) && (
-          <nav className="mx-auto flex max-w-[480px] gap-1 overflow-x-auto px-3 lg:max-w-[1200px] lg:px-5" aria-label={t("golfMenu")} style={{ scrollbarWidth: "none" }}>
+          <nav className="mx-auto flex max-w-[480px] justify-between overflow-x-auto px-2 lg:max-w-[1200px] lg:justify-start lg:px-5" aria-label={t("golfMenu")} style={{ scrollbarWidth: "none" }}>
             {tabs.map(([to, label, go]) => (
-              <button key={to} onClick={go} aria-current={activeTab === to ? "page" : undefined} className={`relative flex-none px-2.5 pb-2.5 pt-1 text-[14px] font-bold ${activeTab === to ? "text-brand" : "text-muted hover:text-ink"}`}>
+              <button key={to} onClick={go} aria-current={activeTab === to ? "page" : undefined} className={`relative flex-none px-1.5 pb-2.5 pt-1 text-[13.5px] font-bold sm:px-2 lg:px-2.5 lg:text-[14px] ${activeTab === to ? "text-brand" : "text-muted hover:text-ink"}`}>
                 {label}
                 {activeTab === to && <motion.span layoutId="golf-tab" className="absolute inset-x-2 bottom-0 h-[2.5px] rounded-full bg-brand" />}
               </button>
