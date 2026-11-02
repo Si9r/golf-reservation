@@ -881,6 +881,7 @@ def test_ops_alert_judge_has_departure(monkeypatch):  # 출발 판정 실패 알
     from app.adapters import mail as M
     from app.config import env
     from app.db import tx as _tx
+    from app import settings as S
 
     rec = MailRec()
     monkeypatch.setattr(M, "mail", rec)
@@ -889,5 +890,5 @@ def test_ops_alert_judge_has_departure(monkeypatch):  # 출발 판정 실패 알
         M.alert_ops(c, None, "출발 판정 실패", "오류: RuntimeError: x", "B-01 을 다시 실행", about=SITE_DEP)
         M.alert_ops(c, None, "출발 판정 실패", "오류: RuntimeError: y", about="NO-SUCH-DEP")
     (s1, b1), (s2, b2) = [(s, b) for to, s, b in rec.sent if to == "ops@example.jp"][-2:]
-    assert SITE_DEP in s1 and "■ 출발편" in b1 and "최소 출발 20명" in b1 and "판정일" in b1 and "B-01 을 다시 실행" in b1
+    assert SITE_DEP in s1 and "■ 출발편" in b1 and f"최소 출발 {S.MIN_DEPARTURE}명" in b1 and "판정일" in b1 and "B-01 을 다시 실행" in b1
     assert "NO-SUCH-DEP" in s2 and "오류: RuntimeError: y" in b2 and "■ 출발편" not in b2
