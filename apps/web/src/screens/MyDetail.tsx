@@ -145,7 +145,7 @@ export default function MyDetail() {
           {alive && v.label !== "GO" && (
             <div className="grid gap-1.5">
               <Meter now={v.booked} add={0} />
-              <span className={`num text-right text-[13px] font-semibold ${tone.ink}`}>{v.booked} / {SET.MIN_DEPARTURE}{L === "ko" ? "명" : "名"}</span>
+              <span className={`num text-right text-[13px] font-semibold ${tone.ink}`}>{v.booked >= SET.MIN_DEPARTURE ? t("countOk", { n: v.booked }) : `${v.booked} / ${SET.MIN_DEPARTURE}${t("peopleUnit")}`}</span>
             </div>
           )}
         </section>

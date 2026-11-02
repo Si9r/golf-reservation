@@ -180,6 +180,8 @@ const ko = {
   checks: "{min}명 미만이면 취소·전액 환불|승하차는 삿포로 시내에서만 가능|변경·취소는 고객센터|골프채 렌탈은 골프장에 문의",
   reserve: "이 패키지 예약",
   pickDepFirst: "출발일을 골라 주세요",
+  countOk: "{n}명 충족",
+  countOkOurs: "{t}명 충족 (우리 {b}명 포함)",
   editBack: "변경 완료 · 확인으로",
   // ---------- S-04 ----------
   cmpTitle: "패키지 비교",
@@ -630,6 +632,8 @@ const ja: Dict = {
   checks: "{min}名未満の場合は催行中止・全額返金|乗降は札幌市内のみ|変更・キャンセルはお問い合わせ窓口へ|ゴルフクラブのレンタルはゴルフ場へお問い合わせ",
   reserve: "このパッケージを予約",
   pickDepFirst: "出発日を選んでください",
+  countOk: "{n}名達成",
+  countOkOurs: "{t}名達成（お客様{b}名を含む）",
   editBack: "変更完了・確認へ",
   cmpTitle: "パッケージ比較",
   cmpType: "タイプ",

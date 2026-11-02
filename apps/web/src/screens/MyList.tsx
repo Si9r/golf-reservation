@@ -58,7 +58,7 @@ export default function MyList() {
     const h = stayHotel(v.p, b.opt);
     return h ? n(h.name) : t("noHotel");
   };
-  const count15 = (r: Row) => `${r.v.booked} / ${SET.MIN_DEPARTURE}${t("peopleUnit")}`;
+  const count15 = (r: Row) => (r.v.booked >= SET.MIN_DEPARTURE ? t("countOk", { n: r.v.booked }) : `${r.v.booked} / ${SET.MIN_DEPARTURE}${t("peopleUnit")}`);
   const Bar = ({ pct }: { pct: number }) => (
     <span className="block h-2 overflow-hidden rounded-full bg-surface-2"><span className="block h-full rounded-full bg-brand" style={{ width: `${pct}%` }} /></span>
   );

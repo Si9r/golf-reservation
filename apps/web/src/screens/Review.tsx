@@ -153,7 +153,7 @@ export default function Review() {
             <Anno n={3} t="출발 조건 (M-150 + L-04 현황): 남은 인원·막대·확정 날짜와 미달 시 전액 환불을 한 상자로" />
             <h2 className="flex items-center gap-2 text-[16px] font-extrabold text-warn lg:text-[18px]"><UsersThree size={20} weight="fill" /> {need > 0 ? t("rvNeed", { n: need }) : t("rvFull", { m: SET.MIN_DEPARTURE })}</h2>
             <div className="my-2.5"><Meter now={v.booked} add={Math.min(d.people, v.seats)} /></div>
-            <p className="text-[13px] text-ink-2 lg:text-[14px]">{t("M-121", { a: v.booked, b: d.people, t: v.sum, m: SET.MIN_DEPARTURE })}</p>
+            <p className="text-[13px] text-ink-2 lg:text-[14px]">{need > 0 ? t("M-121", { a: v.booked, b: d.people, t: v.sum, m: SET.MIN_DEPARTURE }) : t("countOkOurs", { t: v.sum, b: d.people })}</p>
             <p className="mt-1.5 text-[13.5px] font-semibold leading-relaxed text-ink lg:text-[15px]">{t(need > 0 ? "rvRule" : "rvRuleFull", { d: fDayLong(judgeDate(dep), L), m: SET.MIN_DEPARTURE })}</p>
           </section>
 

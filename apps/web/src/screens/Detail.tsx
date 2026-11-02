@@ -381,7 +381,7 @@ export function ItinList({ items, memo }: { items: ItinItem[]; memo?: string }) 
 export function Meter({ now, add }: { now: number; add: number }) {
   const pct = (x: number) => `${Math.min(100, (x / SET.MIN_DEPARTURE) * 100)}%`;
   return (
-    <div className="relative h-2 overflow-hidden rounded-full bg-line" role="img" aria-label={`${now + add}/${SET.MIN_DEPARTURE}`}>
+    <div className="relative h-2 overflow-hidden rounded-full bg-line" role="img" aria-label={`${Math.min(now + add, SET.MIN_DEPARTURE)}/${SET.MIN_DEPARTURE}`}>
       <motion.div className="absolute inset-y-0 left-0 rounded-full bg-brand-line" initial={false} animate={{ width: pct(now + add) }} transition={{ duration: 0.5 }} />
       <motion.div className="absolute inset-y-0 left-0 rounded-full bg-brand" initial={{ width: 0 }} animate={{ width: pct(now) }} transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }} />
     </div>
@@ -394,7 +394,7 @@ export function MeterHead({ total, ours }: { total: number; ours: number }) {
   return (
     <p className="flex items-center justify-between gap-2 text-[13px] font-bold">
       <span>{t("recruitRow", { b: ours })}</span>
-      <span className="num flex-none">{total} / {SET.MIN_DEPARTURE}{t("peopleUnit")}</span>
+      <span className="num flex-none">{total >= SET.MIN_DEPARTURE ? t("countOk", { n: total }) : `${total} / ${SET.MIN_DEPARTURE}${t("peopleUnit")}`}</span>
     </p>
   );
 }
