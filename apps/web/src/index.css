@@ -141,7 +141,7 @@ button:disabled { cursor: not-allowed; }
 .btn:active:not(:disabled) { transform: scale(0.98); }
 .btn-primary { background: var(--brand); color: var(--brand-ink); }
 .btn-primary:hover:not(:disabled) { background: var(--brand-hover); }
-.btn-primary:disabled { background: var(--surface-2); color: var(--muted); box-shadow: inset 0 0 0 1.5px var(--line); }
+.btn-primary:disabled, .btn-primary[aria-disabled="true"], .btn-primary[aria-disabled="true"]:hover { background: var(--surface-2); color: var(--muted); box-shadow: inset 0 0 0 1.5px var(--line); } /* aria-disabled: 비활성으로 보이지만 누르면 부족한 항목을 알려 줌 */
 .btn-ghost { background: var(--surface); color: var(--ink); border: 1.5px solid var(--line-strong); }
 .btn-ghost:hover:not(:disabled) { border-color: var(--brand); color: var(--brand); }
 .btn-soft { background: var(--brand-soft); color: var(--brand); }

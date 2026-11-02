@@ -142,7 +142,7 @@ export function PeopleInput({ value, unset, onChange, error, max = SET.MAX_PEOPL
           <Plus size={18} weight="bold" />
         </button>
       </div>
-      {msg && <p id={`${id}-h`} className="err">{msg}</p>}
+      {msg && <p id={`${id}-h`} className="err" role="alert">{msg}</p>}
     </div>
   );
 }

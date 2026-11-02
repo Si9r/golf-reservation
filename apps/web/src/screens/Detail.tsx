@@ -65,6 +65,9 @@ function DetailInner({ p }: { p: Pkg }) {
   const mapPlace = mapKey === "all" ? null : places.find((x) => x.key === mapKey) ?? null;
   const markers = useMemo<MapMarker[]>(() => places.map((x) => ({ lat: x.lat, lng: x.lng, title: `${x.label} · ${x.role}`, kind: x.kind, glyph: x.glyph })), [p.id, hotel?.id, L]); // eslint-disable-line react-hooks/exhaustive-deps
   const reserveRef = useRef<HTMLDivElement>(null);
+  const peopleRef = useRef<HTMLDivElement>(null);
+  const depRef = useRef<HTMLDivElement>(null);
+  const [showMissing, setShowMissing] = useState(false); // 비활성 버튼을 누른 뒤부터 부족한 항목 표시
   const guard = useSeatGuard();
   // B-01: 다음 단계에서 잔여석이 바뀐 것을 알고 돌아온 경우 (M-128). 출발일을 다시 고르면 사라짐
   const [seatNotice] = useState(() => takeSeatNotice(p.id));
@@ -82,7 +85,8 @@ function DetailInner({ p }: { p: Pkg }) {
   });
   const go = () => {
     if (!canGo) {
-      reserveRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      setShowMissing(true);
+      (d.peopleSet ? depRef : peopleRef).current?.scrollIntoView({ behavior: "smooth", block: "center" }); // 첫 번째로 부족한 항목으로
       return;
     }
     // 예약 전 확인은 맨 아래라 지나치기 쉬워서 넘어가기 전에 한 번 보여 줌 (11/2). 확인 화면에서 돌아온 경우는 이미 봤으니 생략
@@ -109,9 +113,11 @@ function DetailInner({ p }: { p: Pkg }) {
         {t("weekdays", { w: p.wd.map((x) => dowNames(L)[x]).join("·") })}
       </p>
       {/* 3 인원 (출발일 목록과 같은 칸) */}
-      <PeopleInput label={t("people")} value={d.people} unset={!d.peopleSet} onChange={(x) => d.patch({ people: x, peopleSet: true })} anno={<Anno n={3} t="인원 (V-02): 바꾸면 고를 수 있는 날짜가 바로 바뀜" />} />
+      <div ref={peopleRef}>
+        <PeopleInput label={t("people")} value={d.people} unset={!d.peopleSet} error={showMissing && !d.peopleSet ? t("peoplePh") : null} onChange={(x) => d.patch({ people: x, peopleSet: true })} anno={<Anno n={3} t="인원 (V-02): 바꾸면 고를 수 있는 날짜가 바로 바뀜" />} />
+      </div>
       {/* 4 월 탭 + 출발일 목록 */}
-      <div className="relative grid gap-2.5">
+      <div ref={depRef} className="relative grid gap-2.5">
         <Anno n={4} t="월 탭 + 출발일 목록 (L-01·L-02·L-04): 현재 n명 / 최소 20명, 잔여석, 20명 이상 '인원 충족', 잔여석 < 인원이면 선택 불가 (T-29)" />
         <div className="hscroll -mx-1 px-1" role="tablist" aria-label={t("depSelect")}>
           {months.map((m) => (
@@ -143,6 +149,7 @@ function DetailInner({ p }: { p: Pkg }) {
           })}
         </div>
         {seatErr && <p className="err" role="alert">{seatErr}</p>}
+        {showMissing && !dep && !seatChanged && <p className="err" role="alert">{t("pickDepFirst")}</p>}
       </div>
       {/* 5 출발 확정 막대 */}
       {dep && v && (
@@ -158,7 +165,7 @@ function DetailInner({ p }: { p: Pkg }) {
           )}
         </motion.div>
       )}
-      <button className="btn btn-primary hidden w-full lg:inline-flex" disabled={!canGo} onClick={go}>{btnLabel}</button>
+      <button className="btn btn-primary hidden w-full lg:inline-flex" aria-disabled={!canGo} onClick={go}>{btnLabel}</button>
     </div>
   );
 
@@ -326,9 +333,9 @@ function DetailInner({ p }: { p: Pkg }) {
       {/* 11 하단 예약 버튼 (모바일) */}
       <div className="lg:hidden">
         <BottomBar>
-          <span className="absolute -top-3 left-3"><Anno n={11} t="하단 예약 버튼: 출발일 선택 + 잔여석 ≥ 인원일 때만 '이 패키지 예약', S-08에서 왔으면 '변경 완료 · 확인으로'" /></span>
+          <span className="absolute -top-3 left-3"><Anno n={11} t="하단 예약 버튼: 출발일 선택 + 잔여석 ≥ 인원일 때만 '이 패키지 예약', S-08에서 왔으면 '변경 완료 · 확인으로'. 비활성일 때 누르면 부족한 항목(인원·출발일)을 빨간 글씨로 표시하고 그곳으로 이동" /></span>
           <PriceBlock main={`${yen(p.price)}~`} sub={dep && d.peopleSet ? `${fShort(dep, L)} · ${t("peopleN", { n: d.people })} · ${t("busIncl")}` : `${t("perPerson")} · ${t("busIncl")}`} />
-          <button className="btn btn-primary min-w-[150px]" disabled={!canGo} onClick={go}>{btnLabel}</button>
+          <button className="btn btn-primary min-w-[150px]" aria-disabled={!canGo} onClick={go}>{btnLabel}</button>
         </BottomBar>
       </div>
       <Sheet open={checksOpen} onClose={() => setChecksOpen(false)} title={t("checksT")}>
