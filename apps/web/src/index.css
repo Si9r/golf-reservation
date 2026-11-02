@@ -121,7 +121,7 @@ button:disabled { cursor: not-allowed; }
 .page.flush-top { padding-top: 0; }
 @media (min-width: 1024px) {
   .page.wide { max-width: 1200px; padding: 28px 24px 120px; }
-  .page.step { max-width: 1160px; padding: 24px 24px 140px; } /* 예약 단계 화면: PC에서 넓게 (원래 760px) */
+  .page.step { max-width: 1200px; padding: 24px 24px 140px; } /* 예약 단계 화면: PC에서 넓게, 패키지 상세(.wide)와 같은 폭 (11/2) */
   .page.step.narrow .step-body { max-width: 832px; margin: 0 auto; } /* 한 줄 배치 단계(호텔·승하차 PC): 진행 단계 줄은 다른 단계와 같은 위치, 본문만 좁게 */
 }
 

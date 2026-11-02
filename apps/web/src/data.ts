@@ -177,7 +177,7 @@ export interface Round {
 export interface Pkg {
   id: number;
   rec?: boolean;
-  type: "multi" | "stay" | "day"; // package.type: multi = n색 골프(매일 다른 골프장), stay = 체류형, day = 당일
+  type: "multi" | "stay" | "day"; // package.type: multi = 매일 다른 골프장, stay = 한 곳에 머묾, day = 당일. 화면에는 표시하지 않음 (11/2), AI 추천에서만 씀
   name: L2;
   short: L2;
   nights: number;

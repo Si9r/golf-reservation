@@ -7,8 +7,8 @@ import { useT } from "../i18n";
 import { useDb, useDraft } from "../store";
 import { useDepartures } from "../api/sync";
 import { addDays, coursesOf, departuresIn, depView, dowNames, fDate, fDayLong, fMonth, fMonthShort, fShort, hasHotelStep, itinerary, judgeDate, monthInSeason, monthsAhead, optionOf, prevAt, todayISO, tripEnd, yen, yenDiff, ymOf, type ItinItem } from "../logic";
-import { Anno, BottomBar, Collapse, ErrorBanner, gmapLink, Img, PeopleInput, PriceBlock, Q, ScreenTag, StepHead, useFakeLoad } from "../components/ui";
-import { PkgTags, TypeBadge } from "../components/booking";
+import { Anno, BottomBar, Collapse, ErrorBanner, gmapLink, Img, PeopleInput, PriceBlock, Q, ScreenTag, Sheet, StepHead, useFakeLoad } from "../components/ui";
+import { PkgTags } from "../components/booking";
 import { LegRow, MapView, type MapMarker } from "../components/GoogleMap";
 import { takeSeatNotice, useSeatGuard } from "../api/seatCheck";
 
@@ -68,22 +68,26 @@ function DetailInner({ p }: { p: Pkg }) {
   const guard = useSeatGuard();
   // B-01: 다음 단계에서 잔여석이 바뀐 것을 알고 돌아온 경우 (M-128). 출발일을 다시 고르면 사라짐
   const [seatNotice] = useState(() => takeSeatNotice(p.id));
+  const [checksOpen, setChecksOpen] = useState(false);
   const seatChanged = seatNotice && !dep;
   useEffect(() => {
     if (seatChanged) window.setTimeout(() => reserveRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 300);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // B-01: 넘어가기 전에 잔여석·판정일을 다시 확인 (api/seatCheck.ts)
+  const proceed = () => guard(() => {
+    if (d.editReturn) nav("/golf/book/review"); // T-28
+    else nav(hasHotelStep(p) ? "/golf/book/hotel" : "/golf/book/place"); // T-06 / T-07 (숙박 있는 패키지는 옵션이 없어도 S-05)
+  });
   const go = () => {
     if (!canGo) {
       reserveRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
-    // B-01: 넘어가기 전에 잔여석·판정일을 다시 확인 (api/seatCheck.ts)
-    guard(() => {
-      if (d.editReturn) nav("/golf/book/review"); // T-28
-      else nav(hasHotelStep(p) ? "/golf/book/hotel" : "/golf/book/place"); // T-06 / T-07 (숙박 있는 패키지는 옵션이 없어도 S-05)
-    });
+    // 예약 전 확인은 맨 아래라 지나치기 쉬워서 넘어가기 전에 한 번 보여 줌 (11/2). 확인 화면에서 돌아온 경우는 이미 봤으니 생략
+    if (d.editReturn) proceed();
+    else setChecksOpen(true);
   };
   const btnLabel = d.editReturn ? t("editBack") : !d.peopleSet ? t("peoplePh") : dep ? t("reserve") : t("pickDepFirst");
 
@@ -167,14 +171,9 @@ function DetailInner({ p }: { p: Pkg }) {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-10">
         <div className="grid gap-5 lg:col-start-1 lg:row-start-1">
           <Gallery p={p} loading={load.loading} />
-          {/* 1 유형·이름·태그·설명 */}
+          {/* 1 이름·태그·설명 */}
           <section className="relative grid gap-2.5">
-            <Anno n={1} t="사진·유형(n색/체류형/당일) + 유형 설명 한 줄·이름·태그(기간·라운드·호텔)·설명" />
-            <div className="flex flex-wrap items-center gap-2">
-              <TypeBadge p={p} />
-              <span className="text-[12.5px] text-muted">{t(`typeDesc_${p.type}`)}</span>
-            </div>
-            <p className="rounded-xl bg-surface-2 px-3 py-2 text-[12.5px] leading-relaxed text-ink-2">{t(`typeLong_${p.type}`)}</p>
+            <Anno n={1} t="사진·이름·태그(기간·라운드·호텔)·설명" />
             <h1 className="text-[24px] font-black leading-snug tracking-tight lg:text-[32px]">{n(p.name)}</h1>
             <PkgTags p={p} />
             <p className="text-[14.5px] leading-relaxed text-ink-2">{n(p.short)}</p>
@@ -332,6 +331,10 @@ function DetailInner({ p }: { p: Pkg }) {
           <button className="btn btn-primary min-w-[150px]" disabled={!canGo} onClick={go}>{btnLabel}</button>
         </BottomBar>
       </div>
+      <Sheet open={checksOpen} onClose={() => setChecksOpen(false)} title={t("checksT")}>
+        <ul className="grid list-disc gap-2 pl-5 text-[14px] text-ink-2">{list("checks").map((x) => <li key={x}>{x}</li>)}</ul>
+        <button className="btn btn-primary mt-5 w-full" onClick={() => { setChecksOpen(false); proceed(); }}>{t("checksOk")}</button>
+      </Sheet>
     </div>
   );
 }

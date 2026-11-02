@@ -62,29 +62,31 @@ export default function List() {
         </button>
       </div>
 
-      {/* 4~7 필터·정렬 */}
+      {/* 4~6 필터 (정렬은 결과 수 옆) */}
       <div className="-mx-4 mb-2 mt-3">
         <div className="hscroll px-4 py-2">
           <span className="grid h-9 w-7 place-items-center text-muted" aria-hidden="true"><SlidersHorizontal size={18} /></span>
-          {(Object.keys(OPTS) as FKey[]).map((k) => {
-            const on = k === "sort" ? filters.sort !== "rec" : filters[k] !== "all";
-            return (
-              <button key={k} className="fchip relative" data-on={on} onClick={() => setOpen(k)} aria-haspopup="dialog">
-                <Anno n={anno[k][0]} t={anno[k][1]} />
-                <span className="text-muted">{title[k]}</span> {optLabel(k, filters[k])}
-                <CaretDown size={13} weight="bold" />
-              </button>
-            );
-          })}
+          {(["nights", "zone", "rounds"] as const).map((k) => (
+            <button key={k} className="fchip relative" data-on={filters[k] !== "all"} onClick={() => setOpen(k)} aria-haspopup="dialog">
+              <Anno n={anno[k][0]} t={anno[k][1]} />
+              <span className="text-muted">{title[k]}</span> {optLabel(k, filters[k])}
+              <CaretDown size={13} weight="bold" />
+            </button>
+          ))}
           {anyFilter && <button className="fchip border-dashed" onClick={() => patch({ filters: { ...DEFAULT_FILTERS, sort: filters.sort } })}>{t("resetFilters")}</button>}
         </div>
       </div>
 
-      {/* 8 결과 수 */}
-      <div className="relative mb-4 flex flex-wrap items-center gap-2">
+      {/* 8 결과 수 · 7 정렬 */}
+      <div className="relative mb-4 flex items-center gap-2">
         <Anno n={8} t="결과 수 '총 패키지 n개' (문구 결정 17번)" />
         {!load.loading && !load.error && <h1 className="text-[18px] font-black tracking-tight lg:text-[22px]">{t("resultCount", { n: rows.length })}</h1>}
         <Q id="Q-08" t="가격·통화" />
+        <button className="fchip relative ml-auto flex-none" data-on={filters.sort !== "rec"} onClick={() => setOpen("sort")} aria-haspopup="dialog">
+          <Anno n={anno.sort[0]} t={anno.sort[1]} />
+          <span className="text-muted">{title.sort}</span> {optLabel("sort", filters.sort)}
+          <CaretDown size={13} weight="bold" />
+        </button>
       </div>
 
       {load.error && <ErrorBanner onRetry={load.retry} />}
