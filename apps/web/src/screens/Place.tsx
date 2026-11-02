@@ -517,7 +517,7 @@ export default function Place() {
         {head}
         <div ref={stageRef} className="relative -mx-4 overflow-hidden border-y border-line" style={{ height: stageH }}>
           <div className="absolute inset-0">{mapEl("h-full rounded-none", true)}</div>
-          <div className="absolute inset-x-0 top-0 z-10 p-3">{tabsEl(true)}</div>
+          <div className="absolute inset-x-0 top-0 z-10 grid justify-items-center gap-2 p-3"><div className="w-full">{tabsEl(true)}</div><p className="rounded-full bg-surface px-3 py-1.5 text-[12.5px] font-bold text-ink-2 shadow-[var(--shadow)]">{t("mapHint")}</p></div>
           <div className="absolute inset-x-0 bottom-0 z-20 flex flex-col rounded-t-2xl border-t border-line bg-surface shadow-[0_-6px_20px_rgba(0,0,0,0.12)]" style={{ height: sheetH, transition: dragH === null ? "height .22s ease" : "none" }}>
             <button className="flex h-7 flex-none touch-none items-center justify-center" onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} aria-label={L === "ko" ? "목록 크기 바꾸기" : "リストの大きさを変更"}>
               <span className="h-1.5 w-10 rounded-full bg-line-strong" />
