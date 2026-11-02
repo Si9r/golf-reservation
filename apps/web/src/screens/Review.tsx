@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { Bed, Bus, CaretDown, Info, UsersThree, WarningCircle } from "@phosphor-icons/react";
+import { Bed, Bus, CalendarBlank, CaretDown, Info, UsersThree, WarningCircle } from "@phosphor-icons/react";
 import { pkgOf } from "../data";
 import { SET } from "../data";
 import { useT } from "../i18n";
@@ -21,7 +21,7 @@ export default function Review() {
   const bookings = useDb((s) => s.bookings);
   const [dupOpen, setDupOpen] = useState(false);
   const { d, p, redirect, user } = useFlow({ place: true });
-  const [itinOpen, setItinOpen] = useState(false); // 5 일정표: 상세에서 이미 봤으니 접어 둠
+  const [itinOpen, setItinOpen] = useState(true); // 5 일정표: 고른 승하차가 들어간 일정이라 모든 날짜를 펼쳐 둠 (11/2)
   // API 모드: 출발편 현황(API-03), 서버 금액(API-07), 중복 예약 확인(API-11 ?departureId)
   useDepartures(d.pkgId ? [d.pkgId] : [], d.dep ? [d.dep.slice(0, 7)] : []);
   const [srv, setSrv] = useState<{ total: number; unit: number } | null>(null);
@@ -91,19 +91,19 @@ export default function Review() {
       {/* PC: 왼쪽 예약 내용 · 오른쪽 출발 조건·금액 (스크롤해도 보이게) / 휴대폰: 한 줄로 */}
       <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start lg:gap-8">
         <div className="grid gap-3 lg:gap-4">
-          {/* 1 예약 요약: 사진 위에 패키지·일정·인원, 아래에 숙박·승하차 줄 (줄마다 '변경') */}
+          {/* 1 예약 요약: 사진 위에 패키지, 아래에 일정·인원·숙박·승하차 줄 (줄마다 '변경') */}
           <section className="relative overflow-hidden rounded-[20px] bg-surface shadow-[var(--shadow)]">
-            <Anno n={1} t="예약 내용 요약: 사진 카드(이름·일정·인원) + 숙박 / 승차 / 하차 줄별 '변경' → S-03/S-05/S-06 → S-08 복귀 (T-28)" />
+            <Anno n={1} t="예약 내용 요약: 사진 카드(이름) + 일정·인원 / 숙박 / 승차 / 하차 줄별 '변경' → S-03/S-05/S-06 → S-08 복귀 (T-28)" />
             <div className="relative h-[180px] lg:h-[220px]">
               <Img src={p.photos[0]} alt={n(p.name)} className="absolute inset-0 h-full w-full" />
               <span className="absolute inset-0 bg-gradient-to-b from-transparent from-30% to-black/80" />
-              <button className="absolute right-3 top-3 rounded-full bg-white/90 px-3 py-1.5 text-[13px] font-bold text-[#14171f]" onClick={() => edit(`/golf/packages/${p.id}`)}>{t("change")}</button>
-              <div className="absolute inset-x-4 bottom-3.5 grid gap-1 text-white">
-                <b className="line-clamp-2 text-[19px] font-black leading-snug lg:text-[22px]">{n(p.name)}</b>
-                <span className="num text-[14px]">{fShort(dep, L)}{p.nights ? ` ~ ${fShort(tripEnd(p, dep), L)}` : ""} · {t("peopleN", { n: d.people })}</span>
-              </div>
+              <b className="absolute inset-x-4 bottom-3.5 line-clamp-2 text-[19px] font-black leading-snug text-white lg:text-[22px]">{n(p.name)}</b>
             </div>
             <div className="px-4 py-1">
+              {/* 출발일·인원 (11/2 사진 위 '변경'을 이 줄로 옮김) */}
+              <Row icon={CalendarBlank} title={t("rowDate")} to={`/golf/packages/${p.id}`}>
+                <span className="num font-semibold">{fShort(dep, L)}{p.nights ? ` ~ ${fShort(tripEnd(p, dep), L)}` : ""} · {t("peopleN", { n: d.people })}</span>
+              </Row>
               {/* 2 숙박 */}
               <Row icon={Bed} title={t("rowHotel")} to={hasHotelStep(p) ? "/golf/book/hotel" : undefined}>
                 <b className="block leading-snug">{stayTitle}</b>
@@ -120,9 +120,9 @@ export default function Review() {
             </div>
           </section>
 
-          {/* 5 일정표 (상세에서 이미 봤으니 접어 둠) */}
+          {/* 5 일정표 (기본 펼침) */}
           <section className="relative card overflow-hidden rounded-[20px]">
-            <Anno n={5} t="일정표 (L-11): 고른 날짜·승차·하차 장소가 들어간 일정 (기본 접힘) + 구간 이동 시간" />
+            <Anno n={5} t="일정표 (L-11): 고른 날짜·승차·하차 장소가 들어간 일정 (기본 펼침) + 구간 이동 시간" />
             <button className="flex w-full items-center justify-between px-4 py-3.5 text-left" aria-expanded={itinOpen} onClick={() => setItinOpen(!itinOpen)}>
               <b className="text-[14.5px]">{t("rvItin", { n: itin.length })}</b>
               <CaretDown size={16} className={`transition-transform ${itinOpen ? "rotate-180" : ""}`} />

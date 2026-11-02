@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Bed, CaretLeft, CaretRight, Check, Plus, Question, Snowflake } from "@phosphor-icons/react";
+import { Bed, CaretLeft, CaretRight, Check, Plus, Snowflake } from "@phosphor-icons/react";
 import { motion } from "motion/react";
 import { PKGS, SET, hotelOf, type Pkg } from "../data";
 import { useT } from "../i18n";
@@ -150,32 +150,6 @@ export function PkgTags({ p, seats }: { p: Pkg; seats?: number }) {
     </div>
   );
 }
-export function TypeBadge({ p, onPhoto }: { p: Pkg; onPhoto?: boolean }) {
-  const { t } = useT();
-  const bg = p.type === "multi" ? "var(--tag-multi)" : p.type === "stay" ? "var(--tag-stay)" : "var(--tag-day)";
-  return (
-    <span className={`badge ${onPhoto ? "absolute left-3 top-3" : ""}`} style={{ background: bg, color: "#fff" }}>
-      {t(`type_${p.type}`)}
-    </span>
-  );
-}
-
-// 카드 사진 위 유형 이름 + ? : 누르면 유형 설명 (휴대폰에서도 되게 누르기, 다른 곳을 누르면 닫힘)
-function TypeHelp({ p }: { p: Pkg }) {
-  const { t } = useT();
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="absolute left-3 top-3 z-[2] max-w-[calc(100%-24px)]">
-      <span className="flex items-center gap-1">
-        <TypeBadge p={p} />
-        <button type="button" className="grid h-6 w-6 place-items-center rounded-full bg-black/45 text-white" aria-label={t("typeGuideT")} aria-expanded={open} onClick={() => setOpen(!open)} onBlur={() => setOpen(false)}>
-          <Question size={14} weight="bold" />
-        </button>
-      </span>
-      {open && <p role="note" className="mt-1.5 rounded-xl bg-surface p-2.5 text-[12.5px] leading-relaxed text-ink-2" style={{ boxShadow: "var(--shadow)" }}>{t(`typeLong_${p.type}`)}</p>}
-    </div>
-  );
-}
 
 export function PkgCard({ p, date, d, seats, onOpen, cmp, onCmp, showCmp, i = 0 }: { p: Pkg; date?: string | null; d: string | null; seats?: number; onOpen: () => void; cmp?: boolean; onCmp?: () => void; showCmp?: boolean; i?: number }) {
   const { t, n, L } = useT();
@@ -203,7 +177,6 @@ export function PkgCard({ p, date, d, seats, onOpen, cmp, onCmp, showCmp, i = 0 
           <p className="text-[13px] text-muted">{d ? (date ? t("onDate", { d: fShort(d, L) }) : t("earliest", { d: fShort(d, L) })) : "-"}</p>
         </div>
       </button>
-      <TypeHelp p={p} />
       <div className="mt-auto flex items-end justify-between gap-2 px-4 pb-4">
         <button onClick={onOpen} className="text-left">
           <span className="text-[12px] text-muted">{t("perPerson")} · {t("busIncl")}</span>

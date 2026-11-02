@@ -146,38 +146,37 @@ export function PeopleInput({ value, onChange, error, max = SET.MAX_PEOPLE, labe
 }
 
 // ---------- 예약 진행 단계 (C-04: 항상 6단계, 숙박 없는 당일 패키지만 2단계를 건너뜀 표시 — hasHotel = logic.ts hasHotelStep) ----------
-export function Steps({ at, hasHotel }: { at: number; hasHotel: boolean }) {
-  const { list } = useT();
-  // 호텔 옵션이 없는 패키지는 호텔 단계를 아예 빼고 5단계로 보여 줌 (줄 높이는 모든 화면에서 같음)
+// 화면이 바뀌어도 바가 이전 단계 위치에서 이어서 차오르게 기억
+let lastStepPct = 0;
+
+// 단계 화면 머리: ← 버튼 + 현재 단계 이름 + '3 / 6', 아래에 차오르는 바와 진행 순서 (11/2 시안대로)
+// 휴대폰은 화면 끝까지 닿는 흰 띠. PC는 모든 단계 화면에서 패키지 상세 본문과 같은 폭 (단계마다 위치 같음)
+export function StepHead({ at, hasHotel, onBack, disabled, className = "" }: { at: number; hasHotel: boolean; onBack: () => void; disabled?: boolean; className?: string }) {
+  const { t, list } = useT();
+  // 호텔 옵션이 없는 패키지는 호텔 단계를 아예 빼고 5단계로 보여 줌
   const idx = list("steps").map((_, i) => i).filter((i) => hasHotel || i !== 1);
   const steps = idx.map((i) => list("steps")[i]);
   const short = idx.map((i) => list("stepsShort")[i]);
   const cur = Math.max(0, idx.indexOf(at));
+  const pct = ((cur + 1) / steps.length) * 100;
+  useEffect(() => { lastStepPct = pct; }, [pct]);
   return (
-    <div className="relative" aria-label={`${cur + 1}/${steps.length} ${steps[cur]}`}>
-      <Anno n="C-04" t="예약 진행 단계: 칸마다 단계 이름(패키지·호텔·승하차·확인·정보·결제), 현재 단계 굵게, 호텔 옵션 없는 패키지는 호텔 단계 없이 5단계" />
-      <div className="flex gap-1.5" aria-hidden="true">
-        {steps.map((s, i) => (
-          <div key={s} className="min-w-max flex-1 basis-0"> {/* 칸은 단계 이름 길이 이상 (일본어 パッケージ) */}
-            <div className="h-[5px] overflow-hidden rounded-full bg-line">
-              <motion.div className="h-full rounded-full bg-brand" initial={false} animate={{ width: i <= cur ? "100%" : "0%" }} transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }} />
-            </div>
-            <span className={`mt-1 block whitespace-nowrap text-center text-[10.5px] leading-tight sm:text-[11px] ${i === cur ? "font-bold text-brand" : i < cur ? "text-ink-2" : "text-muted"}`}>{short[i]}</span>
-          </div>
+    <div className={`relative mb-4 max-lg:-mx-4 max-lg:-mt-4 max-lg:mb-5 max-lg:bg-surface ${className}`}>
+      <Anno n="C-04" t="예약 진행 단계: 현재 단계 이름 + '3 / 6' + 차오르는 바 + 진행 순서(패키지·호텔·승하차·확인·정보·결제), 현재 단계 굵게. 호텔 옵션 없는 패키지는 호텔 단계 없이 5단계" />
+      <div className="flex h-14 items-center gap-1 px-2 lg:h-auto lg:gap-1.5 lg:px-0 lg:pb-1.5">
+        <button className="grid h-11 w-11 flex-none place-items-center rounded-full hover:bg-surface-2 lg:-ml-2 lg:h-9 lg:w-9" onClick={onBack} aria-label={t("back")} disabled={disabled}><ArrowLeft size={22} weight="bold" /></button>
+        <b className="min-w-0 flex-1 truncate text-[16px] font-bold">{steps[cur]}</b>
+        <span className="num flex-none pr-3 text-[13px] font-bold text-ink-2 lg:pr-0" aria-label={`${cur + 1}/${steps.length}`}>{cur + 1} / {steps.length}</span>
+      </div>
+      <div className="h-[4px] overflow-hidden bg-line lg:rounded-full" aria-hidden="true">
+        <motion.div className="h-full bg-brand lg:rounded-full" initial={{ width: `${lastStepPct}%` }} animate={{ width: `${pct}%` }} transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }} />
+      </div>
+      {/* 진행 순서: 바가 차는 칸과 위치를 맞춤 */}
+      <div className="grid py-1.5 lg:pb-0" style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }} aria-hidden="true">
+        {short.map((s, i) => (
+          <span key={s} className={`whitespace-nowrap text-center text-[11px] leading-tight lg:text-[12px] ${i === cur ? "font-bold text-brand" : i < cur ? "text-ink-2" : "text-muted"}`}>{s}</span>
         ))}
       </div>
-    </div>
-  );
-}
-
-// 단계 화면 머리: ← 버튼 + 진행 단계 줄 (← 아이콘은 화면 왼쪽 끝에 맞추고 단계 줄과 가깝게)
-// PC는 모든 단계 화면에서 832px 가운데 → 한 줄 배치 화면의 본문과 일직선, 단계마다 위치 같음
-export function StepHead({ at, hasHotel, onBack, disabled, className = "" }: { at: number; hasHotel: boolean; onBack: () => void; disabled?: boolean; className?: string }) {
-  const { t } = useT();
-  return (
-    <div className={`mb-4 flex items-center gap-1.5 lg:mx-auto lg:max-w-[832px] ${className}`}>
-      <button className="-ml-2 grid h-9 w-9 flex-none -translate-y-[8px] place-items-center rounded-full hover:bg-surface-2" onClick={onBack} aria-label={t("back")} disabled={disabled}><ArrowLeft size={20} weight="bold" /></button>
-      <div className="flex-1"><Steps at={at} hasHotel={hasHotel} /></div>
     </div>
   );
 }
@@ -186,7 +185,7 @@ export function StepHead({ at, hasHotel, onBack, disabled, className = "" }: { a
 export function BottomBar({ children, width = "step", pcHidden }: { children: ReactNode; width?: "step" | "narrow" | "wide"; pcHidden?: boolean }) {
   return (
     <div className={`fixed inset-x-0 bottom-0 z-[45] border-t border-line bg-surface/95 backdrop-blur ${pcHidden ? "lg:hidden" : ""}`} style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
-      <div className={`relative mx-auto flex max-w-[480px] items-center gap-3 px-4 py-3 ${width === "step" ? "lg:max-w-[1160px] lg:px-6" : width === "narrow" ? "lg:max-w-[880px] lg:px-6" : "lg:max-w-[1200px] lg:px-6"}`}>
+      <div className={`relative mx-auto flex max-w-[480px] items-center gap-3 px-4 py-3 ${width === "step" ? "lg:max-w-[1200px] lg:px-6" : width === "narrow" ? "lg:max-w-[880px] lg:px-6" : "lg:max-w-[1200px] lg:px-6"}`}>
         <Anno n="C-05" t="하단 고정 버튼: 활성 / 비활성 / 처리 중" />
         {children}
       </div>

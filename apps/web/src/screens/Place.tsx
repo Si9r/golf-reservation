@@ -269,7 +269,6 @@ export default function Place() {
   };
   const toggleSame = (on: boolean) => {
     d.patch(on ? { dropSame: true, drop: d.pick } : { dropSame: false, drop: null });
-    setTab(on ? "pick" : "drop");
     setPreview(null);
   };
 
@@ -313,7 +312,7 @@ export default function Place() {
   );
   const sameEl = (
     <label className="relative flex min-h-[44px] items-center gap-3 text-[14.5px] font-semibold">
-      <Anno n={2} t="하차도 승차와 같은 곳 (기본 체크): 체크하면 하차 = 승차" />
+      <Anno n={2} t="하차 탭에만 표시. 하차도 승차와 같은 곳 (기본 체크): 체크하면 하차 = 승차" />
       <input type="checkbox" className="check" checked={d.dropSame} onChange={(e) => toggleSame(e.target.checked)} />
       {t("dropSame")}
     </label>
@@ -493,7 +492,7 @@ export default function Place() {
   const head = (
     <>
       <ScreenTag id="S-06" name="승하차 장소 지정" refs="FN-12, FN-13 · L-06 · API-05, API-06 · V-10, V-11 · T-10, T-31" />
-      <StepHead at={2} hasHotel={hasHotelStep(p)} onBack={back} />
+      <StepHead at={2} hasHotel={hasHotelStep(p)} onBack={back} className="max-lg:mb-0" />
     </>
   );
 
@@ -523,12 +522,12 @@ export default function Place() {
               <span className="h-1.5 w-10 rounded-full bg-line-strong" />
             </button>
             {/* 검색창은 시트 맨 위 (지도를 가리지 않게, 엄지 닿는 곳) — 누르면 시트를 펼침 */}
+            {tab === "drop" && <div className="flex-none px-4">{sameEl}</div>}
             {!(tab === "drop" && d.dropSame) && <div className="flex-none px-4 pb-3">{searchEl}</div>}
             <div className="grid flex-1 content-start gap-3 overflow-y-auto px-4 pb-4">
               {previewEl}
               {tab === "drop" && d.dropSame ? dropSameEl : q ? resultsEl : chipsEl}
               {!q && hotelBtnEl}
-              {sameEl}
               {timeEl}
               {summaryEl}
               {feeEl}
@@ -548,7 +547,7 @@ export default function Place() {
       <h1 className="text-[22px] font-bold leading-snug">{t("s06T")}</h1>
       <p className="mb-4 mt-1 text-[14px] text-muted">{t("s06S")}</p>
       {tabsEl(false)}
-      <div className="mb-4">{sameEl}</div>
+      {tab === "drop" && <div className="mb-4">{sameEl}</div>}
       {/* 장소 먼저 고르고 그다음 시간 (10/29) */}
       {tab === "drop" && d.dropSame ? (
         <div className="mb-4">{dropSameEl}</div>

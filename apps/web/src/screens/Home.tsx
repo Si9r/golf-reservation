@@ -7,7 +7,7 @@ import { useT } from "../i18n";
 import { fullReset, useDb, useDraft } from "../store";
 import { fShort, searchPkgs, todayISO, upcomingDepartures, yen } from "../logic";
 import { Anno, Img, Q, ScreenTag, StageTag, useStage } from "../components/ui";
-import { DatePeopleSheet, TypeBadge } from "../components/booking";
+import { DatePeopleSheet } from "../components/booking";
 import { AiSheet } from "./AiSheet";
 import { knownPkgIds, useDepartures } from "../api/sync";
 import { monthInSeason, monthsAhead } from "../logic";
@@ -157,7 +157,6 @@ export default function Home() {
                     <motion.button key={r.p.id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i, 6) * 0.05 }} onClick={() => openPkg(r.p.id, date ?? undefined)} className="group grid w-[290px] flex-none gap-2.5 text-left lg:w-auto">
                       <span className="relative block h-[230px] overflow-hidden rounded-[18px] lg:h-[260px]">
                         <Img src={r.p.photos[0]} alt={n(r.p.name)} className="absolute inset-0 h-full w-full transition-transform duration-500 group-hover:scale-[1.03]" />
-                        <span className="absolute left-3 top-3"><TypeBadge p={r.p} /></span>
                         {r.d && <span className="num absolute bottom-3 left-3 rounded-[10px] bg-[rgba(20,23,31,0.78)] px-2.5 py-1.5 text-[13px] font-bold text-white">{t("onDate", { d: fShort(r.d, L) })} · {t("seatsBadge", { s: r.seats ?? 0 })}</span>}
                       </span>
                       <span className="grid gap-1 px-0.5">

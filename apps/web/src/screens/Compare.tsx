@@ -22,7 +22,6 @@ export default function Compare() {
   const maxRounds = Math.max(...pk.map(rounds));
   const firstDep = early.filter(Boolean).sort()[0];
   const rows: { k: string; cells: { v: string; best?: boolean }[] }[] = [
-    { k: t("cmpType"), cells: pk.map((p) => ({ v: t(`type_${p.type}`) })) },
     { k: t("cmpPeriod"), cells: pk.map((p) => ({ v: p.nights ? t("nightsDays", { n: p.nights, d: p.nights + 1 }) : t("dayTrip") })) },
     { k: t("cmpRounds"), cells: pk.map((p) => ({ v: t("roundsN", { n: rounds(p) }), best: rounds(p) === maxRounds })) },
     { k: t("cmpCourses"), cells: pk.map((p) => ({ v: coursesOf(p).map((c) => n(c.name)).join(", ") })) },
