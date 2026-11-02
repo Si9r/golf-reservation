@@ -24,6 +24,14 @@ const COLORS: Record<MarkerKind, [string, string]> = {
 
 const resolvedDark = (theme: string) => theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
 
+// 지점 c가 화면 중심보다 px만큼 위에 보이도록 하는 지도 중심 (메르카토르 좌표로 계산, 위도만 남쪽으로 옮김)
+const liftedCenter = (c: LL, zoom: number, px: number): LL => {
+  if (!px) return c;
+  const merc = Math.log(Math.tan(Math.PI / 4 + (c.lat * Math.PI) / 360));
+  const lat = 2 * Math.atan(Math.exp(merc - (px * 2 * Math.PI) / (256 * 2 ** zoom))) - Math.PI / 2;
+  return { lat: (lat * 180) / Math.PI, lng: c.lng };
+};
+
 // Google 지도 (Maps JavaScript API). 실서비스와 같은 방식, 키는 .env.local
 export function MapView({
   markers,
@@ -37,6 +45,7 @@ export function MapView({
   center,
   path,
   greedy,
+  centerLift = 0,
 }: {
   markers: MapMarker[];
   path?: LL[]; // 승차 → 일정 → 하차를 잇는 점선 (피드백 1)
@@ -49,6 +58,7 @@ export function MapView({
   focusKey?: string; // 이 값이 바뀔 때만 화면을 마커에 맞춤
   center?: LL | null; // 주면 마커 전체 대신 이 지점으로 이동
   greedy?: boolean; // 한 손가락으로 이동·확대 (화면 전체를 지도가 쓰는 모바일 승하차)
+  centerLift?: number; // 맞춤 위치를 화면 중심보다 이만큼(px) 위로 (아래 시트가 지도를 가리는 모바일 승하차)
 }) {
   const line = useRef<google.maps.Polyline | null>(null);
   const { L, t } = useT();
@@ -119,7 +129,7 @@ export function MapView({
     // 지도가 준비되기 전 panTo 는 무시되므로 첫 맞춤은 setCenter
     const move = (c: LL) => (fitted.current ? m.panTo(c) : m.setCenter(c));
     if (center) {
-      move(center);
+      move(liftedCenter(center, zoom, centerLift));
       m.setZoom(zoom);
     } else if (markers.length === 1 && !zones) {
       move(markers[0]);
@@ -136,7 +146,7 @@ export function MapView({
           b.extend({ lat: z.lat - dLat, lng: z.lng - dLng });
         });
       }
-      m.fitBounds(b, 24);
+      m.fitBounds(b, { top: 24, left: 24, right: 24, bottom: 24 + centerLift * 2 });
     }
     fitted.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps

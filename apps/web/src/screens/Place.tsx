@@ -395,7 +395,7 @@ export default function Place() {
   const mapEl = (cls: string, greedy = false) => (
     <div className="relative h-full">
       <Anno n={6} t="지도 핀 지정 (Google Maps I-01): 범위를 초록 원으로, 건물·가게 탭, 빈 곳 탭은 350m 안 장소 이름 또는 '지도에서 고른 위치 · 지역명' (위도·경도는 표시하지 않음). 승차 → 골프장 → 하차를 점선으로 연결" />
-      <MapView markers={markers} path={route} zones greedy={greedy} onPoi={onPoi} onMapClick={onMapClick} center={center} zoom={center ? 16 : 11} focusKey={center ? `${center.lat},${center.lng}` : "all"} label={t("mapHint")} className={cls} />
+      <MapView markers={markers} path={route} zones greedy={greedy} centerLift={isLg ? 0 : Math.round(stageH * 0.15)} onPoi={onPoi} onMapClick={onMapClick} center={center} zoom={center ? 16 : 11} focusKey={center ? `${center.lat},${center.lng}` : "all"} label={t("mapHint")} className={cls} />
     </div>
   );
   const previewEl = preview && (
