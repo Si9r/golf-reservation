@@ -17,7 +17,7 @@ export default function Home() {
   const nav = useNavigate();
   const loc = useLocation();
   const stage = useStage();
-  const { q, date, people, patch, choosePkg } = useDraft();
+  const { q, date, people, peopleSet, patch, choosePkg } = useDraft();
   const extra = useDb((s) => s.extra);
   const apiV = useDepartures(knownPkgIds, monthsAhead().filter(monthInSeason)); // API 모드: 추천·곧 출발 카드의 출발일·잔여석을 서버 값으로 (API-03). 안 받은 달은 프로토타입 계산으로 떨어지므로 판매 달 전부
   const [sheet, setSheet] = useState(false);
@@ -37,6 +37,9 @@ export default function Home() {
   const cards = conditioned ? results.slice(0, 7) : searchPkgs({ q: "", date: null, people, extra }).filter((r) => r.p.rec).slice(0, 3);
   const soon = useMemo(() => upcomingDepartures(people, extra, 6), [people, extra, apiV]);
 
+  // 날짜를 고르지 않았으면 예약 가능한 가장 빠른 출발일이 기본값 (오늘은 출발 7일 전 마감이라 결과가 없음. 팀 결정 11/2)
+  const earliest = soon[0]?.d ?? null;
+  const shownDate = date ?? earliest;
   const guides = [
     { icon: Bus, t: t("guide1T") },
     { icon: MapPinLine, t: t("guide2T") },
@@ -91,10 +94,10 @@ export default function Home() {
             {/* 3·4 출발일·인원: 두 칸 (휴대폰 2열, PC는 검색창 옆). 누르면 날짜·인원 시트 */}
             <div className="grid grid-cols-2 gap-2.5 lg:contents">
               <div className="relative">
-                <Anno n={3} t="출발일 (필수, CK-01): 날짜·인원 시트, 날짜마다 출발 패키지 수, 11/16~4/19 휴장 (M-110). 미선택이면 homeDateHint" />
+                <Anno n={3} t="출발일 (필수, CK-01): 날짜·인원 시트, 날짜마다 출발 패키지 수, 11/16~4/19 휴장. 미선택이면 가장 빠른 출발일 표시" />
                 <button type="button" onClick={() => setSheet(true)} className="flex min-h-[56px] w-full flex-col justify-center rounded-[14px] bg-surface-2 px-3.5 text-left">
                   <span className="flex items-center gap-1 text-[11.5px] font-bold text-muted"><CalendarBlank size={13} className="text-brand" />{t("dateL")}</span>
-                  <span className={`num text-[15px] leading-snug ${date ? "font-bold" : "text-muted"}`}>{date ? fShort(date, L) : t("datePh")}</span>
+                  <span className={`num text-[15px] leading-snug ${shownDate ? "font-bold" : "text-muted"}`}>{shownDate ? fShort(shownDate, L) : t("datePh")}</span>
                 </button>
                 {date && (
                   <button type="button" aria-label={t("clearSel")} className="absolute right-1.5 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full text-muted hover:bg-surface" onClick={() => patch({ date: null })}><X size={15} /></button>
@@ -104,14 +107,14 @@ export default function Home() {
                 <Anno n={4} t="인원 (V-02): 1~20명, 날짜·인원 시트에서 바꿈, 바꾸면 결과 수 즉시 갱신" />
                 <button type="button" onClick={() => setSheet(true)} className="flex min-h-[56px] w-full flex-col justify-center rounded-[14px] bg-surface-2 px-3.5 text-left">
                   <span className="flex items-center gap-1 text-[11.5px] font-bold text-muted"><UsersThree size={13} className="text-brand" />{t("people")}</span>
-                  <span className="num text-[15px] font-bold">{t("peopleN", { n: people })}</span>
+                  <span className={`num text-[15px] leading-snug ${peopleSet ? "font-bold" : "text-muted"}`}>{peopleSet ? t("peopleN", { n: people }) : t("peoplePh")}</span>
                 </button>
               </div>
             </div>
             <div className="relative grid gap-2">
-              <Anno n={5} t="조건 결과 수 + 패키지 보기 (T-01): 출발일을 고르기 전에는 비활성 + homeDateHint, 0개여도 이동" />
+              <Anno n={5} t="조건 결과 수 + 패키지 보기 (T-01): 항상 누를 수 있음. 출발일을 안 골랐으면 가장 빠른 출발일로 검색, 0개여도 이동" />
               {date && <p className="text-center text-[13.5px] font-semibold text-ink-2 lg:hidden" aria-live="polite">{t("M-111", { n: results.length })}</p>}
-              <button className="btn btn-primary min-h-[56px] w-full lg:min-w-[160px]" disabled={!date} onClick={() => nav("/golf/packages")}>{t("seeBtn")}</button>
+              <button className="btn btn-primary min-h-[56px] w-full lg:min-w-[160px]" onClick={() => { if (!date && earliest) patch({ date: earliest }); nav("/golf/packages"); }}>{t("seeBtn")}</button>
             </div>
             {date && <p className="hidden text-center text-[13.5px] font-semibold text-ink-2 lg:col-span-4 lg:block" aria-live="polite">{t("M-111", { n: results.length })}</p>}
           </motion.div>
@@ -212,7 +215,7 @@ export default function Home() {
           <div className="mt-6 flex flex-wrap gap-2"><Q id="Q-02" t="패키지 상세 구성" /><Q id="Q-08" t="가격·통화" /></div>
         </div>
       </div>
-      <DatePeopleSheet open={sheet} onClose={() => setSheet(false)} date={date} people={people} onDone={(d, n2) => { patch({ date: d, people: n2 }); setSheet(false); }} />
+      <DatePeopleSheet open={sheet} onClose={() => setSheet(false)} date={shownDate} people={people} peopleSet={peopleSet} onDone={(d, n2, set) => { patch({ date: d, people: n2, peopleSet: set }); setSheet(false); }} />
       <AiSheet open={ai} onClose={() => setAi(false)} />
     </>
   );

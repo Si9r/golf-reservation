@@ -98,13 +98,14 @@ export function Sheet({ open, onClose, title, children, footer, wide }: { open: 
 }
 
 // ---------- 인원 (+/− 와 직접 입력, V-02: 범위 밖 입력은 가까운 값으로 맞추고 M-001) ----------
-export function PeopleInput({ value, onChange, error, max = SET.MAX_PEOPLE, label, anno }: { value: number; onChange: (n: number) => void; error?: string | null; max?: number; label?: string; anno?: ReactNode }) {
+export function PeopleInput({ value, unset, onChange, error, max = SET.MAX_PEOPLE, label, anno }: { value: number; unset?: boolean; onChange: (n: number) => void; error?: string | null; max?: number; label?: string; anno?: ReactNode }) {
   const { t } = useT();
   const id = useId();
-  const [text, setText] = useState(String(value));
+  const [text, setText] = useState(unset ? "" : String(value));
   const [clamped, setClamped] = useState(false);
-  useEffect(() => setText(String(value)), [value]);
+  useEffect(() => setText(unset ? "" : String(value)), [value, unset]);
   const commit = (raw: string) => {
+    if (unset && !raw) return; // 아직 안 골랐으면 칸만 지나가도 그대로
     const n = Number(raw.replace(/[^0-9]/g, "")) || 0;
     const c = Math.min(max, Math.max(SET.MIN_PEOPLE, n));
     setClamped(c !== n);
@@ -113,7 +114,7 @@ export function PeopleInput({ value, onChange, error, max = SET.MAX_PEOPLE, labe
   };
   const step = (d: number) => {
     setClamped(false);
-    onChange(Math.min(max, Math.max(SET.MIN_PEOPLE, value + d)));
+    onChange(unset ? SET.MIN_PEOPLE : Math.min(max, Math.max(SET.MIN_PEOPLE, value + d)));
   };
   const msg = error ?? (clamped ? t("M-001", { n: max }) : null);
   return (
@@ -121,13 +122,14 @@ export function PeopleInput({ value, onChange, error, max = SET.MAX_PEOPLE, labe
       {anno}
       {label && <label className="label" htmlFor={id}>{label}</label>}
       <div className="flex items-center rounded-xl border-[1.5px] bg-surface" style={{ borderColor: msg ? "var(--bad)" : "var(--line-strong)" }}>
-        <button type="button" className="grid h-12 w-14 place-items-center text-ink-2 disabled:opacity-35" onClick={() => step(-1)} disabled={value <= SET.MIN_PEOPLE} aria-label="−1">
+        <button type="button" className="grid h-12 w-14 place-items-center text-ink-2 disabled:opacity-35" onClick={() => step(-1)} disabled={unset || value <= SET.MIN_PEOPLE} aria-label="−1">
           <Minus size={18} weight="bold" />
         </button>
         <input
           id={id}
           inputMode="numeric"
-          className="num h-12 min-w-0 flex-1 border-0 bg-transparent text-center text-[18px] font-bold outline-none"
+          placeholder={t("peoplePh")}
+          className="num h-12 min-w-0 flex-1 border-0 bg-transparent text-center text-[18px] font-bold outline-none placeholder:text-[13px] placeholder:font-semibold placeholder:text-muted"
           value={text}
           aria-invalid={!!msg}
           aria-describedby={msg ? `${id}-h` : undefined}

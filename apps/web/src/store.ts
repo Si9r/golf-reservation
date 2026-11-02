@@ -101,7 +101,8 @@ export interface Info {
 export interface Draft {
   q: string; // 검색어 (S-01·S-02 공유)
   date: string | null; // 출발일 (선택)
-  people: number;
+  people: number; // 고르기 전에는 1 (잔여석 1석 이상으로 검색)
+  peopleSet: boolean; // 손님이 인원을 직접 골랐는지 (고르기 전에는 예약 진행 불가)
   filters: SearchFilters;
   cmp: number[];
   pkgId: number | null;
@@ -123,7 +124,8 @@ export interface Draft {
 const blankDraft = (): Draft => ({
   q: "",
   date: null,
-  people: SET.DEFAULT_PEOPLE,
+  people: SET.MIN_PEOPLE,
+  peopleSet: false,
   filters: DEFAULT_FILTERS,
   cmp: [],
   pkgId: null,
@@ -157,7 +159,7 @@ export const useDraft = create<DraftState>()(
         set({ pkgId: id, dep: null, opt: p.opts[0] ?? null, pick: null, drop: null, dropSame: true, pickMemo: "", pickTime: null, dropTime: null, holdUntil: null, holdPeople: 0, singles: null });
       },
     }),
-    { name: "golf-draft", version: 3, migrate: () => blankDraft() as DraftState, storage: createJSONStorage(() => sessionStorage) },
+    { name: "golf-draft", version: 4, migrate: () => blankDraft() as DraftState, storage: createJSONStorage(() => sessionStorage) },
   ),
 );
 // 서비스명 탭 확인 후 초기화 (M-101, C-06)

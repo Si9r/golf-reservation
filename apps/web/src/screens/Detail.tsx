@@ -44,9 +44,9 @@ function DetailInner({ p }: { p: Pkg }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const deps = months.length ? departuresIn(p, ym) : [];
-  const v = dep ? depView(p.id, dep, d.people, extra) : null;
+  const v = dep ? depView(p.id, dep, d.peopleSet ? d.people : 0, extra) : null; // 인원을 고르기 전에는 우리 인원 없이 현황만
   const seatErr = v && v.state === "unavailable" ? t("M-120", { s: v.seats, n: d.people }) : null;
-  const canGo = !!dep && !seatErr;
+  const canGo = !!dep && d.peopleSet && !seatErr;
   const hotel = hotelOf(p.hotel);
   const courses = coursesOf(p);
   const itin = itinerary(p, p.opts[0] ?? null, null, null);
@@ -85,7 +85,7 @@ function DetailInner({ p }: { p: Pkg }) {
       else nav(hasHotelStep(p) ? "/golf/book/hotel" : "/golf/book/place"); // T-06 / T-07 (숙박 있는 패키지는 옵션이 없어도 S-05)
     });
   };
-  const btnLabel = d.editReturn ? t("editBack") : dep ? t("reserve") : t("pickDepFirst");
+  const btnLabel = d.editReturn ? t("editBack") : !d.peopleSet ? t("peoplePh") : dep ? t("reserve") : t("pickDepFirst");
 
   const reserve = (
     <div ref={reserveRef} className="relative grid gap-4">
@@ -105,7 +105,7 @@ function DetailInner({ p }: { p: Pkg }) {
         {t("weekdays", { w: p.wd.map((x) => dowNames(L)[x]).join("·") })}
       </p>
       {/* 3 인원 (출발일 목록과 같은 칸) */}
-      <PeopleInput label={t("people")} value={d.people} onChange={(x) => d.patch({ people: x })} anno={<Anno n={3} t="인원 (V-02): 바꾸면 고를 수 있는 날짜가 바로 바뀜" />} />
+      <PeopleInput label={t("people")} value={d.people} unset={!d.peopleSet} onChange={(x) => d.patch({ people: x, peopleSet: true })} anno={<Anno n={3} t="인원 (V-02): 바꾸면 고를 수 있는 날짜가 바로 바뀜" />} />
       {/* 4 월 탭 + 출발일 목록 */}
       <div className="relative grid gap-2.5">
         <Anno n={4} t="월 탭 + 출발일 목록 (L-01·L-02·L-04): 현재 n명 / 최소 20명, 잔여석, 20명 이상 '인원 충족', 잔여석 < 인원이면 선택 불가 (T-29)" />
@@ -147,8 +147,8 @@ function DetailInner({ p }: { p: Pkg }) {
           <p className="num text-[14px] font-bold">{fDate(dep, L)} ~ {fShort(tripEnd(p, dep), L)}</p>
           {(
             <>
-              <MeterHead total={v.sum} ours={d.people} />
-              <Meter now={v.booked} add={Math.min(d.people, v.seats)} />
+              <MeterHead total={v.sum} ours={d.peopleSet ? d.people : 0} />
+              <Meter now={v.booked} add={d.peopleSet ? Math.min(d.people, v.seats) : 0} />
               <DepStateText v={v} dep={dep} />
             </>
           )}
@@ -328,7 +328,7 @@ function DetailInner({ p }: { p: Pkg }) {
       <div className="lg:hidden">
         <BottomBar>
           <span className="absolute -top-3 left-3"><Anno n={11} t="하단 예약 버튼: 출발일 선택 + 잔여석 ≥ 인원일 때만 '이 패키지 예약', S-08에서 왔으면 '변경 완료 · 확인으로'" /></span>
-          <PriceBlock main={`${yen(p.price)}~`} sub={dep ? `${fShort(dep, L)} · ${t("peopleN", { n: d.people })} · ${t("busIncl")}` : `${t("perPerson")} · ${t("busIncl")}`} />
+          <PriceBlock main={`${yen(p.price)}~`} sub={dep && d.peopleSet ? `${fShort(dep, L)} · ${t("peopleN", { n: d.people })} · ${t("busIncl")}` : `${t("perPerson")} · ${t("busIncl")}`} />
           <button className="btn btn-primary min-w-[150px]" disabled={!canGo} onClick={go}>{btnLabel}</button>
         </BottomBar>
       </div>
@@ -393,7 +393,7 @@ export function MeterHead({ total, ours }: { total: number; ours: number }) {
   const { t } = useT();
   return (
     <p className="flex items-center justify-between gap-2 text-[13px] font-bold">
-      <span>{t("recruitRow", { b: ours })}</span>
+      <span>{ours ? t("recruitRow", { b: ours }) : t("recruitOnly")}</span>
       <span className="num flex-none">{total >= SET.MIN_DEPARTURE ? t("countOk", { n: total }) : `${total} / ${SET.MIN_DEPARTURE}${t("peopleUnit")}`}</span>
     </p>
   );

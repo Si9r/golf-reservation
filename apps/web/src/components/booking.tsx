@@ -73,19 +73,21 @@ export function Calendar({ ym, onMonth, minYm, maxYm, cell, selected, onPick }: 
 }
 
 // ---------- 날짜·인원 시트 (S-01 #3, S-02 #3, API-04): 날짜마다 그날 출발 가능한 패키지 수, 11/16~4/19 휴장 ----------
-export function DatePeopleSheet({ open, onClose, date, people, onDone }: { open: boolean; onClose: () => void; date: string | null; people: number; onDone: (date: string | null, people: number) => void }) {
+export function DatePeopleSheet({ open, onClose, date, people, peopleSet, onDone }: { open: boolean; onClose: () => void; date: string | null; people: number; peopleSet: boolean; onDone: (date: string | null, people: number, peopleSet: boolean) => void }) {
   const { t } = useT();
   const extra = useDb((s) => s.extra);
   const months = monthsAhead();
   const first = months.find(monthInSeason)!;
   const [d, setD] = useState<string | null>(date);
   const [n, setN] = useState(people);
+  const [nSet, setNSet] = useState(peopleSet);
   const [ym, setYm] = useState(date ? ymOf(date) : first);
   useCalendar(ym, n); // API 모드: 날짜별 패키지 수를 서버에서 (API-04)
   useEffect(() => {
     if (open) {
       setD(date);
       setN(people);
+      setNSet(peopleSet);
       setYm(date ? ymOf(date) : first);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -99,7 +101,7 @@ export function DatePeopleSheet({ open, onClose, date, people, onDone }: { open:
       footer={
         <div className="grid grid-cols-[auto_1fr] gap-2">
           <button className="btn btn-ghost" disabled={!d} onClick={() => setD(null)}>{t("clearSel")}</button>
-          <button className="btn btn-primary" onClick={() => onDone(d, n)}>{t("apply")}</button>
+          <button className="btn btn-primary" onClick={() => onDone(d, n, nSet)}>{t("apply")}</button>
         </div>
       }
     >
@@ -129,7 +131,7 @@ export function DatePeopleSheet({ open, onClose, date, people, onDone }: { open:
         {count !== null && <p className="mt-2 text-[13.5px] font-bold text-brand">{t("M-111", { n: count })}</p>}
       </div>
       <div className="mt-4">
-        <PeopleInput label={t("people")} value={n} onChange={setN} anno={<Anno n="S-01 #4" t="인원 (V-02, 1~20명)" />} />
+        <PeopleInput label={t("people")} value={n} unset={!nSet} onChange={(x) => { setN(x); setNSet(true); }} anno={<Anno n="S-01 #4" t="인원 (V-02, 1~20명)" />} />
       </div>
     </Sheet>
   );
