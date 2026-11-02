@@ -188,6 +188,9 @@ export default function Place() {
   const sheetH = dragH ?? snaps[sheet];
   useEffect(() => { if (q) setSheet(2); }, [q]); // 검색하면 목록을 넓게
   useEffect(() => { if (preview) setSheet((x) => (x === 0 ? 1 : x)); }, [preview]); // 지도에서 고르면 카드가 보이게
+  const [showMissing, setShowMissing] = useState(false); // 비활성 '다음'을 누른 뒤부터 부족한 항목 표시
+  const placeRef = useRef<HTMLDivElement>(null);
+  const timeRef = useRef<HTMLElement>(null);
 
   if (redirect) return <Navigate to={redirect} replace />;
 
@@ -273,6 +276,15 @@ export default function Place() {
   };
 
   const done = !!d.pick && !!(d.dropSame ? d.pick : d.drop) && !!d.pickTime; // 희망 승차 시간은 필수, 하차 시간은 선택 (팀 결정 10/21)
+  // 비활성 '다음'을 누르면: 첫 번째로 부족한 항목의 탭으로 바꾸고 그곳으로 이동 (승차 장소 → 하차 장소 → 희망 승차 시간)
+  const showFirstMissing = () => {
+    const goTab = d.pick && !d.dropSame && !d.drop ? "drop" : "pick";
+    setShowMissing(true);
+    if (goTab !== tab) { setTab(goTab); setPreview(null); }
+    if (!isLg) setSheet((x) => (x === 0 ? 1 : x));
+    const target = !d.pick || goTab === "drop" ? placeRef : timeRef;
+    window.setTimeout(() => target.current?.scrollIntoView({ behavior: "smooth", block: isLg ? "center" : "nearest" }), 260); // 탭·시트가 바뀐 뒤 (시트 높이 전환 .22s)
+  };
   const back = () => nav(d.editReturn ? "/golf/book/review" : hasHotelStep(p) ? "/golf/book/hotel" : `/golf/packages/${p.id}`); // 숙박 있는 패키지는 옵션이 없어도 S-05로
   const pv = preview?.place;
   const pvOk = pv ? !!placeZone(pv) : false;
@@ -318,7 +330,7 @@ export default function Place() {
     </label>
   );
   const timeEl = (
-    <section className="relative card grid gap-2 p-4">
+    <section ref={timeRef} className="relative card grid gap-2 p-4">
       <Anno n={10} t="희망 시간 (booking_stop.desired_time, V-12): 승차 필수 · 하차 선택, 30분 단위. 승차 첫날 티오프 − 2시간 30분(06:00 이후) ~ 첫날 티오프 − 이동 − 30분 + 합승 대기 안내 / 하차 마지막 라운드(티오프+5시간) + 이동 ~ 21:00. 범위 밖이 되면 선택 지움. 참고용" />
       <label className="field">
         <span className="label">{tab === "pick" ? t("wishPick") : t("wishDrop")}</span>
@@ -327,13 +339,14 @@ export default function Place() {
           <option value="">{!tabPlace ? t("wishPlaceFirst") : tab === "drop" ? t("wishSkip") : t("wishNone")}</option>
           {tabRange?.options.map((x) => <option key={x} value={x}>{x}</option>)}
         </select>
+        {showMissing && tab === "pick" && d.pick && !d.pickTime && !!tabRange?.options.length && <span className="err" role="alert">{t("needPickTime")}</span>}
       </label>
       {tab === "drop" && <p className="flex gap-1.5 text-[13px] text-ink-2"><Clock size={16} className="mt-0.5 flex-none text-brand" />{t("dropTimeNote")}</p>}
       <p className="help">{t("wishNote")}</p>
     </section>
   );
   const searchEl = (
-    <div className="relative">
+    <div ref={placeRef} className="relative">
       <Anno n={3} t="장소 검색 (Google Places I-02): 한·일·영, 결과에 '시내 / 시내 밖' 표시 (V-10, M-140, M-141)" />
       <label className="relative block">
         <span className="sr-only">{t("placeSearch")}</span>
@@ -341,6 +354,7 @@ export default function Place() {
         <input className="input pl-10 pr-10" placeholder={t("placeSearch")} value={q} onChange={(e) => setQ(e.target.value)} onFocus={() => { if (!isLg) setSheet(2); }} />
         {q && <button className="absolute right-2 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full text-muted" onClick={() => setQ("")} aria-label={t("close")}><X size={16} /></button>}
       </label>
+      {showMissing && !cur && <p className="err mt-1.5" role="alert">{tab === "pick" ? t("needPick") : t("needDrop")}</p>}
     </div>
   );
   const hitRow = (h: Hit) => {
@@ -481,12 +495,12 @@ export default function Place() {
   );
   const bottomEl = (
     <BottomBar width={isLg ? "narrow" : "step"}>
-      <span className="absolute -top-3 left-3"><Anno n={9} t="하단 다음: 승차·하차 장소와 희망 승차 시간이 지정되면 활성 (희망 하차 시간은 선택) → 잔여석 다시 확인(B-01) → S-08 (T-10) / 범위 밖 → 그대로 (T-31)" /></span>
+      <span className="absolute -top-3 left-3"><Anno n={9} t="하단 다음: 승차·하차 장소와 희망 승차 시간이 지정되면 활성 (희망 하차 시간은 선택). 비활성일 때 누르면 부족한 항목을 빨간 글씨로 표시하고 그 탭·항목으로 이동 → 잔여석 다시 확인(B-01) → S-08 (T-10) / 범위 밖 → 그대로 (T-31)" /></span>
       <div className="min-w-0 flex-1 text-[12.5px] leading-tight text-muted">
         <p className="truncate">{t("pick")} · {d.pick ? withTime(n(d.pick.name), d.pickTime) : "-"}</p>
         <p className="truncate">{t("drop")} · {dropShown ? withTime(n(dropShown.name), d.dropTime) : "-"}</p>
       </div>
-      <button className="btn btn-primary min-w-[140px]" disabled={!done} onClick={() => guard(() => { if (d.dropSame) d.patch({ drop: d.pick }); nav("/golf/book/review"); })}>{d.editReturn ? t("editBack") : t("next")}</button>
+      <button className="btn btn-primary min-w-[140px]" aria-disabled={!done} onClick={() => (done ? guard(() => { if (d.dropSame) d.patch({ drop: d.pick }); nav("/golf/book/review"); }) : showFirstMissing())}>{d.editReturn ? t("editBack") : t("next")}</button>
     </BottomBar>
   );
   const head = (
