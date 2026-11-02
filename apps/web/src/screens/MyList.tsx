@@ -1,3 +1,4 @@
+import { GoalMeter } from "./Detail";
 import { useEffect, useMemo, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
@@ -50,7 +51,7 @@ export default function MyList() {
     const txt = v.label === "OPEN" ? t("mdOpenT", { n: need }) : v.label === "ENOUGH" ? t("mdEnoughT") : v.label === "GO" ? t("mdGoT")
       : v.label === "OP_CANCEL" ? t("mdOpCancelT") : v.label === "USER_CANCEL" ? t("mdUserCancelT") : t("mdDoneT");
     const recruiting = v.label === "OPEN" || v.label === "ENOUGH";
-    return { txt, sub: recruiting ? t("judge", { d: fShort(judgeDate(b.dep), L) }) : "", bar: recruiting ? Math.min(100, Math.round((v.booked / SET.MIN_DEPARTURE) * 100)) : null };
+    return { txt, sub: recruiting ? t("judge", { d: fShort(judgeDate(b.dep), L) }) : "", bar: recruiting };
   };
   const pickTxt = (b: Booking) => (b.pick ? `${n(b.pick.name)} · ${b.pickupTime ?? t("wishAt", { t: b.pickTime ?? "-" })}` : "-");
   const dates = ({ b, v }: Row) => (v.p.nights ? `${fShort(b.dep, L)} – ${fShort(tripEnd(v.p, b.dep), L)}` : fShort(b.dep, L));
@@ -58,10 +59,6 @@ export default function MyList() {
     const h = stayHotel(v.p, b.opt);
     return h ? n(h.name) : t("noHotel");
   };
-  const count15 = (r: Row) => (r.v.booked >= SET.MIN_DEPARTURE ? t("countOk", { n: r.v.booked }) : `${r.v.booked} / ${SET.MIN_DEPARTURE}${t("peopleUnit")}`);
-  const Bar = ({ pct }: { pct: number }) => (
-    <span className="block h-2 overflow-hidden rounded-full bg-surface-2"><span className="block h-full rounded-full bg-brand" style={{ width: `${pct}%` }} /></span>
-  );
 
   const tabs = (
     <div className="relative flex gap-2 lg:gap-1 lg:rounded-xl lg:bg-surface-2 lg:p-1" role="tablist">
@@ -102,10 +99,10 @@ export default function MyList() {
             </button>
             <span className="num text-[13.5px] text-ink-2">{dates(r)} · {t("peopleN", { n: r.b.people })}</span>
             <span className="hidden text-[13.5px] text-ink-2 lg:block"><span className="text-muted">{t("pick")}</span> {pickTxt(r.b)} · <span className="text-muted">{t("rowHotel")}</span> {hotelTxt(r)}</span>
-            {s.bar !== null ? (
-              <span className="mt-1 grid max-w-[420px] gap-1">
-                <span className="flex justify-between gap-2 text-[12.5px]"><b className={tone.chip.split(" ")[1]}>{s.txt}</b><span className="num flex-none whitespace-nowrap font-bold">{count15(r)}</span></span>
-                <Bar pct={s.bar} />
+            {s.bar ? (
+              <span className="mt-1 grid max-w-[420px] gap-1.5">
+                <b className={`text-[12.5px] ${tone.chip.split(" ")[1]}`}>{s.txt}</b>
+                <GoalMeter now={r.v.booked} />
               </span>
             ) : <span className={`text-[13px] font-bold ${tone.chip.split(" ")[1]}`}>{s.txt}</span>}
           </div>

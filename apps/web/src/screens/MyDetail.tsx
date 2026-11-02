@@ -7,7 +7,7 @@ import { DESIGN_TOOLS, useApp, useAuth, useDb, useToast, viewOf, type Booking } 
 import { addDays, coursesOf, fDate, fDayLong, fShort, itinerary, judgeDate, optionOf, pickupWindow, stayHotel, todayISO, tripEnd, yen } from "../logic";
 import { Anno, Collapse, Img, Q, ScreenTag, Sheet, gmapLink } from "../components/ui";
 import { useDrive } from "../gmaps";
-import { ItinList, Meter } from "./Detail";
+import { GoalMeter, ItinList } from "./Detail";
 import { PriceDetail } from "../components/booking";
 import { joinEn, splitEn, upper, validPart } from "./InfoForm";
 import { USE_API, api } from "../api/client";
@@ -143,10 +143,7 @@ export default function MyDetail() {
             )}
           </div>
           {alive && v.label !== "GO" && (
-            <div className="grid gap-1.5">
-              <Meter now={v.booked} add={0} />
-              <span className={`num text-right text-[13px] font-semibold ${tone.ink}`}>{v.booked >= SET.MIN_DEPARTURE ? t("countOk", { n: v.booked }) : `${v.booked} / ${SET.MIN_DEPARTURE}${t("peopleUnit")}`}</span>
-            </div>
+            <GoalMeter now={v.booked} />
           )}
         </section>
 

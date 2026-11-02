@@ -388,6 +388,25 @@ export function Meter({ now, add }: { now: number; add: number }) {
   );
 }
 
+// 예약 조회용 인원 막대: 정원 기준 + 최소 인원 눈금. 최소 인원을 넘어도 총 몇 명인지 보임 (팀 결정 11/2)
+export function GoalMeter({ now }: { now: number }) {
+  const { t } = useT();
+  const ok = now >= SET.MIN_DEPARTURE;
+  const pct = (x: number) => `${Math.min(100, (x / SET.BUS_SEATS) * 100)}%`;
+  return (
+    <span className="grid gap-1">
+      <span className="relative block h-2 rounded-full bg-line" role="img" aria-label={`${now}/${SET.BUS_SEATS}`}>
+        <span className="absolute inset-y-0 left-0 rounded-full bg-brand" style={{ width: pct(now) }} />
+        <span className="absolute -inset-y-0.5 w-0.5 rounded-full bg-ink" style={{ left: pct(SET.MIN_DEPARTURE) }} />
+      </span>
+      <span className="num flex justify-between gap-2 text-[12.5px] font-bold">
+        <span className={ok ? "text-ok" : "text-muted"}>{ok ? t("minMet", { m: SET.MIN_DEPARTURE }) : t("minGoal", { m: SET.MIN_DEPARTURE })}</span>
+        <span className="text-ink">{t("totalNow", { n: now })}</span>
+      </span>
+    </span>
+  );
+}
+
 // 모집 현황 한 줄: 왼쪽 '모집 현황 · 우리 n명 포함', 오른쪽 '모인 인원 / 최소 인원'
 export function MeterHead({ total, ours }: { total: number; ours: number }) {
   const { t } = useT();
