@@ -95,6 +95,7 @@ export interface Info {
   companions: string[];
   en?: [string, string]; // 입력 중인 대표자 영문 [성, 이름] (보낼 때 nameEn = '성 이름')
   compEn?: [string, string][]; // 입력 중인 동반자 영문 [성, 이름] (보낼 때 companions)
+  ph?: [string, string, string]; // 입력 중인 연락처 [시작, 중간, 끝 번호] (보낼 때 phone = '시작-중간-끝')
   // 예약 화면 동의 2개 (V-25): 취소 규정 · 합승 안내. 이용약관·개인정보는 본 사이트 회원가입 때 동의 (운영사 확정)
   agree: { cancel: boolean; shared: boolean };
 }

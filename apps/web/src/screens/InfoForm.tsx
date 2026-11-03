@@ -26,6 +26,17 @@ export const validPart = (s: string) => s.length >= 1 && s.length <= 30 && VPART
 export const splitEn = (s: string): [string, string] => { const w = s.trim().split(/\s+/); return [w[0] ?? "", w.slice(1).join(" ")]; };
 export const joinEn = ([a, b]: [string, string]) => `${a.trim()} ${b.trim()}`.trim();
 export const upper = (s: string) => s.toUpperCase().replace(/[^A-Z -]/g, ""); // 영문·공백·하이픈만 입력됨
+// 국가번호 (고를 때 국가 이름도 함께: +82 (대한민국))
+const CC = ["+82", "+81", "+86", "+886", "+1"] as const;
+// 연락처 시작·중간·끝 번호 세 칸: 칸마다 숫자 1~4자리. 회원 정보의 '10-4827-3519'·'01048273519' 모두 세 칸으로 나눔
+const PH = /^\d{1,4}$/;
+export const splitPhone = (s: string): [string, string, string] => {
+  const w = s.split(/[\s-]+/).filter(Boolean);
+  if (w.length >= 3) return [w[0], w[1], w.slice(2).join("")];
+  const x = w.join("");
+  if (w.length === 1 && x.length >= 9) return [x.slice(0, -8), x.slice(-8, -4), x.slice(-4)];
+  return [w[0] ?? "", w[1] ?? "", ""];
+};
 
 export default function InfoForm() {
   const { t, n, L, list } = useT();
@@ -39,6 +50,7 @@ export default function InfoForm() {
   const busyRef = useRef(false); // 같은 순간 두 번 눌러도 확보 요청은 한 번만 (state 는 다음 화면 갱신 전까지 false 라 막지 못함)
   const [terms, setTerms] = useState<null | (typeof AGREE)[number]>(null);
   const refs = useRef<Record<string, HTMLElement | null>>({});
+  const phRefs = useRef<(HTMLInputElement | null)[]>([]);
   if (redirect) return <Navigate to={redirect} replace />;
 
   // 회원 정보로 채움 (동반자는 기본 '나중에 입력')
@@ -47,14 +59,21 @@ export default function InfoForm() {
   const en: [string, string] = f.en ?? splitEn(f.nameEn);
   const compN = d.people - 1;
   const compEn: [string, string][] = Array.from({ length: compN }, (_, i) => f.compEn?.[i] ?? (f.companions[i] ? splitEn(f.companions[i]) : ["", ""]));
+  const ph: [string, string, string] = f.ph ?? splitPhone(f.phone);
   const set = (p: Partial<Info>) => useDraft.getState().patch({ info: { ...f, ...p } });
+  const setPh = (i: number, v: string) => {
+    const next = [...ph] as [string, string, string];
+    next[i] = v.replace(/\D/g, "").slice(0, 4);
+    set({ ph: next, phone: next.join("-") });
+    if (next[i].length === 4 && i < 2) phRefs.current[i + 1]?.focus(); // 4자리를 채우면 다음 칸으로
+  };
   const blur = (k: string) => setTouched((x) => ({ ...x, [k]: true }));
 
   const nameKo = f.nameKo.trim();
   const errs: Record<string, string | null> = {
     nameKo: nameKo.length >= 1 && nameKo.length <= 30 ? null : t("M-161"), // V-20
     nameEn: en.every(validPart) ? null : en.some((x) => x.trim()) ? t("M-162") : t("M-161"), // V-21 성·이름 모두 필수
-    phone: V22.test(`${f.cc} ${f.phone}`.trim()) && V22.test(f.phone) ? null : f.phone ? t("M-163") : t("M-161"), // V-22
+    phone: ph.every((x) => PH.test(x)) && V22.test(`${f.cc} ${ph.join("-")}`) && V22.test(ph.join("-")) ? null : ph.some((x) => x) ? t("M-163") : t("M-161"), // V-22 시작·중간·끝 번호 모두 필수
     email: V23.test(f.email.trim()) ? null : f.email ? t("M-164") : t("M-161"), // V-23
     comps: compN === 0 || compEn.every((x) => x.every(validPart)) ? null : compEn.some((x) => x.some((y) => y.trim())) ? t("M-162") : t("M-161"), // V-24 동반자 전원 성·이름 필수
     agree: AGREE.every((k) => f.agree[k]) ? null : t("M-165"), // V-25
@@ -77,7 +96,7 @@ export default function InfoForm() {
       toast(t("M-120", { s: v.seats, n: d.people }), "bad");
       return;
     }
-    const info = { ...f, nameEn: joinEn(en), companions: compEn.map(joinEn) };
+    const info = { ...f, nameEn: joinEn(en), phone: ph.join("-"), companions: compEn.map(joinEn) };
     if (USE_API) {
       // API-10 예약 만들기: 결제 대기(PENDING_PAYMENT)로 저장, 예약번호 발급, 좌석을 잡음 (본 사이트 결제 연동 10/27).
       // 입력값(대표자·동반자·승하차·객실 구성)도 이때 저장. 실패하면 E-SEAT → 서버 최신 잔여석으로 M-120
@@ -145,12 +164,19 @@ export default function InfoForm() {
           </div>
           <div className="grid grid-cols-2 gap-2 text-[12px] text-muted"><span>{t("enSur")}</span><span>{t("enGiven")}</span></div>
         </Field>
-        <Field id="phone" n={3} anno="연락처 (V-22: 국가번호 포함 숫자·공백·하이픈 8자 이상)" label={t("phone")} err={show("phone")} refs={refs}>
-          <div className="grid grid-cols-[96px_1fr] gap-2">
-            <select className="input pr-2" value={f.cc} onChange={(e) => set({ cc: e.target.value })} aria-label="Country code">
-              {["+82", "+81", "+86", "+886", "+1"].map((c) => <option key={c}>{c}</option>)}
+        <Field id="phone" n={3} anno="연락처 (V-22): 국가번호(국가 이름 함께) + 시작·중간·끝 번호 세 칸 (칸마다 숫자 1~4자리, 4자리면 다음 칸으로). 보낼 때 '시작-중간-끝'" label={t("phone")} err={show("phone")} refs={refs}>
+          <div className="grid gap-2 lg:grid-cols-[minmax(0,200px)_minmax(0,1fr)] lg:items-start">
+            <select className="input pr-2" value={f.cc} onChange={(e) => set({ cc: e.target.value })} aria-label={t("ccL")}>
+              {CC.map((c) => <option key={c} value={c}>{`${c} (${t(`cc_${c.slice(1)}` as Key)})`}</option>)}
             </select>
-            <input id="f-phone" className="input num" inputMode="tel" value={f.phone} aria-invalid={!!show("phone")} onBlur={() => blur("phone")} onChange={(e) => set({ phone: e.target.value.replace(/[^\d\s-]/g, "") })} autoComplete="tel-national" />
+            <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)] gap-x-1.5 gap-y-1">
+              {ph.map((x, i) => [
+                i > 0 && <span key={`s${i}`} className="grid h-12 place-items-center text-muted" aria-hidden>-</span>,
+                <input key={i} id={i === 0 ? "f-phone" : undefined} ref={(el) => { phRefs.current[i] = el; }} className="input num text-center" inputMode="numeric" value={x} maxLength={4}
+                  aria-label={t(["phA", "phB", "phC"][i] as Key)} placeholder={["10", "1234", "5678"][i]} aria-invalid={!!show("phone") && !PH.test(x)} onBlur={() => blur("phone")} onChange={(e) => setPh(i, e.target.value)} autoComplete={i === 0 ? "tel-area-code" : i === 1 ? "tel-local-prefix" : "tel-local-suffix"} />,
+              ])}
+              {(["phA", "phB", "phC"] as const).map((k, i) => <span key={k} className="text-center text-[12px] text-muted" style={{ gridColumn: i * 2 + 1 }}>{t(k)}</span>)}
+            </div>
           </div>
         </Field>
         <Field id="email" n={4} anno="이메일 (V-23): 확인서·출발 확정·취소 안내 주소" label={t("email")} err={show("email")} help={t("emailNote")} refs={refs}>
