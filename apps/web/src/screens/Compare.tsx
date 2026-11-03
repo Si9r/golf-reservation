@@ -5,7 +5,8 @@ import { Crown } from "@phosphor-icons/react";
 import { hotelOf, pkgOf } from "../data";
 import { useT } from "../i18n";
 import { useDb, useDraft } from "../store";
-import { coursesOf, firstAvailable, fShort, rounds, seatsLeft, yen } from "../logic";
+import { coursesOf, firstAvailable, fShort, monthInSeason, monthsAhead, rounds, seatsLeft, yen } from "../logic";
+import { useDepartures } from "../api/sync";
 import { Anno, Img, ScreenTag, StageTag, StepHead } from "../components/ui";
 
 export default function Compare() {
@@ -14,6 +15,7 @@ export default function Compare() {
   const { cmp, date, people, patch, choosePkg } = useDraft();
   const extra = useDb((s) => s.extra);
   const pk = cmp.map(pkgOf).filter(Boolean) as NonNullable<ReturnType<typeof pkgOf>>[];
+  useDepartures(pk.map((p) => p.id), monthsAhead().filter(monthInSeason)); // API 모드: 새로고침 뒤에도 출발일·잔여석을 서버 값으로 (API-03)
   useEffect(() => {
     if (pk.length < 2) nav("/golf/packages", { replace: true }); // 2개 미만이 되면 S-02로
   }, [pk.length, nav]);

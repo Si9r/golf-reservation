@@ -148,7 +148,7 @@ export function PkgTags({ p, seats }: { p: Pkg; seats?: number }) {
       <span className="chip">{p.nights ? t("nightsDays", { n: p.nights, d: p.nights + 1 }) : t("dayTrip")}</span>
       <span className="chip">{t("roundsN", { n: rounds(p) })}</span>
       <span className={`chip ${p.hotel ? "" : "gray"}`}>{p.hotel ? t("withHotel") : t("noHotel")}</span>
-      {seats !== undefined && <span className="badge brand">{t("seatsBadge", { s: seats })}</span>}
+      {seats !== undefined && <span className="badge brand">{t("seatsLeft", { s: seats })}</span>}
     </div>
   );
 }

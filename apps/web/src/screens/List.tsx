@@ -69,7 +69,7 @@ export default function List() {
           {(["nights", "zone", "rounds"] as const).map((k) => (
             <button key={k} className="fchip relative" data-on={filters[k] !== "all"} onClick={() => setOpen(k)} aria-haspopup="dialog">
               <Anno n={anno[k][0]} t={anno[k][1]} />
-              <span className="text-muted">{title[k]}</span> {optLabel(k, filters[k])}
+              <span className="whitespace-pre"><span className="text-muted">{title[k]}{t("fColon")}</span>{optLabel(k, filters[k])}</span>
               <CaretDown size={13} weight="bold" />
             </button>
           ))}
@@ -84,7 +84,7 @@ export default function List() {
         <Q id="Q-08" t="가격·통화" />
         <button className="fchip relative ml-auto flex-none" data-on={filters.sort !== "rec"} onClick={() => setOpen("sort")} aria-haspopup="dialog">
           <Anno n={anno.sort[0]} t={anno.sort[1]} />
-          <span className="text-muted">{title.sort}</span> {optLabel("sort", filters.sort)}
+          <span className="whitespace-pre"><span className="text-muted">{title.sort}{t("fColon")}</span>{optLabel("sort", filters.sort)}</span>
           <CaretDown size={13} weight="bold" />
         </button>
       </div>

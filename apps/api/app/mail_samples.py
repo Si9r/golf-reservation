@@ -1,5 +1,5 @@
 """테스트 메일: 이 서비스가 보내는 모든 메일 종류를 예시 예약으로 한 번씩 보냄 (DB·notification 기록 없음).
-사용법 (apps/api 폴더에서): python -m app.mail_samples <받는 주소>
+사용법 (apps/api 폴더에서): python -m app.mail_samples <받는 주소> [ja]  (ja: 손님 안내를 일본어로)
 .env MAIL_BACKEND=smtp 이면 실제 발송 (보내는 주소 MAIL_FROM), log 면 로그만"""
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from .config import env
 
 SAMPLE = {"no": "GT-261113-0001", "package_name": "삿포로 시내 숙박 2박 3일", "dep_date": "2026-11-13", "judge_date": "2026-11-06",
           "people": 3, "total": 221400, "name": "이정훈", "pickup_time": "10:20", "pick_place": "JR 삿포로역 남쪽 출구"}
+SAMPLE_JA = {**SAMPLE, "package_name": "札幌市内宿泊 2泊3日", "name": "田中 太郎", "pick_place": "JR札幌駅 南口"}
 KINDS = ("CONFIRM", "GO", "CANCEL", "PICKUP", "USER_CANCEL")  # CONFIRM 은 지금 본 사이트가 보내지만 템플릿 확인용으로 함께
 
 
@@ -23,11 +24,11 @@ OPS_DEPARTURE = {"dep_id": "PKG-001-20261113", "dep_date": SAMPLE["dep_date"], "
                  "booked": 14, "min_people": 20, "confirmed": 5, "package_name": SAMPLE["package_name"]}
 
 
-def samples() -> list[tuple[str, str, str]]:
+def samples(lang: str = "ko") -> list[tuple[str, str, str]]:
     """(종류, 제목, 본문): 손님 안내 5종 + 운영자 알림 2종 (예시 값)"""
     from .services.booking import REFUND_HINT, REFUND_REASON_KO
 
-    out = [(k, *M.render(k, SAMPLE)) for k in KINDS]
+    out = [(k, *(M.render_ja(k, SAMPLE_JA) if lang == "ja" else M.render(k, SAMPLE))) for k in KINDS]
     order = OPS_BOOKING["order_id"]
     out.append(("OPS_REFUND", *M.render_ops(
         "환불 실패 (operator_cancel)",
@@ -45,10 +46,10 @@ def samples() -> list[tuple[str, str, str]]:
     return out
 
 
-def send_samples(to: str) -> list[tuple[str, str]]:
+def send_samples(to: str, lang: str = "ko") -> list[tuple[str, str]]:
     """모든 종류를 to 로 한 번씩 (7통). 돌려주는 값: (종류, OK | 오류)"""
     result = []
-    for kind, subject, body in samples():
+    for kind, subject, body in samples(lang):
         try:
             M.mail.send(to, f"[테스트] {subject}", body)
             result.append((kind, "OK"))
@@ -59,10 +60,10 @@ def send_samples(to: str) -> list[tuple[str, str]]:
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    if len(sys.argv) != 2 or "@" not in sys.argv[1]:
-        sys.exit("받는 주소를 적어 주세요: python -m app.mail_samples someone@example.com")
+    if len(sys.argv) not in (2, 3) or "@" not in sys.argv[1] or sys.argv[2:] not in ([], ["ja"]):
+        sys.exit("받는 주소를 적어 주세요: python -m app.mail_samples someone@example.com [ja]")
     print(f"backend={env.MAIL_BACKEND} from={env.MAIL_FROM} smtp={env.SMTP_HOST or '-'}:{env.SMTP_PORT}")
-    res = send_samples(sys.argv[1])
+    res = send_samples(sys.argv[1], "ja" if sys.argv[2:] else "ko")
     for kind, r in res:
         print(f"{kind:12} {r}")
     sys.exit(0 if all(r == "OK" for _, r in res) else 1)
