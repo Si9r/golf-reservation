@@ -4,7 +4,7 @@
 import { useEffect } from "react";
 import { create } from "zustand";
 import type { DepartureItem } from "@golf/shared";
-import { PKGS, type Place } from "../data";
+import { PKGS, PLACES, type Place } from "../data";
 import { useAuth, type Booking } from "../store";
 import { ApiError, USE_API, api, apiPkgId, optCode, protoId, setToken, type ApiBooking } from "./client";
 
@@ -100,8 +100,8 @@ export async function loadMe(): Promise<boolean> {
 }
 
 // ---------- 예약: 서버 응답 → 화면의 Booking 모양 ----------
-const placeOf = (s: ApiBooking["stops"][number] | undefined): Place | null =>
-  s ? { name: { ko: s.placeName, ja: s.placeName }, kind: "spot", area: "SAPPORO", lat: Number(s.lat), lng: Number(s.lng), placeId: s.placeId ?? undefined, addr: s.address ?? undefined } as Place : null;
+const placeOf = (s: ApiBooking["stops"][number] | undefined): Place | null => // 서버는 예약 때 언어의 이름만 저장. 알려진 장소는 화면 언어로 표시
+  s ? { name: PLACES.find((p) => p.name.ko === s.placeName || p.name.ja === s.placeName)?.name ?? { ko: s.placeName, ja: s.placeName }, kind: "spot", area: "SAPPORO", lat: Number(s.lat), lng: Number(s.lng), placeId: s.placeId ?? undefined, addr: s.address ?? undefined } as Place : null;
 
 export function toBooking(b: ApiBooking): Booking {
   const pick = b.stops.find((s) => s.kind === "PICK");

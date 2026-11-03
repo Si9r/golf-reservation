@@ -1,3 +1,4 @@
+import re
 import threading
 
 from fastapi.testclient import TestClient
@@ -431,6 +432,38 @@ def test_mail_templates():  # 4종 제목·본문에 예약번호·패키지·�
     assert "전액 환불" in render("CANCEL", b)[1] and "2026년 10월 23일(금)" in render("CONFIRM", b)[1]
     s, body_ = render("PICKUP", {**b, "pickup_time": "10:20", "pick_place": "JR 삿포로역 남쪽 출구"})  # 승차 시간 안내 (골프가 보냄)
     assert "승차 시간 안내" in s and "2026년 10월 30일(금) 10:20" in body_ and "JR 삿포로역 남쪽 출구" in body_
+
+
+def test_mail_templates_ja():  # 일본어 메일: 5종 제목·본문에 예약번호·패키지·출발일·인원·금액, 한글 없음
+    from app.adapters.mail import render_ja
+
+    b = {"no": "GT-261030-0001", "package_name": "札幌市内宿泊 2泊3日", "dep_date": "2026-10-30", "judge_date": "2026-10-23",
+         "people": 3, "total": 221400, "name": "田中 太郎", "pickup_time": "10:20", "pick_place": "JR札幌駅 南口"}
+    for kind in ("CONFIRM", "GO", "CANCEL", "PICKUP", "USER_CANCEL"):
+        subject, body = render_ja(kind, b)
+        assert "GT-261030-0001" in subject and not re.search("[가-힣]", subject + body), kind
+        for x in ("GT-261030-0001", "札幌市内宿泊 2泊3日", "2026年10月30日(金)", "3名", "¥221,400", "10:00-17:00", "田中 太郎 様"):
+            assert x in body, (kind, x)
+    assert "全額返金" in render_ja("CANCEL", b)[1] and "2026年10月23日(金)" in render_ja("CONFIRM", b)[1]
+    assert "2026年10月30日(金) 10:20" in render_ja("PICKUP", b)[1]
+
+
+def test_mail_follows_booking_lang(client, monkeypatch):  # 일본어로 예약하면 일본어 메일 (패키지 이름도 일본어), 한국어 예약은 한국어 그대로
+    from app.adapters import mail as M
+
+    rec = MailRec()
+    monkeypatch.setattr(M, "mail", rec)
+    dep = "PKG-001-20261106"
+    set_booked(dep, 0)
+    ja = client.post(U + "/bookings", json=body((dep, 2), lang="ja"), headers=A).json()["bookingNo"]
+    ko = client.post(U + "/bookings", json=body((dep, 2)), headers=A).json()["bookingNo"]
+    with tx() as c:
+        name_ja = db1("SELECT name_ja n FROM package WHERE id = 'PKG-001'")["n"]
+        M.notify(c, ja, "a@example.com", "GO")
+        M.notify(c, ko, "a@example.com", "GO")
+    (_, s_ja, b_ja), (_, s_ko, _) = rec.sent
+    assert ja in s_ja and "催行が決定しました" in s_ja and name_ja in b_ja
+    assert ko in s_ko and "출발이 확정" in s_ko
 
 
 def test_mail_failure_keeps_booking(client, monkeypatch):  # 발송 실패해도 예약은 그대로, 기록은 FAIL

@@ -1,8 +1,9 @@
 """안내 메일 발송 — 이 서비스가 직접 보냄 (운영사 확정 10/26, 질문 Q-30). 메일 보내는 곳은 여기 한 곳.
 - MAIL_BACKEND=log (기본): 실제로 보내지 않고 로그만 남김
 - MAIL_BACKEND=smtp: SMTP로 실제 발송. 보내는 주소는 모든 메일이 MAIL_FROM = golf-test@resend.dev (config 기본값, 테스트용 Resend, 10/29 지시)
-- 테스트 메일: python -m app.mail_samples <받는 주소> (모든 종류를 한 번씩)
+- 테스트 메일: python -m app.mail_samples <받는 주소> [ja] (모든 종류를 한 번씩)
 발송 결과는 notification 테이블에 OK / FAIL 로 기록. 실패해도 예약 처리는 되돌리지 않음
+손님 안내는 예약할 때 쓴 언어(booking.lang)로 보냄. 운영자 알림은 한국어만
 
 누가 보내나 (본 사이트 결제 연동 10/27)
 - 예약 확정(결제 완료) CONFIRM: 본 사이트가 보냄 → 골프는 보내지 않음 (apply_order 에서 부르지 않음, 템플릿은 남김)
@@ -139,8 +140,73 @@ def render(kind: str, b: dict) -> tuple[str, str]:
     return subject, "\n".join(lines) + "\n" + _footer()
 
 
+# ---------- 템플릿 (일본어) ----------
+def _day_ja(d: str) -> str:
+    """'2026-10-30' → '2026年10月30日(金)'"""
+    x = date.fromisoformat(d)
+    return f"{x.year}年{x.month}月{x.day}日({'月火水木金土日'[x.weekday()]})"
+
+
+def _footer_ja() -> str:
+    sup = S.SUPPORT
+    lines = ["", "お問い合わせ: TRAVENDER ゴルフ お問い合わせ窓口"]
+    if sup.get("tel"):
+        lines.append(f"電話 {sup['tel']}")
+    if sup.get("email"):
+        lines.append(f"メール {sup['email']}")
+    lines.append(f"受付時間 {sup['hours']}（日本時間）")
+    lines.append("お問い合わせの際は予約番号をお知らせください。")
+    return "\n".join(lines)
+
+
+def _summary_ja(b: dict) -> str:
+    return "\n".join([
+        f"予約番号: {b['no']}",
+        f"パッケージ: {b['package_name']}",
+        f"出発日: {_day_ja(b['dep_date'])}",
+        f"人数: {b['people']}名",
+        f"お支払い金額: {_yen(b['total'])}（送迎バス込み）",
+    ])
+
+
+def render_ja(kind: str, b: dict) -> tuple[str, str]:
+    """render 의 일본어판 (같은 값을 받음)"""
+    hello = f"{b['name']} 様\nTRAVENDER 北海道ゴルフをご利用いただきありがとうございます。" if b.get("name") else "TRAVENDER 北海道ゴルフをご利用いただきありがとうございます。"
+    if kind == "CONFIRM":
+        subject = f"[TRAVENDER ゴルフ] ご予約が確定しました ({b['no']})"
+        lines = [hello, "", "お支払いが完了し、ご予約が確定しました。", "", _summary_ja(b), "",
+                 "他のグループと同じ送迎バスをご利用いただきます。"
+                 f"{_day_ja(b['judge_date'])}時点で同じ出発便の人数が{S.MIN_DEPARTURE}名以上の場合は催行決定となり、"
+                 "達しない場合は催行中止となり、お支払い金額を全額返金いたします。結果はメールでお知らせします。",
+                 "実際の乗車時刻は催行決定後にご案内します。",
+                 f"同行者のローマ字氏名は出発{S.COMPANION_DUE_DAYS}日前まで予約詳細で修正できます。"]
+    elif kind == "GO":
+        subject = f"[TRAVENDER ゴルフ] 催行が決定しました ({b['no']})"
+        lines = [hello, "", f"同じ出発便の人数が{S.MIN_DEPARTURE}名以上となり、催行が決定しました。", "", _summary_ja(b), "",
+                 "実際の乗車時刻と場所は別途ご案内します。予約詳細でもご確認いただけます。"]
+    elif kind == "CANCEL":
+        subject = f"[TRAVENDER ゴルフ] 催行中止のお知らせ ({b['no']})"
+        lines = [hello, "", f"誠に申し訳ございません。出発{S.JUDGE_DAYS}日前までに同じ出発便の人数が{S.MIN_DEPARTURE}名に達しなかったため、催行中止となりました。",
+                 "", _summary_ja(b), "",
+                 f"お支払い金額 {_yen(b['total'])} は全額返金いたします。返金はお支払いいただいた方法で行われ、"
+                 "カード会社によっては反映まで時間がかかる場合があります。"]
+    elif kind == "PICKUP":
+        subject = f"[TRAVENDER ゴルフ] 乗車時刻のご案内 ({b['no']})"
+        lines = [hello, "", "出発日の乗車時刻と場所をお知らせします。", "",
+                 f"乗車: {_day_ja(b['dep_date'])} {b.get('pickup_time') or '-'}", f"場所: {b.get('pick_place') or '-'}", "", _summary_ja(b), "",
+                 "送迎バスは複数のグループを順にお迎えしますので、乗車時刻の5分前までに乗車場所へお越しください。"
+                 "道路状況によりバスが多少遅れる場合があります。"]
+    elif kind == "USER_CANCEL":
+        subject = f"[TRAVENDER ゴルフ] ご予約のキャンセルが完了しました ({b['no']})"
+        lines = [hello, "", "ご依頼いただいたご予約のキャンセルが完了しました。", "", _summary_ja(b), "",
+                 "返金金額と進捗状況は TRAVENDER 本サイトのキャンセル・返金規定に従って処理され、本サイトでご確認いただけます。"]
+    else:
+        raise ValueError(f"알 수 없는 메일 종류: {kind}")
+    return subject, "\n".join(lines) + "\n" + _footer_ja()
+
+
 def _booking_info(c: Connection, booking_no: str) -> dict:
-    r = one(c, """SELECT b.no, b.people, b.total_price total, d.dep_date, d.judge_date, p.name_ko package_name, m.name_ko name,
+    r = one(c, """SELECT b.no, b.lang, b.people, b.total_price total, d.dep_date, d.judge_date, IF(b.lang = 'ja', p.name_ja, p.name_ko) package_name, m.name_ko name,
                          s.pickup_time, s.place_name pick_place
                   FROM booking b JOIN departure d ON d.id = b.departure_id JOIN package p ON p.id = d.package_id
                   LEFT JOIN booking_member m ON m.booking_no = b.no AND m.seq = 1
@@ -154,7 +220,8 @@ def _booking_info(c: Connection, booking_no: str) -> dict:
 def notify(c: Connection, booking_no: str, to: str, kind: str, **_: object) -> None:
     """kind(CONFIRM · GO · CANCEL · PICKUP · USER_CANCEL) 메일을 만들어 보내고 notification 에 기록. 실패해도 예약 처리는 되돌리지 않음"""
     try:
-        subject, body = render(kind, _booking_info(c, booking_no))
+        info = _booking_info(c, booking_no)
+        subject, body = (render_ja if info["lang"] == "ja" else render)(kind, info)  # 예약할 때 쓴 언어로 보냄
         mail.send(to, subject, body)
         run(c, "INSERT INTO notification (booking_no, kind, result) VALUES (:no, :k, 'OK')", no=booking_no, k=kind)
     except Exception as e:  # noqa: BLE001

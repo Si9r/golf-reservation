@@ -137,7 +137,7 @@ function DetailInner({ p }: { p: Pkg }) {
                     {full ? t("depEnough", { b: dv.booked }) : off ? t("depShort", { n: d.people }) : enough ? t("depEnough", { b: dv.booked }) : t("depNow", { b: dv.booked })}
                   </span>
                 </span>
-                <span className={`num text-[13px] font-semibold ${off ? "text-muted" : "text-ink-2"}`}>{full ? t("full") : t("seatsNow", { s: dv.seats })}</span>
+                <span className={`num text-[13px] font-semibold ${off ? "text-muted" : "text-ink-2"}`}>{full ? t("full") : t("seatsLeft", { s: dv.seats })}</span>
               </button>
             );
           })}
