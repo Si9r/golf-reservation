@@ -196,7 +196,7 @@ export default function InfoForm() {
 
       {compN > 0 && (
         <section ref={(el) => { refs.current.comps = el; }} className="relative mt-4 card grid gap-3 rounded-[20px] p-5">
-          <Anno n={5} t="동반자 명단 × (인원−1) (V-24): 필수. 사람마다 영문 성·이름 두 칸 (자동 대문자)" />
+          <Anno n={5} t="동반자 명단 × (인원−1) (V-24): 필수. 사람마다 영문 성·이름 두 칸 (자동 대문자, 칸 아래 성·이름 표시)" />
           <h2 className="flex flex-wrap items-center gap-2 text-[16px] font-bold"><span>{t("compT")}<Req /></span> <span className="text-[13px] font-normal text-muted">{t("peopleN", { n: compN })}</span></h2>
           <p className="help -mt-1">{t("compNote")}</p>
           <div className="grid gap-3">
@@ -209,6 +209,7 @@ export default function InfoForm() {
                       onChange={(e) => { const next = compEn.map((x) => [...x] as [string, string]); next[i][k] = upper(e.target.value); set({ compEn: next }); }} />
                   ))}
                 </div>
+                <div className="grid grid-cols-2 gap-2 text-[12px] text-muted"><span>{t("enSur")}</span><span>{t("enGiven")}</span></div>
               </div>
             ))}
           </div>
