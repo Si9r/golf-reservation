@@ -52,7 +52,7 @@ export default function Review() {
   const seatErr = v.state === "unavailable";
   const drop = d.dropSame ? d.pick : d.drop;
   const edit = (to: string) => {
-    d.patch({ editReturn: true });
+    d.patch({ editReturn: "review" });
     nav(to); // T-28
   };
   const itin = itinerary(p, d.opt, d.pick, drop, { pickTime: d.pickTime, dropTime: d.dropTime }); // 13: 희망 승하차 시간

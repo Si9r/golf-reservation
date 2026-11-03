@@ -1,4 +1,4 @@
-import { useRef, useState, type MutableRefObject, type ReactNode } from "react";
+import { useEffect, useRef, useState, type MutableRefObject, type ReactNode } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { ArrowSquareOut, CaretRight, WarningCircle } from "@phosphor-icons/react";
 import { SET, TERMS_URL } from "../data";
@@ -51,6 +51,11 @@ export default function InfoForm() {
   const [terms, setTerms] = useState<null | (typeof AGREE)[number]>(null);
   const refs = useRef<Record<string, HTMLElement | null>>({});
   const phRefs = useRef<(HTMLInputElement | null)[]>([]);
+  // '인원 변경'으로 패키지 상세에 다녀온 경우: 돌아왔으니 표시를 지움 (확인 화면과 같음)
+  useEffect(() => {
+    if (d.editReturn) d.patch({ editReturn: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   if (redirect) return <Navigate to={redirect} replace />;
 
   // 회원 정보로 채움 (동반자는 기본 '나중에 입력')
@@ -66,6 +71,11 @@ export default function InfoForm() {
     next[i] = v.replace(/\D/g, "").slice(0, 4);
     set({ ph: next, phone: next.join("-") });
     if (next[i].length === 4 && i < 2) phRefs.current[i + 1]?.focus(); // 4자리를 채우면 다음 칸으로
+  };
+  // 인원은 패키지 상세(S-03)에서 바꿈 → '변경 완료'로 이 화면에 돌아옴 (입력한 내용은 그대로)
+  const editPeople = () => {
+    d.patch({ editReturn: "info" });
+    nav(`/golf/packages/${p.id}`);
   };
   const blur = (k: string) => setTouched((x) => ({ ...x, [k]: true }));
 
@@ -209,9 +219,12 @@ export default function InfoForm() {
       {/* 대표자·동반자를 다 적은 뒤 총 인원 확인 */}
       <div className="mt-4 flex items-center justify-between rounded-[20px] bg-brand-soft px-5 py-3.5">
         <span className="text-[14px] font-semibold text-ink-2">{t("totalPeople")}</span>
-        <span className="text-right">
-          <b className="num text-[16px]">{t("peopleN", { n: d.people })}</b>
-          <span className="block text-[12.5px] text-muted">{t("peopleSplit", { c: compN })}</span>
+        <span className="flex items-center gap-3">
+          <span className="text-right">
+            <b className="num text-[16px]">{t("peopleN", { n: d.people })}</b>
+            <span className="block text-[12.5px] text-muted">{t("peopleSplit", { c: compN })}</span>
+          </span>
+          <button className="btn btn-xs btn-ghost flex-none bg-surface" onClick={editPeople}>{t("peopleEdit")}</button>
         </span>
       </div>
 

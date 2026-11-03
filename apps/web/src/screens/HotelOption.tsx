@@ -6,7 +6,7 @@ import { useT } from "../i18n";
 import { coursesOf, distM, fShort, hasHotelStep, optionOf, roomsOf, stayHotel, totalPrice, yen, yenDiff } from "../logic";
 import { Anno, BottomBar, gmapLink, PriceBlock, Q, ScreenTag, StepHead } from "../components/ui";
 import { DriveChip, MapView } from "../components/GoogleMap";
-import { useFlow } from "./flow";
+import { editBackTo, useFlow } from "./flow";
 import { useSeatGuard } from "../api/seatCheck";
 
 export default function HotelOption() {
@@ -23,8 +23,8 @@ export default function HotelOption() {
   const price = totalPrice(p, opt, d.people, d.singles);
   const rooms = roomsOf(d.people, d.singles);
   const setSingles = (s: number) => d.patch({ singles: roomsOf(d.people, s).singles });
-  const back = () => nav(d.editReturn ? "/golf/book/review" : `/golf/packages/${p.id}`);
-  const next = () => guard(() => nav(d.editReturn ? "/golf/book/review" : "/golf/book/place")); // T-08, B-01 잔여석 다시 확인
+  const back = () => nav(d.editReturn ? editBackTo(d.editReturn) : `/golf/packages/${p.id}`);
+  const next = () => guard(() => nav(d.editReturn ? editBackTo(d.editReturn) : "/golf/book/place")); // T-08, B-01 잔여석 다시 확인
   return (
     <div className="page step narrow">
       <ScreenTag id="S-05" name="호텔 옵션 선택" refs="FN-09, FN-11 · API-02 · T-08, T-28" />

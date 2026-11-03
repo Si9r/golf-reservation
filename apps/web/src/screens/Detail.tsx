@@ -11,6 +11,7 @@ import { Anno, BottomBar, Collapse, ErrorBanner, gmapLink, Img, PeopleInput, Pri
 import { PkgTags } from "../components/booking";
 import { LegRow, MapView, type MapMarker } from "../components/GoogleMap";
 import { takeSeatNotice, useSeatGuard } from "../api/seatCheck";
+import { editBackTo } from "./flow";
 
 export const ICON: Record<ItinItem["kind"], typeof Bus> = { bus: Bus, golf: Flag, hotel: Bed, drop: MapPin, free: Sun };
 
@@ -80,7 +81,7 @@ function DetailInner({ p }: { p: Pkg }) {
 
   // B-01: 넘어가기 전에 잔여석·판정일을 다시 확인 (api/seatCheck.ts)
   const proceed = () => guard(() => {
-    if (d.editReturn) nav("/golf/book/review"); // T-28
+    if (d.editReturn) nav(editBackTo(d.editReturn)); // T-28
     else nav(hasHotelStep(p) ? "/golf/book/hotel" : "/golf/book/place"); // T-06 / T-07 (숙박 있는 패키지는 옵션이 없어도 S-05)
   });
   const go = () => {
@@ -93,7 +94,7 @@ function DetailInner({ p }: { p: Pkg }) {
     if (d.editReturn) proceed();
     else setChecksOpen(true);
   };
-  const btnLabel = d.editReturn ? t("editBack") : !d.peopleSet ? t("peoplePh") : dep ? t("reserve") : t("pickDepFirst");
+  const btnLabel = d.editReturn ? t(d.editReturn === "info" ? "editBackInfo" : "editBack") : !d.peopleSet ? t("peoplePh") : dep ? t("reserve") : t("pickDepFirst");
 
   const reserve = (
     <div ref={reserveRef} className="relative grid gap-4">
@@ -172,7 +173,7 @@ function DetailInner({ p }: { p: Pkg }) {
   return (
     <div className="page wide">
       <ScreenTag id="S-03" name="패키지 상세" refs="FN-06~08, FN-11, FN-18 · L-01·02·04·11 · API-02, API-03 · T-06, T-07, T-28, T-29" />
-      <StepHead at={0} hasHotel={hasHotelStep(p)} onBack={() => (d.editReturn ? nav("/golf/book/review") : nav("/golf/packages"))} className="lg:-mt-1" />
+      <StepHead at={0} hasHotel={hasHotelStep(p)} onBack={() => (d.editReturn ? nav(editBackTo(d.editReturn)) : nav("/golf/packages"))} className="lg:-mt-1" />
       {load.error && <ErrorBanner onRetry={load.retry} />}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-10">

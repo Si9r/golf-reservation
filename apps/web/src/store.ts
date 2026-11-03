@@ -120,7 +120,7 @@ export interface Draft {
   holdPeople: number;
   pendingNo?: string | null; // API 모드: 결제 대기 예약번호 (API-10, 본 사이트 결제 연동). 이 예약이 좌석을 잡음
   singles: number | null; // 1인실 이용 인원 (null = 자동: 홀수면 1명)
-  editReturn: boolean; // S-08 '변경'으로 들어온 경우 → '변경 완료' 후 S-08
+  editReturn: false | "review" | "info"; // S-08 '변경' 또는 S-09 '인원 변경'으로 들어온 경우 → '변경 완료' 후 그 화면으로
 }
 const blankDraft = (): Draft => ({
   q: "",

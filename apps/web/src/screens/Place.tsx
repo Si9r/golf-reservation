@@ -8,7 +8,7 @@ import { hasHotelStep, nearestKnown, norm, placeZone, stayHotel, stopTimeRange, 
 import { Anno, BottomBar, Q, ScreenTag, StepHead } from "../components/ui";
 import { DriveChip, MapView, type MapMarker } from "../components/GoogleMap";
 import { useDrive, useMaps, type LL } from "../gmaps";
-import { useFlow } from "./flow";
+import { editBackTo, useFlow } from "./flow";
 import { useApp, type Draft } from "../store";
 import { USE_API, api } from "../api/client";
 import { useSeatGuard } from "../api/seatCheck";
@@ -285,7 +285,7 @@ export default function Place() {
     const target = !d.pick || goTab === "drop" ? placeRef : timeRef;
     window.setTimeout(() => target.current?.scrollIntoView({ behavior: "smooth", block: isLg ? "center" : "nearest" }), 260); // 탭·시트가 바뀐 뒤 (시트 높이 전환 .22s)
   };
-  const back = () => nav(d.editReturn ? "/golf/book/review" : hasHotelStep(p) ? "/golf/book/hotel" : `/golf/packages/${p.id}`); // 숙박 있는 패키지는 옵션이 없어도 S-05로
+  const back = () => nav(d.editReturn ? editBackTo(d.editReturn) : hasHotelStep(p) ? "/golf/book/hotel" : `/golf/packages/${p.id}`); // 숙박 있는 패키지는 옵션이 없어도 S-05로
   const pv = preview?.place;
   const pvOk = pv ? !!placeZone(pv) : false;
   const center = preview ? preview.at : cur ? { lat: cur.lat, lng: cur.lng } : null;
@@ -500,7 +500,7 @@ export default function Place() {
         <p className="truncate">{t("pick")} · {d.pick ? withTime(n(d.pick.name), d.pickTime) : "-"}</p>
         <p className="truncate">{t("drop")} · {dropShown ? withTime(n(dropShown.name), d.dropTime) : "-"}</p>
       </div>
-      <button className="btn btn-primary min-w-[140px]" aria-disabled={!done} onClick={() => (done ? guard(() => { if (d.dropSame) d.patch({ drop: d.pick }); nav("/golf/book/review"); }) : showFirstMissing())}>{d.editReturn ? t("editBack") : t("next")}</button>
+      <button className="btn btn-primary min-w-[140px]" aria-disabled={!done} onClick={() => (done ? guard(() => { if (d.dropSame) d.patch({ drop: d.pick }); nav(d.editReturn ? editBackTo(d.editReturn) : "/golf/book/review"); }) : showFirstMissing())}>{d.editReturn ? t("editBack") : t("next")}</button>
     </BottomBar>
   );
   const head = (
