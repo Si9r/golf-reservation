@@ -115,7 +115,7 @@ export default function MyDetail() {
           <div className="absolute inset-x-0 top-0 flex items-center gap-2 p-2 text-white lg:p-4">
             <button className="grid h-11 w-11 flex-none place-items-center rounded-full hover:bg-white/15" onClick={() => nav("/golf/my")} aria-label={t("back")}><ArrowLeft size={22} weight="bold" /></button>
             <span className="flex-1 text-[15px] font-bold">{t("bkT")}</span>
-            <button className="flex flex-none items-center gap-1 rounded-full px-3 py-2 text-[13px] font-semibold hover:bg-white/15" onClick={copyNo} aria-label={t("copyNo")}>
+            <button className="flex flex-none items-center gap-1 rounded-full bg-black/40 px-3 py-2 text-[13px] font-semibold ring-1 ring-white/25 backdrop-blur-sm hover:bg-black/55" onClick={copyNo} aria-label={t("copyNo")}>
               <span className="num">{b.no}</span> <Copy size={15} />
             </button>
           </div>
