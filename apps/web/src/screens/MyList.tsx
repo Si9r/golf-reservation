@@ -2,10 +2,10 @@ import { GoalMeter } from "./Detail";
 import { useEffect, useMemo, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
-import { CaretRight, Headset, Suitcase } from "@phosphor-icons/react";
+import { CaretRight, Copy, Headset, Suitcase } from "@phosphor-icons/react";
 import { SET } from "../data";
 import { useT } from "../i18n";
-import { useAuth, useDb, viewOf, type Booking } from "../store";
+import { useAuth, useDb, useToast, viewOf, type Booking } from "../store";
 import { fShort, judgeDate, stayHotel, todayISO, tripEnd, yen } from "../logic";
 import { Anno, Img, ScreenTag } from "../components/ui";
 import { USE_API } from "../api/client";
@@ -30,6 +30,8 @@ export default function MyList() {
   const user = useAuth((s) => s.user);
   const { bookings, extra } = useDb();
   const [tab, setTab] = useState<"up" | "past" | "cancel">("up");
+  const toast = useToast((s) => s.show);
+  const copyNo = (no: string) => { navigator.clipboard?.writeText(no).then(() => toast(t("copied"))).catch(() => undefined); }; // 예약 상세(S-13)와 같음
   // API 모드: 내 예약을 서버에서 (API-11 → API-12). 브라우저 데모 예약은 쓰지 않음
   useEffect(() => {
     if (!USE_API || !user) return;
@@ -62,7 +64,7 @@ export default function MyList() {
 
   const tabs = (
     <div className="relative flex gap-2 lg:gap-1 lg:rounded-xl lg:bg-surface-2 lg:p-1" role="tablist">
-      <Anno n={1} t="탭: 예정(CONFIRMED) / 지난(DONE) / 취소(OP_CANCEL·USER_CANCEL), 탭마다 건수" />
+      <Anno n={1} t="탭: 예정(CONFIRMED) / 지난(DONE) / 취소(OP_CANCEL·USER_CANCEL), 탭마다 건수. 카드 예약번호 옆 복사 버튼 (복사하면 안내 토스트). 좁은 화면(380px 미만)은 '예약번호' 글자를 숨겨 상태 배지와 겹치지 않게" />
       {(["up", "past", "cancel"] as const).map((k) => (
         <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
           className={`min-h-[40px] rounded-full px-4 text-[14px] font-bold lg:rounded-lg ${tab === k ? "bg-ink text-surface lg:bg-surface lg:text-ink lg:shadow-sm" : "border border-line-strong bg-surface text-ink-2 lg:border-0 lg:bg-transparent lg:text-muted"}`}>
@@ -86,7 +88,9 @@ export default function MyList() {
       <motion.article key={r.b.no} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }} className="overflow-hidden rounded-[18px] bg-surface shadow-[var(--shadow)]">
         <header className="flex items-center justify-between gap-3 border-b border-line px-4 py-3 lg:px-6">
           <span className="num flex min-w-0 flex-wrap gap-x-3 text-[13px] text-muted">
-            <span>{t("noLabel")} <b className="text-ink">{r.b.no}</b></span>
+            <span className="inline-flex items-center gap-1 whitespace-nowrap"><span className="max-[379px]:sr-only">{t("noLabel")}</span> <b className="whitespace-nowrap text-ink">{r.b.no}</b>
+              <button className="-my-2 -mr-1 grid h-7 w-7 place-items-center rounded-full text-ink-2 hover:bg-surface-2 hover:text-brand" onClick={() => copyNo(r.b.no)} aria-label={t("copyNo")} title={t("copyNo")}><Copy size={15} /></button>
+            </span>
             <span>{t("bookedOn")} {fShort(r.b.createdAt.slice(0, 10), L)}</span>
           </span>
           <span className={`flex-none rounded-lg px-2.5 py-1 text-[12px] font-bold ${tone.chip}`}>{t(`lab_${r.v.label}`)}</span>
