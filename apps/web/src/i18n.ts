@@ -729,7 +729,7 @@ const ja: Dict = {
   demoAccount: "デモアカウント",
   repT: "代表者情報",
   filled: "会員情報から入力しました",
-  nameKo: "お名前（漢字・ハングル）",
+  nameKo: "お名前",
   nameEn: "ローマ字氏名（パスポートと同じ）",
   phone: "電話番号（国番号を含む）",
   ccL: "国番号",
