@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
 import { Bus, CalendarBlank, CaretRight, MagnifyingGlass, MapPinLine, Sparkle, UsersThree, X } from "@phosphor-icons/react";
@@ -22,6 +22,15 @@ export default function Home() {
   const apiV = useDepartures(knownPkgIds, monthsAhead().filter(monthInSeason)); // API 모드: 추천·곧 출발 카드의 출발일·잔여석을 서버 값으로 (API-03). 안 받은 달은 프로토타입 계산으로 떨어지므로 판매 달 전부
   const [sheet, setSheet] = useState(false);
   const [ai, setAi] = useState(false);
+  const matchRef = useRef<HTMLElement>(null);
+  // 검색창 엔터: 키보드를 닫고 아래 '조건에 맞는 패키지'로 스크롤 (추천 칸이 없는 1단계는 패키지 목록으로)
+  const onSearchKey = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== "Enter" || e.nativeEvent.isComposing) return; // 한글·일본어 조합 중 엔터는 글자 확정
+    e.preventDefault();
+    e.currentTarget.blur();
+    if (matchRef.current) matchRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    else nav("/golf/packages");
+  };
   // 로고 → 확인 창 '처음으로'(M-101): 홈이 열린 뒤 진행 중 예약을 비움 (L-13)
   useEffect(() => {
     if ((loc.state as { reset?: boolean } | null)?.reset) {
@@ -88,7 +97,7 @@ export default function Home() {
             <label className="relative flex min-h-[56px] flex-col justify-center rounded-[14px] bg-surface-2 px-3.5 pr-11">
               <Anno n={2} t="검색창 (V-01): 골프장·지역·호텔 이름 한·일·영 부분 일치, 결과 수 즉시 갱신" />
               <span className="flex items-center gap-1 text-[11.5px] font-bold text-muted"><MagnifyingGlass size={13} className="text-brand" />{t("searchL")}</span>
-              <input className="w-full min-w-0 bg-transparent text-[15px] outline-none placeholder:text-muted" placeholder={t("searchPh")} aria-label={t("searchPh")} value={q} maxLength={SET.SEARCH_MAX} onChange={(e) => patch({ q: e.target.value })} />
+              <input className="w-full min-w-0 bg-transparent text-[15px] outline-none placeholder:text-muted" placeholder={t("searchPh")} aria-label={t("searchPh")} value={q} maxLength={SET.SEARCH_MAX} onChange={(e) => patch({ q: e.target.value })} onKeyDown={onSearchKey} enterKeyHint="search" />
               {q && <button className="absolute right-1.5 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full text-muted hover:bg-surface" onClick={() => patch({ q: "" })} aria-label={t("close")}><X size={16} /></button>}
             </label>
             {/* 3·4 출발일·인원: 두 칸 (휴대폰 2열, PC는 검색창 옆). 누르면 날짜·인원 시트 */}
@@ -146,8 +155,8 @@ export default function Home() {
 
           {/* 7 추천 / 조건에 맞는 패키지: 사진 크게 */}
           {stage >= 2 && (
-            <section className="relative mt-10">
-              <Anno n={7} t="추천 패키지 3개 → 검색어·날짜가 있으면 '조건에 맞는 패키지' 최대 7개" />
+            <section ref={matchRef} className="relative mt-10 scroll-mt-28">
+              <Anno n={7} t="추천 패키지 3개 → 검색어·날짜가 있으면 '조건에 맞는 패키지' 최대 7개. 검색창에서 엔터를 누르면 여기로 스크롤" />
               <div className="mb-3.5 flex items-baseline justify-between gap-2">
                 <h2 className="flex items-center gap-2 text-[22px] font-black tracking-tight">{conditioned ? t("recMatch") : t("recT")} <StageTag s={2} />{conditioned && <span className="text-[13px] font-normal text-muted">{results.length}</span>}</h2>
                 <button className="link text-[14px]" onClick={() => nav("/golf/packages")}>{t("seeAllL")}</button>
