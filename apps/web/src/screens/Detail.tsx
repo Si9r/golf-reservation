@@ -359,7 +359,7 @@ export function DepStateText({ v, dep, go, showErr }: { v: ReturnType<typeof dep
 }
 
 // 일정 목록 (구간 이동 시간 포함)
-export function ItinList({ items, memo }: { items: ItinItem[]; memo?: string }) {
+export function ItinList({ items }: { items: ItinItem[] }) {
   const { t, L } = useT();
   return (
     <ol className="grid gap-0 px-4 pb-4">
@@ -370,14 +370,13 @@ export function ItinList({ items, memo }: { items: ItinItem[]; memo?: string }) 
             {j > 0 && <LegRow from={prevAt(items, j)} to={it.at} />}
             <li className="relative grid grid-cols-[52px_28px_1fr] gap-2 pb-3 last:pb-0">
               <span className={`num pt-0.5 text-right text-[13px] font-bold leading-tight ${it.tbd ? "text-muted" : "text-brand"}`}>
-                {it.wish && <span className="block text-[10.5px] font-semibold text-muted">{t("wish")}</span>}
                 {it.time ?? (it.tbd ? t("tbd") : "")}
               </span>
               <span className="relative flex justify-center">
                 <span className="z-[1] grid h-7 w-7 place-items-center rounded-full bg-brand-soft text-brand"><I size={15} weight="bold" /></span>
               </span>
               <span className="min-w-0 pt-0.5">
-                <b className="block text-[14px] leading-snug">{it.title[L]}{it.kind === "bus" && j === 0 && memo ? ` (${memo})` : ""}</b>
+                <b className="block text-[14px] leading-snug">{it.title[L]}</b>
                 {it.note && <span className="block text-[12.5px] text-muted">{it.note[L]}</span>}
               </span>
             </li>

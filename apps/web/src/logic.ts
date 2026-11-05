@@ -209,50 +209,12 @@ export const nearestKnown = (lat: number, lng: number): Place | null => {
 export const placeZone = (p: Place | null) => (p ? zoneAt(p.lat, p.lng) : null);
 export const areaLabel = (a: Area, L: Lang) => AREA_NAME[a][L];
 
-// ---------- 희망 승하차 시간 (V-12) ----------
+// ---------- 시각 계산 ----------
 const toMin = (t: string) => {
   const [h, m] = t.split(":").map(Number);
   return h * 60 + m;
 };
 const fmtMin = (x: number) => `${pad(Math.floor(x / 60))}:${pad(x % 60)}`;
-// 이동 시간: Google 경로 시간과 서버 대략값 표(TRAVEL = 서버 TRAVEL_MIN) 중 큰 쪽.
-// 화면에서 고를 수 있는 범위가 항상 서버 검사(V-12-range) 범위 안에 들도록 (Google이 더 짧으면 화면에서 고른 시간을 서버가 거절했음)
-const travelOf = (z: Zone, area: Area, driveMin?: number | null) => Math.max(driveMin ?? 0, TRAVEL[z][area] ?? 60);
-export interface StopRange {
-  from: string;
-  to: string;
-  options: string[]; // 고를 수 있는 시간 (30분 단위). 비어 있으면 일정상 고를 수 없음
-  base: { kind: "tee"; tee: string } | { kind: "end"; end: string } | null; // 범위 안내 문구용 (첫날 티오프 / 마지막 라운드 종료 예정)
-}
-// 고를 수 있는 희망 시간 범위. 서버 services/booking.py stop_time_range 와 같은 계산
-// 승차(첫날): (첫날 티오프 − 2시간 30분, 06:00보다 이르면 06:00)을 올림 ~ (첫날 티오프 − 이동 − 30분)을 내림
-// 하차(마지막 날): (마지막 라운드 티오프 + 5시간 + 이동)을 올림 ~ 21:00
-// driveMin: Google 경로 시간(분). TRAVEL 대략값보다 짧으면 TRAVEL 을 씀 (서버가 TRAVEL 대략값으로 검사하므로 화면 범위 ⊆ 서버 범위)
-export const stopTimeRange = (p: Pkg, kind: "pick" | "drop", place: Place | null, driveMin?: number | null): StopRange | null => {
-  const z = placeZone(place);
-  if (!z) return null;
-  const step = SET.STOP_TIME_STEP_MIN;
-  let lo = toMin(SET.STOP_TIME_FIRST);
-  let hi = toMin(SET.STOP_TIME_LAST);
-  let base: StopRange["base"] = null;
-  if (kind === "pick") {
-    const r = p.days[0]; // 첫날 라운드가 없으면 (프로토타입 데이터에는 첫 출발 시각이 없어) 끝은 21:00
-    if (r) {
-      lo = Math.max(lo, Math.ceil((toMin(r.tee) - SET.PICK_EARLIEST_BEFORE_TEE_MIN) / step) * step);
-      hi = Math.min(hi, Math.floor((toMin(r.tee) - travelOf(z, courseOf(r.course).area, driveMin) - SET.PICK_MARGIN_MIN) / step) * step);
-      base = { kind: "tee", tee: r.tee };
-    }
-  } else {
-    const r = p.days[p.days.length - 1];
-    const end = r ? toMin(r.tee) + SET.ROUND_HOURS * 60 : null;
-    lo = Math.max(lo, Math.ceil(((end ?? toMin(SET.NO_ROUND_DROP_FROM)) + (r ? travelOf(z, courseOf(r.course).area, driveMin) : 0)) / step) * step);
-    if (end !== null) base = { kind: "end", end: fmtMin(end) };
-  }
-  const options: string[] = [];
-  for (let x = lo; x <= hi; x += step) options.push(fmtMin(x));
-  return { from: fmtMin(lo), to: fmtMin(hi), options, base };
-};
-
 // 예상 승차 시간 = 첫 티오프 − 체크인 30분 − 이동 − 여유 10분 (F-063, 확정은 출발 확정 후)
 export const pickupWindow = (p: Pkg, pick: Place | null, driveMin?: number | null) => {
   const z = placeZone(pick);
@@ -277,7 +239,6 @@ export interface ItinItem {
   note?: { ko: string; ja: string };
   course?: number;
   tbd?: boolean; // 시간은 출발 확정 후 안내 (L-11)
-  wish?: boolean; // 손님이 고른 희망 시간 (실제 시간은 출발 확정 후 안내)
 }
 // 승차·호텔 출발 시각 = 그날 티오프 − 이동 시간 − 30분(체크인 여유, 서버 PICK_MARGIN_MIN), 30분 단위 내림 (팀 테스트 10/23 B-02)
 // 이동 시간: 받아 둔 Google 경로 시간, 없으면 지역 대략값(TRAVEL), 그것도 없으면 60분
@@ -288,10 +249,9 @@ const leaveAt = (tee: string, from: { lat: number; lng: number }, fromArea: Area
   const step = SET.STOP_TIME_STEP_MIN;
   return fmtMin(Math.floor((toMin(tee) - travel - SET.PICK_MARGIN_MIN) / step) * step);
 };
-// L-11 일정표 만들기. 첫날 승차는 운영이 등록(API-17)한 확정 시간, 없으면 손님 희망 시간('희망'), 둘 다 없으면 '확정 후'.
-// 마지막 날 하차는 손님 희망 하차 시간이 있으면 그것('희망')
-export const itinerary = (p: Pkg, optId: string | null, pick: Place | null, drop: Place | null, o: { confirmedPickup?: string | null; pickTime?: string | null; dropTime?: string | null } = {}) => {
-  const { confirmedPickup, pickTime, dropTime } = o;
+// L-11 일정표 만들기. 첫날 승차는 운영이 등록(API-17)한 확정 시간, 없으면 '확정 후' (희망 승하차 시간은 받지 않음, 팀 결정 11/05)
+export const itinerary = (p: Pkg, optId: string | null, pick: Place | null, drop: Place | null, o: { confirmedPickup?: string | null } = {}) => {
+  const { confirmedPickup } = o;
   const h = stayHotel(p, optId);
   const hAt = h ? { lat: h.lat, lng: h.lng } : undefined;
   const pAt = pick ? { lat: pick.lat, lng: pick.lng } : undefined;
@@ -301,7 +261,7 @@ export const itinerary = (p: Pkg, optId: string | null, pick: Place | null, drop
   const last = p.days.length - 1;
   return p.days.map((r, i) => {
     const items: ItinItem[] = [];
-    if (i === 0) items.push({ kind: "bus", at: pAt, time: confirmedPickup ?? pickTime ?? undefined, wish: !confirmedPickup && !!pickTime, tbd: !confirmedPickup && !pickTime, title: { ko: `버스 승차 · ${pickName.ko}`, ja: `バス乗車・${pickName.ja}` }, note: { ko: "확정 시간은 메일로 안내", ja: "確定時刻はメールでご案内" } });
+    if (i === 0) items.push({ kind: "bus", at: pAt, time: confirmedPickup ?? undefined, tbd: !confirmedPickup, title: { ko: `버스 승차 · ${pickName.ko}`, ja: `バス乗車・${pickName.ja}` }, note: { ko: "확정 시간은 메일로 안내", ja: "確定時刻はメールでご案内" } });
     else if (h && !h.onsite) items.push({ kind: "bus", at: hAt, time: r ? leaveAt(r.tee, h, h.area, courseOf(r.course)) : "09:00", title: { ko: `${h.name.ko} 출발`, ja: `${h.name.ja} 出発` } });
     else if (!h && i > 0) items.push({ kind: "bus", at: pAt, time: r && pick ? leaveAt(r.tee, pick, placeZone(pick), courseOf(r.course)) : "09:00", title: { ko: `버스 승차 · ${pickName.ko}`, ja: `バス乗車・${pickName.ja}` } });
     if (r) {
@@ -312,7 +272,7 @@ export const itinerary = (p: Pkg, optId: string | null, pick: Place | null, drop
     }
     if (i < last && h) items.push({ kind: "hotel", at: hAt, time: r?.back, title: { ko: `숙박 · ${h.name.ko}`, ja: `宿泊・${h.name.ja}` }, note: { ko: "체크인 15:00 이후 · 조식 포함", ja: "チェックイン15:00以降・朝食付き" } });
     if (i < last && !h) items.push({ kind: "drop", at: dAt, time: r?.back, title: { ko: `버스 하차 · ${dropName.ko}`, ja: `バス降車・${dropName.ja}` }, note: { ko: "숙박은 직접 준비 (호텔 없이 옵션)", ja: "宿泊はご自身で手配（ホテルなし）" } });
-    if (i === last) items.push({ kind: "drop", at: dAt, time: dropTime ?? (r ? r.back : "11:00"), wish: !!dropTime, title: { ko: `버스 하차 · ${dropName.ko}`, ja: `バス降車・${dropName.ja}` }, ...(dropTime ? { note: { ko: "확정 시간은 메일로 안내", ja: "確定時刻はメールでご案内" } } : {}) });
+    if (i === last) items.push({ kind: "drop", at: dAt, time: r ? r.back : "11:00", title: { ko: `버스 하차 · ${dropName.ko}`, ja: `バス降車・${dropName.ja}` } });
     return items;
   });
 };

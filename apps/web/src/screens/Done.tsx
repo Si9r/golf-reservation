@@ -99,7 +99,7 @@ export default function Done() {
               <span className="num text-[14px] text-muted">{dates} · {t("peopleN", { n: b.people })}</span>
             </div>
             <div className="grid grid-cols-[auto_1fr] gap-x-3.5 gap-y-2.5 text-[14px]">
-              <span className="text-muted">{t("pick")}</span><span className="min-w-0">{b.pick ? n(b.pick.name) : "-"}{b.pickTime ? ` · ${t("wishAt", { t: b.pickTime })}` : ""}</span>
+              <span className="text-muted">{t("pick")}</span><span className="min-w-0">{b.pick ? n(b.pick.name) : "-"}</span>
               <span className="text-muted">{t("drop")}</span><span className="min-w-0">{b.drop ? n(b.drop.name) : "-"}</span>
               <span className="text-muted">{t("rowHotel")}</span><span className="min-w-0">{hotel ? n(hotel.name) : t("noHotel")}</span>
             </div>

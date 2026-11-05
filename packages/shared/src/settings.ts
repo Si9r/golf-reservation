@@ -14,17 +14,10 @@ export const SETTINGS = {
   NEAR_PLACE_M: 350, // L-06 지도 탭 근처 장소 이름 사용
   // L-06 승하차 가능 범위: 중심(삿포로 TV탑 부근)에서 반경 5km (운영사 확정 10/29). 서버 settings.py SERVICE_AREA 와 같은 값. 화면 data.ts ZONES_STRICT 가 씀
   SERVICE_AREA: { id: "SAPPORO", lat: 43.0621, lng: 141.3544, r: 5000 },
-  MEMO_MAX: 100, // V-11
+  MEMO_MAX: 100, // V-11 요청 사항
   SEARCH_MAX: 50, // V-01
   DEPARTURE_MONTHS_AHEAD: 13, // B-04
-  // 희망 승하차 시간 (V-12, 운영사 확정). 범위 계산은 서버 services/booking.py stop_time_range
-  STOP_TIME_FIRST: "06:00",
-  STOP_TIME_LAST: "21:00",
-  STOP_TIME_STEP_MIN: 30,
-  PICK_MARGIN_MIN: 30, // 승차: 첫 티오프 − 이동 시간 − 이 여유 (가장 늦은 승차)
-  PICK_EARLIEST_BEFORE_TEE_MIN: 150, // 승차: 첫 티오프 − 2시간 30분부터 (가장 이른 승차). 합승이라 일찍 타면 골프장에서 대기
-  ROUND_HOURS: 5, // 라운드 종료 예정 = 티오프 + 5시간
-  NO_ROUND_DROP_FROM: "11:00", // 마지막 날 라운드가 없을 때 하차 기준
+  // 희망 승하차 시간은 받지 않음 (팀 결정 11/05): 승차 시간은 운영이 정해 안내 (PICKUP_REGISTER_DUE_DAYS)
   SUPPORT: { tel: "00-0000-000", email: "golf@travender-hokkaido.com", hours: "10:00-17:00" }, // 전화·이메일 임시값 (운영사 10/29, 실제 번호 받기 전). 운영 시간 확정
   TERMS_URL: { terms: "https://travender-hokkaido.com/terms", privacy: "https://travender-hokkaido.com/privacy", cancel: "https://travender-hokkaido.com/cancel" }, // 예시
 } as const;

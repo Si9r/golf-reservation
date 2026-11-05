@@ -89,7 +89,7 @@ export interface ApiBooking {
   optionId: string | null; lang: "ko" | "ja"; createdAt: string; refundStatus: "REQUESTED" | "DONE" | "FAIL" | null;
   departure: { id: string; date: string; booked: number; minPeople: number; seatsLeft: number; status: DepartureStatus; judgeDate: string };
   companionDue: string;
-  stops: { kind: "PICK" | "DROP"; placeName: string; placeId: string | null; address: string | null; lat: number; lng: number; memo: string | null; pickupTime: string | null; desiredTime: string | null }[];
+  stops: { kind: "PICK" | "DROP"; placeName: string; placeId: string | null; address: string | null; lat: number; lng: number; memo: string | null; pickupTime: string | null }[];
   members: { seq: number; isRep: boolean; nameLocal: string | null; nameEn: string | null; countryCode: string | null; phone: string | null; email: string | null }[];
 }
 

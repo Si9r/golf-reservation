@@ -55,7 +55,7 @@ export default function Review() {
     d.patch({ editReturn: "review" });
     nav(to); // T-28
   };
-  const itin = itinerary(p, d.opt, d.pick, drop, { pickTime: d.pickTime, dropTime: d.dropTime }); // 13: 희망 승하차 시간
+  const itin = itinerary(p, d.opt, d.pick, drop);
   const go = () => nav(user ? "/golf/book/info" : `/login?next=${encodeURIComponent("/golf/book/info")}`); // T-14
   // EV-28 ④ 중복 예약 확인 (M-152): 같은 회원 · 같은 패키지 · 같은 출발일의 유효 예약
   const dupB = USE_API ? apiDup : user ? bookings.find((b) => b.pkgId === p.id && b.dep === dep && b.status === "CONFIRMED") ?? null : null;
@@ -111,11 +111,11 @@ export default function Review() {
               </Row>
               {/* 3 버스 승하차 */}
               <Row icon={Bus} title={t("pick")} to="/golf/book/place">
-                <b className="font-semibold">{n(d.pick!.name)}</b> · {t("wishAt", { t: d.pickTime! })}
-                {d.pickMemo && <span className="block text-[12.5px] text-muted">{d.pickMemo}</span>}
+                <b className="font-semibold">{n(d.pick!.name)}</b>
+                {d.pickMemo && <span className="block text-[12.5px] text-muted">{t("reqL")} · {d.pickMemo}</span>}
               </Row>
               <Row icon={Bus} title={t("drop")} to="/golf/book/place">
-                <b className="font-semibold">{drop ? n(drop.name) : "-"}</b>{d.dropSame && <span className="text-muted"> ({t("sameAsPick")})</span>}{d.dropTime ? ` · ${t("wishAt", { t: d.dropTime })}` : ""}
+                <b className="font-semibold">{drop ? n(drop.name) : "-"}</b>{d.dropSame && <span className="text-muted"> ({t("sameAsPick")})</span>}
               </Row>
             </div>
           </section>
@@ -131,7 +131,7 @@ export default function Review() {
             {!itinOpen && (
               <div className="-mt-1 pb-2">
                 <p className="px-4 pb-1 text-[13px] font-bold text-brand">{t("dayN", { i: 1 })} · {fShort(dep, L)}</p>
-                <ItinList items={itin[0].slice(0, 2)} memo={d.pickMemo} />
+                <ItinList items={itin[0].slice(0, 2)} />
               </div>
             )}
             <Collapse open={itinOpen}>
@@ -139,7 +139,7 @@ export default function Review() {
                 {itin.map((items, i) => (
                   <div key={i}>
                     <p className="px-4 pb-1 text-[13px] font-bold text-brand">{t("dayN", { i: i + 1 })} · {fShort(addDays(dep, i), L)}</p>
-                    <ItinList items={items} memo={i === 0 ? d.pickMemo : undefined} />
+                    <ItinList items={items} />
                   </div>
                 ))}
               </div>

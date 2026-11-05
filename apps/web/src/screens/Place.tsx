@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
-import { Airplane, Bed, Buildings, Bus, CheckCircle, Clock, GoogleLogo, MagnifyingGlass, MapPin, Train, WarningCircle, X } from "@phosphor-icons/react";
+import { Airplane, Bed, Buildings, Bus, CheckCircle, GoogleLogo, MagnifyingGlass, MapPin, Train, WarningCircle, X } from "@phosphor-icons/react";
 import { AREA_NAME, PLACES, SET, ZONES_STRICT, courseOf, serviceArea, type Place as P, type PlaceKind } from "../data";
 import { useT } from "../i18n";
-import { hasHotelStep, nearestKnown, norm, placeZone, stayHotel, stopTimeRange, zoneAt, type StopRange } from "../logic";
+import { hasHotelStep, nearestKnown, norm, placeZone, stayHotel, zoneAt } from "../logic";
 import { Anno, BottomBar, Q, ScreenTag, StepHead } from "../components/ui";
 import { DriveChip, MapView, type MapMarker } from "../components/GoogleMap";
-import { useDrive, useMaps, type LL } from "../gmaps";
+import { useMaps, type LL } from "../gmaps";
 import { editBackTo, useFlow } from "./flow";
-import { useApp, type Draft } from "../store";
+import { useApp } from "../store";
 import { USE_API, api } from "../api/client";
 import { useSeatGuard } from "../api/seatCheck";
 
@@ -112,29 +112,7 @@ export default function Place() {
   const firstCourse = days.length ? courseOf(days[0]!.course) : null;
   const lastRound = p ? p.days[p.days.length - 1] : null;
   const lastAt: { at: LL; name: string } | null = !p ? null : lastRound ? { at: courseOf(lastRound.course), name: n(courseOf(lastRound.course).name) } : hotel ? { at: hotel, name: n(hotel.name) } : firstCourse ? { at: firstCourse, name: n(firstCourse.name) } : null;
-  // 희망 시간 범위 (V-12): 승차 → 첫날 골프장, 마지막 날 골프장 → 하차. 이동 시간은 Google 경로 결과, 없으면 TRAVEL 대략값
-  const day1Course = p?.days[0] ? courseOf(p.days[0].course) : null;
-  const lastDayRound = p ? p.days[p.days.length - 1] : null;
-  const lastDayCourse = lastDayRound ? courseOf(lastDayRound.course) : null;
-  const dropPlace = d.dropSame ? d.pick : d.drop;
   const guard = useSeatGuard(); // B-01: 다음으로 가기 전 잔여석 다시 확인 (S-03·S-05·S-08과 같음)
-  const pickLeg = useDrive(d.pick, day1Course);
-  const dropLeg = useDrive(lastDayCourse, dropPlace);
-  const gmin = (x: typeof pickLeg) => (x.drive?.source === "google" ? x.drive.min : null);
-  const pickRange = p ? stopTimeRange(p, "pick", d.pick, gmin(pickLeg)) : null;
-  const dropRange = p ? stopTimeRange(p, "drop", dropPlace, gmin(dropLeg)) : null;
-  // 장소·일정이 바뀌어 고른 시간이 범위 밖이 되면 선택을 지움 (경로 시간을 받는 중에는 기다림)
-  const pickKey = pickRange ? pickRange.options.join() : "";
-  const dropKey = dropRange ? dropRange.options.join() : "";
-  useEffect(() => {
-    if (pickLeg.loading || dropLeg.loading) return;
-    const out: Partial<Draft> = {};
-    if (d.pickTime && !pickRange?.options.includes(d.pickTime)) out.pickTime = null;
-    if (d.dropTime && !dropRange?.options.includes(d.dropTime)) out.dropTime = null;
-    if (Object.keys(out).length) d.patch(out);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pickKey, dropKey, d.pickTime, d.dropTime, pickLeg.loading, dropLeg.loading]);
-
   const markers = useMemo<MapMarker[]>(() => {
     if (!p) return [];
     const out: MapMarker[] = [...new Map(days.map((r) => [r!.course, courseOf(r!.course)])).values()].map((c, i) => ({ lat: c.lat, lng: c.lng, title: n(c.name), kind: "golf" as const, glyph: String(i + 1) }));
@@ -159,7 +137,7 @@ export default function Place() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [p?.id, d.pick, d.drop, d.dropSame]);
 
-  // 모바일 승하차: 지도가 화면을 채우고, 목록·시간·요약은 아래에서 끌어올리는 시트 (PC는 위 목록 + 넓은 지도)
+  // 모바일 승하차: 지도가 화면을 채우고, 목록·요약은 아래에서 끌어올리는 시트 (PC는 위 목록 + 넓은 지도)
   const [isLg, setIsLg] = useState(() => window.matchMedia("(min-width: 1024px)").matches);
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 1024px)");
@@ -190,7 +168,6 @@ export default function Place() {
   useEffect(() => { if (preview) setSheet((x) => (x === 0 ? 1 : x)); }, [preview]); // 지도에서 고르면 카드가 보이게
   const [showMissing, setShowMissing] = useState(false); // 비활성 '다음'을 누른 뒤부터 부족한 항목 표시
   const placeRef = useRef<HTMLDivElement>(null);
-  const timeRef = useRef<HTMLElement>(null);
 
   if (redirect) return <Navigate to={redirect} replace />;
 
@@ -216,8 +193,7 @@ export default function Place() {
     setQ("");
     setSugs([]);
     if (tab === "pick") {
-      const moved = !d.pick || d.pick.lat !== pl.lat || d.pick.lng !== pl.lng;
-      d.patch({ ...(d.dropSame ? { pick: pl, drop: pl } : { pick: pl }), ...(moved ? { pickMemo: "" } : {}) }); // 메모는 그 장소에 대한 설명이므로 장소가 바뀌면 비움
+      d.patch(d.dropSame ? { pick: pl, drop: pl } : { pick: pl }); // 요청 사항은 장소와 따로라 그대로 둠
       if (!d.dropSame && !d.drop) setTab("drop");
     } else d.patch({ drop: pl });
   };
@@ -275,15 +251,14 @@ export default function Place() {
     setPreview(null);
   };
 
-  const done = !!d.pick && !!(d.dropSame ? d.pick : d.drop) && !!d.pickTime; // 희망 승차 시간은 필수, 하차 시간은 선택 (팀 결정 10/21)
-  // 비활성 '다음'을 누르면: 첫 번째로 부족한 항목의 탭으로 바꾸고 그곳으로 이동 (승차 장소 → 하차 장소 → 희망 승차 시간)
+  const done = !!d.pick && !!(d.dropSame ? d.pick : d.drop); // 승하차 장소만 필수 (희망 시간은 받지 않음, 팀 결정 11/05)
+  // 비활성 '다음'을 누르면: 첫 번째로 부족한 항목의 탭으로 바꾸고 그곳으로 이동 (승차 장소 → 하차 장소)
   const showFirstMissing = () => {
     const goTab = d.pick && !d.dropSame && !d.drop ? "drop" : "pick";
     setShowMissing(true);
     if (goTab !== tab) { setTab(goTab); setPreview(null); }
     if (!isLg) setSheet((x) => (x === 0 ? 1 : x));
-    const target = !d.pick || goTab === "drop" ? placeRef : timeRef;
-    window.setTimeout(() => target.current?.scrollIntoView({ behavior: "smooth", block: isLg ? "center" : "nearest" }), 260); // 탭·시트가 바뀐 뒤 (시트 높이 전환 .22s)
+    window.setTimeout(() => placeRef.current?.scrollIntoView({ behavior: "smooth", block: isLg ? "center" : "nearest" }), 260); // 탭·시트가 바뀐 뒤 (시트 높이 전환 .22s)
   };
   const back = () => nav(d.editReturn ? editBackTo(d.editReturn) : hasHotelStep(p) ? "/golf/book/hotel" : `/golf/packages/${p.id}`); // 숙박 있는 패키지는 옵션이 없어도 S-05로
   const pv = preview?.place;
@@ -298,13 +273,6 @@ export default function Place() {
   const hitNear = hits.filter((h) => !isSt(h)).slice(0, 5 - hitSt.length);
   const noResult = q.trim().length >= 2 && !sugLoading && sugs.length === 0 && local.length === 0;
   const dropShown = d.dropSame ? d.pick : d.drop;
-  const tabRange = tab === "pick" ? pickRange : dropRange;
-  const tabTime = tab === "pick" ? d.pickTime : d.dropTime;
-  const tabPlace = tab === "pick" ? d.pick : dropShown;
-  const rangeText = (k: "pick" | "drop", r: StopRange | null) =>
-    !r ? null : !r.options.length ? t("rangeNone") : k === "pick" && r.base?.kind === "tee" ? t("rangePickTee", { tee: r.base.tee, from: r.from, to: r.to }) : k === "drop" && r.base?.kind === "end" ? t("rangeDropEnd", { end: r.base.end, from: r.from }) : t("rangeAny", { from: r.from, to: r.to });
-  const withTime = (name: string, time: string | null) => (time ? `${name} · ${t("wishAt", { t: time })}` : name);
-
   const tabsEl = (compact: boolean) => (
     <div className={`relative grid grid-cols-2 gap-1 rounded-xl p-1 ${compact ? "bg-surface/95 shadow-md backdrop-blur" : "mb-2 bg-surface-2"}`} role="tablist">
       <Anno n={1} t="승차/하차 탭: 각 탭에 지정한 장소명 또는 '아직 정하지 않았어요'" />
@@ -328,22 +296,6 @@ export default function Place() {
       <input type="checkbox" className="check" checked={d.dropSame} onChange={(e) => toggleSame(e.target.checked)} />
       {t("dropSame")}
     </label>
-  );
-  const timeEl = (
-    <section ref={timeRef} className="relative card grid gap-2 p-4">
-      <Anno n={10} t="희망 시간 (booking_stop.desired_time, V-12): 승차 필수 · 하차 선택, 30분 단위. 승차 첫날 티오프 − 2시간 30분(06:00 이후) ~ 첫날 티오프 − 이동 − 30분 + 합승 대기 안내 / 하차 마지막 라운드(티오프+5시간) + 이동 ~ 21:00. 범위 밖이 되면 선택 지움. 참고용" />
-      <label className="field">
-        <span className="label">{tab === "pick" ? t("wishPick") : t("wishDrop")}</span>
-        {tabRange && <span className={`text-[13px] ${tabRange.options.length ? "text-ink-2" : "font-semibold text-bad"}`}>{rangeText(tab, tabRange)}</span>}
-        <select className="input" value={tabTime ?? ""} disabled={!tabRange?.options.length} onChange={(e) => d.patch(tab === "pick" ? { pickTime: e.target.value || null } : { dropTime: e.target.value || null })}>
-          <option value="">{!tabPlace ? t("wishPlaceFirst") : tab === "drop" ? t("wishSkip") : t("wishNone")}</option>
-          {tabRange?.options.map((x) => <option key={x} value={x}>{x}</option>)}
-        </select>
-        {showMissing && tab === "pick" && d.pick && !d.pickTime && !!tabRange?.options.length && <span className="err" role="alert">{t("needPickTime")}</span>}
-      </label>
-      {tab === "drop" && <p className="flex gap-1.5 text-[13px] text-ink-2"><Clock size={16} className="mt-0.5 flex-none text-brand" />{t("dropTimeNote")}</p>}
-      <p className="help">{t("wishNote")}</p>
-    </section>
   );
   const searchEl = (
     <div ref={placeRef} className="relative">
@@ -452,7 +404,6 @@ export default function Place() {
               {pl ? (
                 <>
                   <b className="block text-[14.5px] leading-snug">{n(pl.name)}{k === "drop" && d.dropSame && <span className="font-normal text-muted"> ({t("sameAsPick")})</span>}</b>
-                  {(k === "pick" ? d.pickTime : d.dropTime) && <span className="block text-[13px] font-semibold text-brand">{t("wishAt", { t: (k === "pick" ? d.pickTime : d.dropTime)! })}</span>}
                   <span className="text-[12.5px] text-muted">{pl.addr ?? n(AREA_NAME[placeZone(pl) ?? pl.area])}</span>
                 </>
               ) : (
@@ -474,12 +425,13 @@ export default function Place() {
       )}
       {d.pick && (
         <div className="relative grid gap-2 px-4 py-3.5">
-          <Anno n={7} t="만날 위치 메모 (booking_stop.memo, V-11: 최대 100자)" />
+          <Anno n={7} t="요청 사항 (선택, 예약당 하나 → 승차 booking_stop.memo, V-11: 최대 100자). 희망 승하차 시간 대신 (팀 결정 11/05). 실제 시간은 운영이 정해 출발 3일 전까지 메일로 안내" />
           <label className="field">
             <span className="label text-[13px]">{t("memoL")}</span>
             <input className="input min-h-[44px]" placeholder={t("memoPh")} value={d.pickMemo} maxLength={SET.MEMO_MAX} onChange={(e) => d.patch({ pickMemo: e.target.value.slice(0, SET.MEMO_MAX) })} />
             <span className="help text-right num">{d.pickMemo.length}/{SET.MEMO_MAX}</span>
           </label>
+          <p className="help">{t("stopTimeInfo")}</p>
         </div>
       )}
     </section>
@@ -495,10 +447,10 @@ export default function Place() {
   );
   const bottomEl = (
     <BottomBar width={isLg ? "narrow" : "step"}>
-      <span className="absolute -top-3 left-3"><Anno n={9} t="하단 다음: 승차·하차 장소와 희망 승차 시간이 지정되면 활성 (희망 하차 시간은 선택). 비활성일 때 누르면 부족한 항목을 빨간 글씨로 표시하고 그 탭·항목으로 이동 → 잔여석 다시 확인(B-01) → S-08 (T-10) / 범위 밖 → 그대로 (T-31)" /></span>
+      <span className="absolute -top-3 left-3"><Anno n={9} t="하단 다음: 승차·하차 장소가 지정되면 활성. 비활성일 때 누르면 부족한 항목을 빨간 글씨로 표시하고 그 탭·항목으로 이동 → 잔여석 다시 확인(B-01) → S-08 (T-10) / 범위 밖 → 그대로 (T-31)" /></span>
       <div className="min-w-0 flex-1 text-[12.5px] leading-tight text-muted">
-        <p className="truncate">{t("pick")} · {d.pick ? withTime(n(d.pick.name), d.pickTime) : "-"}</p>
-        <p className="truncate">{t("drop")} · {dropShown ? withTime(n(dropShown.name), d.dropTime) : "-"}</p>
+        <p className="truncate">{t("pick")} · {d.pick ? n(d.pick.name) : "-"}</p>
+        <p className="truncate">{t("drop")} · {dropShown ? n(dropShown.name) : "-"}</p>
       </div>
       <button className="btn btn-primary min-w-[140px]" aria-disabled={!done} onClick={() => (done ? guard(() => { if (d.dropSame) d.patch({ drop: d.pick }); nav(d.editReturn ? editBackTo(d.editReturn) : "/golf/book/review"); }) : showFirstMissing())}>{d.editReturn ? t("editBack") : t("next")}</button>
     </BottomBar>
@@ -542,7 +494,6 @@ export default function Place() {
               {previewEl}
               {tab === "drop" && d.dropSame ? dropSameEl : q ? resultsEl : chipsEl}
               {!q && hotelBtnEl}
-              {timeEl}
               {summaryEl}
               {feeEl}
             </div>
@@ -553,7 +504,7 @@ export default function Place() {
     );
   }
 
-  // PC: 위에 탭·시간·검색·자주 고르는 곳, 아래에 넓은 지도 (호텔 화면 지도와 같은 16:9)
+  // PC: 위에 탭·검색·자주 고르는 곳, 아래에 넓은 지도 (호텔 화면 지도와 같은 16:9)
   return (
     <div className="page step narrow">
       {head}
@@ -562,7 +513,6 @@ export default function Place() {
       <p className="mb-4 mt-1 text-[14px] text-muted">{t("s06S")}</p>
       {tabsEl(false)}
       {tab === "drop" && <div className="mb-4">{sameEl}</div>}
-      {/* 장소 먼저 고르고 그다음 시간 (10/29) */}
       {tab === "drop" && d.dropSame ? (
         <div className="mb-4">{dropSameEl}</div>
       ) : (
@@ -575,7 +525,6 @@ export default function Place() {
           {previewEl}
         </div>
       )}
-      <div className="mt-5">{timeEl}</div>
       <div className="mt-5">{summaryEl}</div>
       <div className="mt-4">{feeEl}</div>
       <p className="mt-2 text-[12px] text-muted">{!anno ? null : serviceArea.wide ? "SERVICE_AREA: 넓은 범위 (기타히로시마·치토세·공항 포함, 확인 필요)" : `SERVICE_AREA: 삿포로 중심 반경 ${ZONES_STRICT[0].r / 1000}km (운영사 확정 10/29)`}</p>

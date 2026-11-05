@@ -50,7 +50,7 @@ export default function MyDetail() {
   const hotel = stayHotel(p, b.opt);
   const opt = optionOf(b.opt);
   const confirmedPickup = v.dep === "GO" || v.status === "DONE" ? b.pickupTime ?? pickupWindow(p, b.pick, pickDrive.drive?.min)?.exact ?? null : null;
-  const itin = itinerary(p, b.opt, b.pick, b.drop, { confirmedPickup, pickTime: b.pickTime, dropTime: b.dropTime }); // 13: 희망 승하차 시간
+  const itin = itinerary(p, b.opt, b.pick, b.drop, { confirmedPickup });
   const due = addDays(b.dep, -SET.COMPANION_DUE_DAYS);
   const alive = v.status === "CONFIRMED";
   const canEdit = alive && todayISO() <= due; // 명단 마감 전, 살아 있는 예약만 (E-DUE)
@@ -169,7 +169,7 @@ export default function MyDetail() {
 
             {/* 2 버스 승하차 (지도 대신 지도 앱 링크, PC는 승차·하차 나란히) */}
             <section className="relative card overflow-hidden">
-              <Anno n={2} t="승하차 (booking_stop): 장소명 · 희망 시간, 메모, 승차 시간(출발 확정 후 API-17, M-205), 하차일, 지도 앱 열기(I-03). 지도는 승하차 화면에서만" />
+              <Anno n={2} t="승하차 (booking_stop): 장소명, 요청 사항(승차 memo), 승차 시간(출발 확정 후 API-17, M-205), 하차일, 지도 앱 열기(I-03). 지도는 승하차 화면에서만" />
               <p className="flex items-center gap-1.5 border-b border-line px-4 py-2.5 text-[13px] font-semibold text-muted"><Bus size={16} /> {t("busT")} <Q id="Q-23" t="승차 시간 확정 주체·시점" /></p>
               <div className="grid divide-y divide-line lg:grid-cols-2 lg:divide-x lg:divide-y-0">
                 {([["pick", b.pick], ["drop", b.drop]] as const).map(([k, pl]) => (
@@ -177,8 +177,7 @@ export default function MyDetail() {
                     <span className={`badge ${k === "pick" ? "brand" : "wait"}`}>{k === "pick" ? t("pick") : t("drop")}</span>
                     <span className="min-w-0 flex-1 text-[14px]">
                       <b className="block">{pl ? n(pl.name) : "-"}</b>
-                      {(k === "pick" ? b.pickTime : b.dropTime) && <span className="block text-[13px] font-semibold text-brand">{t("wishAt", { t: (k === "pick" ? b.pickTime : b.dropTime)! })}</span>}
-                      {k === "pick" && b.pickMemo && <span className="block text-[13px] text-ink-2">{b.pickMemo}</span>}
+                      {k === "pick" && b.pickMemo && <span className="block text-[13px] text-ink-2">{t("reqL")} · {b.pickMemo}</span>}
                       <span className="block text-[12.5px]">
                         {k === "pick" ? (confirmedPickup ? <b className="text-ok">{t("pickupConfirmed", { t: `${fShort(b.dep, L)} ${confirmedPickup}` })}</b> : <span className="text-muted">{t("M-205")}</span>) : <span className="text-muted">{t("dropDay", { d: fShort(tripEnd(p, b.dep), L) })}</span>}
                       </span>
@@ -198,7 +197,7 @@ export default function MyDetail() {
                   {itin.map((items, i) => (
                     <div key={i}>
                       <p className="px-4 pb-1 text-[13px] font-bold text-brand">{t("dayN", { i: i + 1 })} · <span className="num">{fShort(addDays(b.dep, i), L)}</span></p>
-                      <ItinList items={items} memo={i === 0 ? b.pickMemo : undefined} />
+                      <ItinList items={items} />
                     </div>
                   ))}
                 </div>

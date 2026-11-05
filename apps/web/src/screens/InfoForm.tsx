@@ -114,10 +114,10 @@ export default function InfoForm() {
       busyRef.current = true;
       setBusy(true);
       const drop = d.dropSame ? d.pick! : d.drop!;
-      const stop = (kind: "PICK" | "DROP", pl: NonNullable<typeof d.pick>, time: string | null) => ({ kind, placeName: n(pl.name), placeId: pl.placeId ?? null, address: pl.addr ?? null, lat: pl.lat, lng: pl.lng, memo: kind === "PICK" ? d.pickMemo || null : null, desiredTime: time ?? "" });
+      const stop = (kind: "PICK" | "DROP", pl: NonNullable<typeof d.pick>) => ({ kind, placeName: n(pl.name), placeId: pl.placeId ?? null, address: pl.addr ?? null, lat: pl.lat, lng: pl.lng, memo: kind === "PICK" ? d.pickMemo || null : null }); // 요청 사항은 승차 memo 에 예약당 하나
       api.book({
         departureId: apiDepId(p.id, d.dep!), people: d.people, optionId: apiOptId(p.id, d.opt), singles: d.singles,
-        stops: [stop("PICK", d.pick!, d.pickTime), stop("DROP", drop, d.dropTime)],
+        stops: [stop("PICK", d.pick!), stop("DROP", drop)],
         rep: { nameLocal: info.nameKo, nameEn: info.nameEn, countryCode: info.cc, phone: info.phone, email: info.email },
         companions: info.companions.map((nameEn) => ({ nameEn })), lang: L,
       })
@@ -259,7 +259,7 @@ export default function InfoForm() {
             <b className="text-[15px] font-extrabold leading-snug">{n(p.name)}</b>
             <p className="flex flex-wrap items-center gap-2 text-ink-2">{fShort(d.dep!, L)}{p.nights ? ` ~ ${fShort(tripEnd(p, d.dep!), L)}` : ""} <span className="badge brand">{t("peopleN", { n: d.people })}</span></p>
             {(() => { const h = stayHotel(p, d.opt); const o = optionOf(d.opt); return <p className="text-ink-2">{h ? `${n(h.name)} · ${o && !o.hotel ? n(o.sub) : n(h.room)}` : o?.none ? n(o.name) : t("noHotel")}</p>; })()}
-            <p className="text-ink-2">{t("pick")} · {d.pick ? n(d.pick.name) : "-"} · {t("wishAt", { t: d.pickTime ?? "-" })}</p>
+            <p className="text-ink-2">{t("pick")} · {d.pick ? n(d.pick.name) : "-"}</p>
             <div className="mt-1 flex items-baseline justify-between border-t border-line pt-3">
               <span className="font-semibold">{t("totalL", { n: d.people })}</span>
               <span className="num text-[22px] font-extrabold text-brand">{yen(total)}</span>

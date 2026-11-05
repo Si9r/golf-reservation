@@ -55,7 +55,7 @@ export default function MyList() {
     const recruiting = v.label === "OPEN" || v.label === "ENOUGH";
     return { txt, sub: recruiting ? t("judge", { d: fShort(judgeDate(b.dep), L) }) : "", bar: recruiting };
   };
-  const pickTxt = (b: Booking) => (b.pick ? `${n(b.pick.name)} · ${b.pickupTime ?? t("wishAt", { t: b.pickTime ?? "-" })}` : "-");
+  const pickTxt = (b: Booking) => (b.pick ? `${n(b.pick.name)}${b.pickupTime ? ` · ${b.pickupTime}` : ""}` : "-");
   const dates = ({ b, v }: Row) => (v.p.nights ? `${fShort(b.dep, L)} – ${fShort(tripEnd(v.p, b.dep), L)}` : fShort(b.dep, L));
   const hotelTxt = ({ b, v }: Row) => {
     const h = stayHotel(v.p, b.opt);

@@ -101,8 +101,6 @@ export default function Pay() {
         pick: d.pick,
         drop,
         pickMemo: d.pickMemo,
-        pickTime: d.pickTime ?? undefined,
-        dropTime: d.dropTime ?? undefined,
         unit,
         singles: price.rooms?.singles,
         total,
@@ -187,8 +185,8 @@ export default function Pay() {
             </div>
             <dl className="grid gap-1.5 border-t border-line px-4 py-3 text-[13.5px]">
               <div className="flex gap-3"><dt className="w-16 flex-none text-muted">{t("rowHotel")}</dt><dd className="min-w-0">{hotel ? `${n(hotel.name)} · ${opt && !opt.hotel ? n(opt.sub) : n(hotel.room)}` : opt?.none ? n(opt.name) : t("noHotel")}</dd></div>
-              <div className="flex gap-3"><dt className="w-16 flex-none text-muted">{t("pick")}</dt><dd className="min-w-0">{d.pick ? n(d.pick.name) : "-"} · {t("wishAt", { t: d.pickTime ?? "-" })}</dd></div>
-              <div className="flex gap-3"><dt className="w-16 flex-none text-muted">{t("drop")}</dt><dd className="min-w-0">{drop ? n(drop.name) : "-"}{d.dropTime ? ` · ${t("wishAt", { t: d.dropTime })}` : ""}</dd></div>
+              <div className="flex gap-3"><dt className="w-16 flex-none text-muted">{t("pick")}</dt><dd className="min-w-0">{d.pick ? n(d.pick.name) : "-"}{d.pickMemo && <span className="block text-muted">{t("reqL")} · {d.pickMemo}</span>}</dd></div>
+              <div className="flex gap-3"><dt className="w-16 flex-none text-muted">{t("drop")}</dt><dd className="min-w-0">{drop ? n(drop.name) : "-"}</dd></div>
             </dl>
             <dl className="grid gap-1.5 border-t border-line px-4 py-3 text-[13.5px]">
               <div className="flex gap-3"><dt className="w-16 flex-none text-muted">{t("payRep")}</dt><dd className="min-w-0"><b className="font-semibold">{info.nameEn}</b> ({info.nameKo})<span className="block whitespace-nowrap">{info.cc} {info.phone}</span><span className="block text-muted">{info.email}</span></dd></div>
@@ -202,14 +200,14 @@ export default function Pay() {
             <Anno n={6} t="일정표 (L-11): 결제 전 마지막 확인이라 모든 일차를 펼친 상태, 고른 승하차 장소·호텔이 들어간 일정" />
             <p className="border-b border-line px-4 py-2.5 text-[13px] font-semibold text-muted">{t("itin")} · {fShort(d.dep!, L)}{p.nights ? ` ~ ${fShort(tripEnd(p, d.dep!), L)}` : ""}</p>
             <div className="grid gap-1 pt-2">
-              {itinerary(p, d.opt, d.pick, drop, { pickTime: d.pickTime, dropTime: d.dropTime }).map((items, i) => (
+              {itinerary(p, d.opt, d.pick, drop).map((items, i) => (
                 <div key={i} className={!itinAll && i > 0 ? "hidden lg:block" : undefined}>
                   <p className="px-4 pb-1 text-[13px] font-bold text-brand">{t("dayN", { i: i + 1 })} · {fShort(addDays(d.dep!, i), L)}</p>
-                  <ItinList items={i === 0 && !itinAll ? items.slice(0, 2) : items} memo={i === 0 ? d.pickMemo : undefined} />
+                  <ItinList items={i === 0 && !itinAll ? items.slice(0, 2) : items} />
                 </div>
               ))}
             </div>
-            {!itinAll && <button className="link w-full border-t border-line px-4 py-2.5 text-left text-[13.5px] lg:hidden" onClick={() => setItinAll(true)}>{t("payItinAll", { n: itinerary(p, d.opt, d.pick, drop, { pickTime: d.pickTime, dropTime: d.dropTime }).length })}</button>}
+            {!itinAll && <button className="link w-full border-t border-line px-4 py-2.5 text-left text-[13.5px] lg:hidden" onClick={() => setItinAll(true)}>{t("payItinAll", { n: itinerary(p, d.opt, d.pick, drop).length })}</button>}
           </section>
 
           {/* 테스트용 결제 결과 (프로토타입만. API 모드는 서버의 가짜 본 사이트 PAYMENT_BACKEND=fake 가 결과를 정함) */}

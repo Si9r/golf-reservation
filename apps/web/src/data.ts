@@ -29,19 +29,14 @@ export const SET = {
   SINGLE_ADD: 12000, // 1인실 추가 요금 (1명당, 예시 · Q-02)
   COMPANION_DUE_DAYS: 7, // 동반자 이름 수정 마감 = 출발 7일 전 (오타 수정용, 이름은 예약 때 모두 받음 — 팀 결정 10/23)
   NEAR_PLACE_M: 350, // 지도 탭 위치 근처의 알려진 장소 이름 사용 (L-06)
-  MEMO_MAX: 100, // 만날 위치 메모 (V-11)
+  MEMO_MAX: 100, // 요청 사항 (V-11)
   SEARCH_MAX: 50, // 검색어 (V-01)
   SUPPORT_TEL: "00-0000-000", // 임시값 (운영사 10/29, 실제 번호 받기 전. 화면 '예시 번호' 표시는 그대로)
   SUPPORT_MAIL: "golf@travender-hokkaido.com", // 임시값 (운영사 10/29)
   SUPPORT_HOURS: "10:00-17:00",
-  // 희망 승하차 시간 (V-12, 운영사 확정). 서버 apps/api/app/settings.py 와 같은 값
-  STOP_TIME_FIRST: "06:00", // 가장 이른 승차·하차
-  STOP_TIME_LAST: "21:00", // 가장 늦은 승차·하차
+  // 일정표의 2일차부터 승차·호텔 출발 시각 (logic.ts leaveAt). 희망 승하차 시간은 받지 않음 (팀 결정 11/05)
   STOP_TIME_STEP_MIN: 30, // 30분 단위
-  PICK_MARGIN_MIN: 30, // 승차: 첫 티오프 − 이동 시간 − 이 여유 (가장 늦은 승차)
-  PICK_EARLIEST_BEFORE_TEE_MIN: 150, // 승차: 첫 티오프 − 2시간 30분부터 (가장 이른 승차, 12:30 → 10:00). 합승이라 일찍 타면 골프장에서 대기
-  ROUND_HOURS: 5, // 라운드 종료 예정 = 티오프 + 5시간
-  NO_ROUND_DROP_FROM: "11:00", // 마지막 날 라운드가 없을 때 하차 기준 (체크아웃 후, 일정표와 같음)
+  PICK_MARGIN_MIN: 30, // 티오프 − 이동 시간 − 이 여유
 };
 
 const U = (id: string, w = 960) => `https://images.unsplash.com/${id}?auto=format&fit=crop&w=${w}&q=70`;
@@ -304,7 +299,6 @@ export const PLACES: Place[] = [
 ];
 
 // 지역 → 골프장 지역 이동 시간(분). Google 경로를 못 받을 때만 쓰는 대략값.
-// 서버 apps/api/app/settings.py TRAVEL_MIN 과 같은 값 (서버는 이 표로 희망 시간 범위를 검사, 둘을 같이 고칠 것)
 export const TRAVEL: Record<Zone, Partial<Record<Area, number>>> = {
   SAPPORO: { SAPPORO: 40, KITAHIROSHIMA: 40, ENIWA: 40, CHITOSE: 60, TOMAKOMAI: 70 },
   KITAHIROSHIMA: { SAPPORO: 40, KITAHIROSHIMA: 15, ENIWA: 20, CHITOSE: 30, TOMAKOMAI: 45 },
