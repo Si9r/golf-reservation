@@ -23,7 +23,7 @@
 | 결제 시작 / API-20 `POST /bookings/{no}/checkout` | `services/booking.py` `checkout` | 완료 |
 | 결제 결과 확인 / API-21 `GET /bookings/{no}/payment` | `services/booking.py` `payment_status` → `apply_order` (출발편 잠금 후 다시 확인 → 두 번 불러도 확정 한 번) | 완료 |
 | L-09 예약번호 | `rules.py` `booking_no` + `booking_seq` 테이블 | 완료 |
-| L-10 출발 판정 / B-01 | `jobs/__init__.py` `judge_departures` · `_judge_one` | 완료 (출발편별 3회 재시도 → 운영자 알림, 중간에 멈춰도 남은 환불·메일만 다시) |
+| L-10 출발 판정 / B-01 (매일 09:00) | `jobs/__init__.py` `judge_departures` · `_judge_one` | 완료 (출발편별 3회 재시도 → 운영자 알림, 중간에 멈춰도 남은 환불·메일만 다시) |
 | L-14 고객 취소 / API-16 | `services/booking.py` `cancel_by_user` (공통 처리 `_cancel_confirmed`) | 완료 (본 사이트 연동 API-19 전 임시·운영 예비용) |
 | API-19 고객 취소·환불 결과 받기 (본 사이트 → 이 서비스) | `routes.py` `site_cancel`, `services/booking.py` `cancel_from_site` | 완료 (인증은 `X-Site-Key` 임시, 결제 연동 협의 때 확정) |
 | L-15 환불 요청 | `services/booking.py` `refund_booking` → `adapters/payment.py` `cancel_order` (reason `operator_cancel` · `customer_cancel`, 실패 → `refund_status=FAIL` + 운영자 알림 `alert_ops`) | 완료 (전액 환불만) |
@@ -34,8 +34,8 @@
 | B-05 상품 가져오기 / API-15 | — | 틀만 (상품 데이터 받은 뒤) |
 | B-06 명단 입력 요청 | — | 없앰 (동반자 이름을 예약 때 모두 받음, 팀 결정 10/23) |
 | B-07 환불 재시도 | `jobs` `retry_refunds` (`refund_status=FAIL`인 취소 예약) | 완료 |
-| B-08 결제 확인 (10분마다) | `jobs` `check_payments`: 주문 전 결제 대기 10분 지남 → UNPAID, 주문 후 결제 대기 → 본 사이트 조회 | 완료 |
-| B-09 안내 메일 재발송 (개발 추가, 1시간마다 정도) | `jobs` `resend_mails` → `services/booking.py` `send_due_mails`: 못 보낸 GO·CANCEL·USER_CANCEL, 실패는 `MAIL_TRIES`(3)회까지 | 완료 |
+| B-08 결제 확인 (10분마다, `jobs/schedule.py`) | `jobs` `check_payments`: 주문 전 결제 대기 10분 지남 → UNPAID, 주문 후 결제 대기 → 본 사이트 조회 | 완료 |
+| B-09 안내 메일 재발송 (개발 추가, 매시 30분) | `jobs` `resend_mails` → `services/booking.py` `send_due_mails`: 못 보낸 GO·CANCEL·USER_CANCEL, 실패는 `MAIL_TRIES`(3)회까지 | 완료 |
 | API-01 ~ 04, 06 ~ 14, 18 ~ 21 | `routes.py` | 동작 (`/api/golf/docs`에서 확인) |
 | API-05 장소 검색 | — | 틀만 (지금은 화면이 Google을 직접 호출) |
 | V-01 ~ V-24 입력 검사 | `schemas.py`(pydantic) + `services/booking.py` `_validate` | 서버 쪽 완료 |
@@ -124,7 +124,7 @@ API를 빼면(`VITE_USE_API` 없음) 지금처럼 브라우저 안 데이터로�
 | Alembic `0003`: `booking.status`에 `PENDING_PAYMENT`·`UNPAID` 추가, `payment_id` → `order_id`(중복 불가), `order_status`·`order_checked_at` 추가 | 작업 지시 (10/27) |
 | 결제 후 출발편이 이미 운행 취소면 바로 OP_CANCEL + 전액 환불(`operator_cancel`). 운행 취소 환불은 주문별로 차례로, 한 건이 실패해도 계속(FAIL 기록 + 운영자 알림 → B-07 재시도). 운영자 알림은 `notification` `OPS_ALERT` + `.env` `OPS_EMAIL`. 알림 메일(`adapters/mail.py` `render_ops`)에는 발생 시각·무슨 일(본 사이트 오류 코드와 원인 짐작)·고객(대표자 이름·이메일·전화·회원 ID)·예약(상태·패키지·출발일·인원·금액·본 사이트 주문·환불 상태) 또는 출발편(상태·확정 인원)·해야 할 일 | 작업 지시 (10/27). 알림 내용 보강 10/29 |
 | **예약 확인 메일(CONFIRM)은 본 사이트가 보냄** → 이 서비스는 보내지 않음(템플릿은 남김). 출발 확정 GO·승차 시간 안내 PICKUP은 이 서비스가 보냄(PICKUP 템플릿만, 보내는 곳은 API-17과 함께). 운행 취소 CANCEL·고객 취소 USER_CANCEL은 담당이 정해질 때까지 그대로 보냄 | 작업 지시 (10/27). CANCEL·USER_CANCEL 보내는 쪽은 답 대기 |
-| **빠졌던 메일 보완**: ① 판정 뒤에 결제가 끝난 예약 — 출발 확정 출발편이면 GO, 운행 취소 출발편이면 환불 후 CANCEL (`apply_order`, 결과 화면 '안내 메일을 확인해 주세요'와 맞춤) ② B-01 판정 오류 — 출발편별 `JUDGE_TRIES`(3)회 다시, 그래도 실패하면 운영자 알림(`OPS_EMAIL`, 예약번호가 없어 `notification`에는 못 남기고 로그·메일) ③ B-01이 판정만 하고 멈춘 경우 — 다음 실행에서 환불 못 한 운행 취소 예약을 다시 환불하고 메일 ④ 발송 실패 메일 — B-09가 다시 보냄. 보낼 대상은 `send_due_mails` 한 곳에서 고르고 `notification`에 OK가 있으면 다시 보내지 않음. 운행 취소 메일은 환불 요청 뒤에만 ('전액 환불' 안내). 출발일이 지난 예약은 보내지 않음 | 개발 결정 (10/29). B-09 실행 주기는 배포 때 정함 |
+| **빠졌던 메일 보완**: ① 판정 뒤에 결제가 끝난 예약 — 출발 확정 출발편이면 GO, 운행 취소 출발편이면 환불 후 CANCEL (`apply_order`, 결과 화면 '안내 메일을 확인해 주세요'와 맞춤) ② B-01 판정 오류 — 출발편별 `JUDGE_TRIES`(3)회 다시, 그래도 실패하면 운영자 알림(`OPS_EMAIL`, 예약번호가 없어 `notification`에는 못 남기고 로그·메일) ③ B-01이 판정만 하고 멈춘 경우 — 다음 실행에서 환불 못 한 운행 취소 예약을 다시 환불하고 메일 ④ 발송 실패 메일 — B-09가 다시 보냄. 보낼 대상은 `send_due_mails` 한 곳에서 고르고 `notification`에 OK가 있으면 다시 보내지 않음. 운행 취소 메일은 환불 요청 뒤에만 ('전액 환불' 안내). 출발일이 지난 예약은 보내지 않음 | 개발 결정 (10/29). B-09 실행 주기는 매시 30분 (팀 결정 11/05) |
 | 결과 화면 재확인: 결제 대기(pending·authenticating)면 30초 간격 3번, 그래도 대기면 '결제를 확인하고 있어요' 안내(확정되면 예약 조회에 나옴) | 작업 지시 (10/27) |
 | 승하차 가능 범위를 삿포로 중심(TV탑 부근 43.0621, 141.3544) 반경 **12km → 3km**로 (10/29 **5km**로 바뀜, 아래 행): 서버 `service_area`(Alembic `0004`, `seed/demo_data.json`), 화면 `data.ts` `ZONES_STRICT`. 삿포로역·오도리·스스키노·나카지마 공원까지 들어가고 마루야마(약 3.2km)·삿포로돔·신삿포로는 빠짐. 이미 있는 예약은 다시 검사하지 않음 | 팀 결정 (2026-10-27): 합승 버스 정차를 도심에 모아 승차 시간을 줄임. 운영사 확인은 질문표 10번 |
 | **영문 이름은 하이픈만 허용**: 여권 표기 그대로, 이름 안 하이픈(-) 허용, 아포스트로피(') 불가, 하이픈으로 시작·끝 불가. 대문자·성·이름 각각 필수·합쳐서 60자 이하는 그대로. 대표자·동반자, 예약(API-10)·오타 수정(API-13, S-13) 모두 같은 규칙: 서버 `services/booking.py` `NAME_EN`, 화면 `screens/InfoForm.tsx` `V21`·`VPART`·`upper`. 안내 예시는 KIM MIN-JI. 이미 저장된 예약 데이터는 바꾸지 않음 | **운영사 답변 (2026-10-29)** |
@@ -139,6 +139,7 @@ API를 빼면(`VITE_USE_API` 없음) 지금처럼 브라우저 안 데이터로�
 | **예약 조회·예약 상세 인원 표시**: 제목 'n명 **이상** 더 모이면 출발'(`mdOpenT`), 최소 인원을 넘으면 '최소 인원이 모였습니다 · 출발 확정 대기 중'(`mdEnoughT`). 막대는 **정원 기준 + 최소 인원 눈금**(`Detail.tsx` `GoalMeter`), 아래에 '최소 15명 충족'과 '현재 총 n명'. 패키지 상세·예약 확인의 막대(`Meter`)는 그대로 | 팀 결정 (2026-11-02). 최소 인원(15)과 정원(20)이 달라져 최소 인원을 넘은 뒤에도 총 인원을 알려야 함 → 화면설계서 S-12·S-13 반영 필요
 | **모바일 승하차 지도 중심**: 고른 장소를 화면 가운데보다 **지도 높이의 15%만큼 위**에 표시, 처음 전체 보기도 같은 만큼 위로 (`Place.tsx` → `GoogleMap.tsx` `centerLift`). PC는 그대로 가운데 | 팀 요청 (2026-11-02). 아래 시트가 지도 아래쪽을 가림
 | **예약 단계 비활성 버튼 안내 (패키지 상세부터)**: 다음 버튼이 비활성일 때 누르면 부족한 항목(인원·출발일)을 빨간 글씨로 표시하고 첫 항목으로 스크롤. 고르면 바로 사라짐. `disabled` 대신 `aria-disabled` (`Detail.tsx`, `index.css`). 승하차(S-06)도 같은 방식: 승차 장소 → 하차 장소 → 희망 승차 시간 순으로 그 탭·항목으로 이동 (`Place.tsx`, 문구 `needPick`·`needDrop`·`needPickTime`). 호텔(S-05)은 항상 활성이라 해당 없음. 그 뒤 단계는 아직 | 팀 요청 (2026-11-02). `disabled` 버튼은 눌러도 반응이 없어 무엇이 부족한지 알 수 없음 → 화면설계서 S-03·S-06 반영 필요
+| **정기 실행 시간표 (서버 안에서)**: `apps/api/app/jobs/schedule.py`. 매분 0초에 확인해 때가 된 배치를 차례로 실행 (JST). **10분마다** B-08 결제 확인 · **매일 09:00** B-08 → B-01 출발 판정 → B-03 여행 완료 → B-04 출발편 만들기 (판정 직전에 결제 확인을 한 번 더 돌려 늦게 끝난 결제도 인원에 넣음) · **매시 30분** B-07 환불 재시도 · B-09 안내 메일 재발송 (09:00 판정과 겹치지 않게). B-02는 시간표에 넣지 않음 (좌석 확보 `seat_hold`를 지금 쓰지 않음). `.env` `JOBS_ENABLED=1`일 때만 서버(uvicorn)가 켜질 때 함께 돎 (기본 꺼짐: 로컬 개발·테스트에서는 돌지 않음, 손으로는 그대로 `python -m app.jobs B-01`). 서버를 여러 개 띄워도 MySQL `GET_LOCK('golf_jobs')`로 동시에는 한 곳만 돌고, 뒤이어 돌아도 배치는 남은 일만 함. 서버가 꺼져 있던 시각의 실행은 건너뜀 (09:00에 꺼져 있었으면 판정은 다음 날 09:00, 지난 판정일도 함께 처리) | 팀 결정 (2026-11-05). 스케줄러가 없어 개발 DB에 판정일이 지난 모집 중 출발편 41개·결제 대기 1건이 쌓여 있었음 (DB 점검 11/04). 새 패키지 없이 표준 라이브러리 스레드로 |
 
 #### 화면 문구 줄이기: 설계서 메시지(M-xxx) 변경 (10/29)
 
