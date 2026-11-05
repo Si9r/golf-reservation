@@ -1,4 +1,4 @@
-"""정기 실행 B-xx (상세설계 '처리 로직' ③). 스케줄러(cron 등)는 배포 환경에서 정함 → python -m app.jobs B-01"""
+"""정기 실행 B-xx (상세설계 '처리 로직' ③). 시간표는 jobs/schedule.py (JOBS_ENABLED=1 일 때 서버 안에서), 손으로는 python -m app.jobs B-01"""
 from __future__ import annotations
 
 import logging
@@ -126,7 +126,7 @@ def retry_refunds() -> dict:
 
 
 def resend_mails() -> int:
-    """B-09 안내 메일 재발송 (개발 추가, 1시간마다 정도): 보내야 하는데 아직 못 보낸 출발 확정·운행 취소·고객 취소 메일.
+    """B-09 안내 메일 재발송 (개발 추가, 매시 30분): 보내야 하는데 아직 못 보낸 출발 확정·운행 취소·고객 취소 메일.
     발송 실패(메일 서버 장애 등)는 MAIL_TRIES 회까지 다시 보냄. 대상 기준은 services/booking.py send_due_mails"""
     return send_due_mails()
 

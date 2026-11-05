@@ -1,5 +1,6 @@
 """실행: uvicorn app.main:app --reload --port 8787  (apps/api 폴더에서)"""
 import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -11,7 +12,22 @@ from .config import env
 from .routes import router
 
 logging.basicConfig(level=logging.INFO)
-app = FastAPI(title="홋카이도 골프투어 API", version="0.1.0", docs_url="/api/golf/docs", openapi_url="/api/golf/openapi.json")
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    stop = None
+    if env.JOBS_ENABLED:  # 정기 실행 (10분마다 결제 확인, 09:00 출발 판정 등)
+        from .jobs.schedule import start
+
+        stop = start()
+    yield
+    if stop:
+        stop.set()
+
+
+app = FastAPI(title="홋카이도 골프투어 API", version="0.1.0", docs_url="/api/golf/docs", openapi_url="/api/golf/openapi.json",
+              lifespan=lifespan)
 errors.install(app)
 app.include_router(router)
 if env.PAYMENT_BACKEND.lower() == "fake":  # 가짜 결제창은 fake 모드에서만 (partner 모드에는 경로 자체가 없음)

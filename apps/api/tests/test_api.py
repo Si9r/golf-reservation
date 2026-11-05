@@ -925,3 +925,27 @@ def test_ops_alert_judge_has_departure(monkeypatch):  # 출발 판정 실패 알
     (s1, b1), (s2, b2) = [(s, b) for to, s, b in rec.sent if to == "ops@example.jp"][-2:]
     assert SITE_DEP in s1 and "■ 출발편" in b1 and f"최소 출발 {S.MIN_DEPARTURE}명" in b1 and "판정일" in b1 and "B-01 을 다시 실행" in b1
     assert "NO-SUCH-DEP" in s2 and "오류: RuntimeError: y" in b2 and "■ 출발편" not in b2
+
+
+def test_jobs_schedule_run(monkeypatch):  # 시간표 실행: 차례대로, 하나가 오류여도 계속, 다른 서버가 실행 중이면 건너뜀
+    from sqlalchemy import text
+
+    from app import jobs
+    from app.db import engine
+    from app.jobs import schedule
+
+    ran = []
+
+    def boom():
+        ran.append("B-01")
+        raise RuntimeError("x")
+
+    monkeypatch.setitem(jobs.JOBS, "B-08", lambda: ran.append("B-08"))
+    monkeypatch.setitem(jobs.JOBS, "B-01", boom)
+    monkeypatch.setitem(jobs.JOBS, "B-03", lambda: ran.append("B-03"))
+    assert schedule.run_due(["B-08", "B-01", "B-03"]) and ran == ["B-08", "B-01", "B-03"]
+    with engine.connect() as other:  # 다른 서버가 잠금을 잡고 있음
+        assert other.execute(text("SELECT GET_LOCK(:n, 0)"), {"n": schedule.LOCK}).scalar() == 1
+        assert not schedule.run_due(["B-08"]) and ran == ["B-08", "B-01", "B-03"]
+        other.execute(text("SELECT RELEASE_LOCK(:n)"), {"n": schedule.LOCK})
+    assert schedule.run_due(["B-08"]) and ran[-1] == "B-08"

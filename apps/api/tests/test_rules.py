@@ -95,3 +95,19 @@ def test_pickup_register_due():  # L-16 승차 시간 등록: 출발 확정(7일
 
     assert S.PICKUP_REGISTER_DUE_DAYS == 3 and 0 <= S.PICKUP_REGISTER_DUE_DAYS < S.JUDGE_DAYS  # 등록할 날이 있어야 함
 
+
+
+def test_jobs_schedule():  # 정기 실행 시간표 (팀 결정 11/05): 10분마다 결제 확인, 09:00 출발 판정, 매시 30분 환불·메일 재시도
+    from datetime import datetime
+
+    from app.jobs.schedule import JST, due
+
+    def at(hm: str) -> list[str]:
+        h, m = map(int, hm.split(":"))
+        return due(datetime(2026, 11, 5, h, m, tzinfo=JST))
+
+    assert at("09:00") == ["B-08", "B-01", "B-03", "B-04"]  # 판정 직전에 결제 확인, 결제 확인은 한 번만
+    assert at("09:10") == at("00:00") == at("21:50") == ["B-08"]
+    assert at("09:30") == at("14:30") == ["B-08", "B-07", "B-09"]
+    assert at("09:05") == at("08:59") == []
+    assert "B-01" not in at("21:00") and "B-01" not in at("00:00")  # 판정은 하루 한 번 09:00

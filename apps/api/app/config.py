@@ -35,6 +35,7 @@ class Env(BaseSettings):
     SUPPORT_TEL: str = ""
     SUPPORT_EMAIL: str = ""
     FIXED_TODAY: str = ""  # 테스트·데모용 오늘 날짜 고정 (YYYY-MM-DD)
+    JOBS_ENABLED: bool = False  # 정기 실행 시간표(jobs/schedule.py)를 서버 안에서 돌림. 운영 서버에서만 켬
 
 
 env = Env()
