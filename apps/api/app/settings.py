@@ -26,22 +26,6 @@ SERVICE_AREA = {"id": "SAPPORO", "lat": 43.0621, "lng": 141.3544, "r": 5000}
 MEMO_MAX = 100  # V-11
 SEARCH_MAX = 50  # V-01
 DEPARTURE_MONTHS_AHEAD = 13  # B-04
-# 희망 승하차 시간 (V-12, 운영사 확정). 고를 수 있는 범위는 services/booking.py stop_time_range
-STOP_TIME_FIRST = "06:00"  # 가장 이른 승차·하차
-STOP_TIME_LAST = "21:00"  # 가장 늦은 승차·하차
-STOP_TIME_STEP_MIN = 30  # 30분 단위
-PICK_MARGIN_MIN = 30  # 승차: 첫 티오프 − 이동 시간 − 이 여유 (가장 늦은 승차)
-PICK_EARLIEST_BEFORE_TEE_MIN = 150  # 승차: 첫 티오프 − 2시간 30분부터 (가장 이른 승차, 12:30 티오프 → 10:00). 합승이라 일찍 타면 골프장에서 대기
-ROUND_HOURS = 5  # 라운드 종료 예정 = 티오프 + 5시간
-NO_ROUND_DROP_FROM = "11:00"  # 마지막 날 라운드가 없을 때 하차 기준 (체크아웃 후, 화면 일정표와 같음)
-# 승하차 지역(service_area.id) → 골프장 지역(golf_course.area) 이동 시간(분) 대략값. 서버에는 지도 API가 없어 이 표로 계산.
-# 화면 apps/web/src/data.ts TRAVEL 과 같은 값 (둘을 같이 고칠 것). 표에 없으면 TRAVEL_DEFAULT_MIN
-TRAVEL_MIN = {
-    "SAPPORO": {"SAPPORO": 40, "KITAHIROSHIMA": 40, "ENIWA": 40, "CHITOSE": 60, "TOMAKOMAI": 70},
-    "KITAHIROSHIMA": {"SAPPORO": 40, "KITAHIROSHIMA": 15, "ENIWA": 20, "CHITOSE": 30, "TOMAKOMAI": 45},
-    "CHITOSE": {"SAPPORO": 60, "KITAHIROSHIMA": 30, "ENIWA": 25, "CHITOSE": 20, "TOMAKOMAI": 25},
-}
-TRAVEL_DEFAULT_MIN = 60
 HOLD_KEEP_AFTER_EXPIRE_MIN = 60  # B-02: 만료 후 이만큼 지난 확보만 삭제 (L-08 2) 용, 개발 결정)
 JUDGE_TRIES = 3  # B-01: 출발편 하나의 판정이 오류로 끝나면 이만큼 다시 시도, 그래도 실패하면 운영자 알림
 MAIL_TRIES = 3  # 안내 메일: 발송 실패(FAIL)는 이 횟수까지 다시 보냄 (B-09, 개발 결정)

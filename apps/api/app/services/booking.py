@@ -25,7 +25,6 @@ NAME_EN_MAX = 60
 # 손님에게 보이는 예약 (S-12·S-13, API-11·12·13): 결제 대기(PENDING_PAYMENT)·미결제(UNPAID)는 보이지 않음
 VISIBLE = ("CONFIRMED", "USER_CANCEL", "OP_CANCEL", "DONE")
 VISIBLE_SQL = "('" + "','".join(VISIBLE) + "')"
-HHMM = re.compile(r"([01]\d|2[0-3]):[0-5]\d")
 
 
 def _pkg_of_dep(c: Connection, dep_id: str) -> dict | None:
@@ -98,11 +97,6 @@ def _validate(req: dict, people: int) -> None:
     for i, s in enumerate(req["stops"]):
         if len(s.get("memo") or "") > S.MEMO_MAX:
             f.append({"field": f"stops.{i}.memo", "rule": "V-11"})
-        t = s.get("desiredTime") or ""
-        if s["kind"] == "DROP" and not t:
-            continue  # V-12 희망 하차 시간은 선택
-        if not HHMM.fullmatch(t) or _min(t) % S.STOP_TIME_STEP_MIN:  # V-12 희망 시간: 승차 필수, 30분 단위
-            f.append({"field": f"stops.{i}.desiredTime", "rule": "V-12"})
     if f:
         fail("E-VALID", f)
 
@@ -120,48 +114,6 @@ def check_area(c: Connection, lat: float, lng: float) -> dict:
     return {"inArea": _area_of(c, {"lat": lat, "lng": lng}) is not None}
 
 
-def _min(t: str) -> int:
-    h, m = t.split(":")[:2]
-    return int(h) * 60 + int(m)
-
-
-def _travel(area_id: str, course_area: str | None) -> int:
-    return S.TRAVEL_MIN.get(area_id, {}).get(course_area or "", S.TRAVEL_DEFAULT_MIN)
-
-
-def stop_time_range(days: list[dict], kind: str, area_id: str) -> tuple[int, int]:
-    """V-12 희망 승하차 시간으로 고를 수 있는 범위 (0시부터 분, 양 끝 포함, 30분 단위).
-    화면 apps/web/src/logic.ts stopTimeRange 와 같은 계산 (화면은 Google 경로 시간이 있으면 그것을 씀).
-    days: package_day 를 day_no 순으로 (tee_time · depart_time · course_area). area_id: 승하차 장소의 service_area.id
-    - 승차(첫날): (첫날 티오프 − 2시간 30분, 06:00보다 이르면 06:00) ~ (첫날 티오프 − 이동 − 30분 여유)를 30분 단위로 내림.
-      첫날 라운드가 없으면 06:00 ~ 첫 출발 시각 − 30분
-    - 하차(마지막 날): (마지막 라운드 티오프 + 5시간 + 이동)을 30분 단위로 올림 ~ 21:00. 라운드가 없으면 NO_ROUND_DROP_FROM
-    이동 시간은 지역별 대략값 표(settings.TRAVEL_MIN). 시작이 끝보다 늦으면 고를 수 있는 시간이 없음"""
-    lo, hi, step = _min(S.STOP_TIME_FIRST), _min(S.STOP_TIME_LAST), S.STOP_TIME_STEP_MIN
-    if not days:  # 일정이 없는 패키지(데이터 오류)는 기본 범위로 (500 방지)
-        return lo, hi
-    if kind == "PICK":
-        d = days[0]
-        if d["tee_time"]:
-            lo = max(lo, -(-(_min(d["tee_time"]) - S.PICK_EARLIEST_BEFORE_TEE_MIN) // step) * step)
-            to = _min(d["tee_time"]) - _travel(area_id, d["course_area"]) - S.PICK_MARGIN_MIN
-        elif d["depart_time"]:
-            to = _min(d["depart_time"]) - S.PICK_MARGIN_MIN
-        else:
-            to = hi
-        return lo, min(hi, to // step * step)
-    d = days[-1]
-    frm = _min(d["tee_time"]) + S.ROUND_HOURS * 60 + _travel(area_id, d["course_area"]) if d["tee_time"] else _min(S.NO_ROUND_DROP_FROM)
-    return max(lo, -(-frm // step) * step), hi
-
-
-def _days_of_dep(c: Connection, dep_id: str) -> list[dict]:
-    return rows(c, """SELECT pd.day_no, pd.tee_time, pd.depart_time, gc.area course_area
-                      FROM departure d JOIN package_day pd ON pd.package_id = d.package_id
-                      LEFT JOIN golf_course gc ON gc.id = pd.course_id
-                      WHERE d.id = :id ORDER BY pd.day_no""", id=dep_id)
-
-
 def create_booking(m: Member, req: dict) -> dict:
     """L-08 (API-10, 본 사이트 결제 연동 10/27): 결제 전에 예약을 결제 대기(PENDING_PAYMENT)로 만들고 예약번호 발급.
     입력 검사 → 출발편 잠금 → 같은 회원의 주문 전 결제 대기는 미결제로 → 잔여석 확인 → 예약·승하차·탑승자 저장.
@@ -173,16 +125,6 @@ def create_booking(m: Member, req: dict) -> dict:
         for s in req["stops"]:
             area = _area_of(c, s) or fail("E-AREA", [{"field": f"stops.{s['kind']}", "rule": "L-06"}])
             stops.append({**s, "areaId": area})
-        days = _days_of_dep(c, req["departureId"])
-        out = []
-        for i, s in enumerate(stops):  # V-12 범위: 패키지 일정으로 정한 범위 안인지 (하차 시간을 안 넣었으면 건너뜀)
-            if not s.get("desiredTime"):
-                continue
-            lo, hi = stop_time_range(days, s["kind"], s["areaId"])
-            if not lo <= _min(s["desiredTime"]) <= hi:
-                out.append({"field": f"stops.{i}.desiredTime", "rule": "V-12-range"})
-        if out:
-            fail("E-VALID", out)
         q = make_quote(c, req["departureId"], req.get("optionId"), people, req.get("singles"))
 
     with tx() as c:
@@ -204,10 +146,10 @@ def create_booking(m: Member, req: dict) -> dict:
             no=no, m=m.memberId, d=d["id"], o=req.get("optionId"), n=people, s=(q["rooms"] or {}).get("singles", 0),
             u=q["unitPrice"], t=q["total"], lang=req["lang"])
         for s in stops:
-            run(c, """INSERT INTO booking_stop (booking_no, kind, place_name, place_id, address, lat, lng, area_id, memo, desired_time)
-                      VALUES (:no, :k, :n, :pid, :a, :lat, :lng, :area, :memo, :dt)""",
+            run(c, """INSERT INTO booking_stop (booking_no, kind, place_name, place_id, address, lat, lng, area_id, memo)
+                      VALUES (:no, :k, :n, :pid, :a, :lat, :lng, :area, :memo)""",
                 no=no, k=s["kind"], n=s["placeName"], pid=s.get("placeId"), a=s.get("address"), lat=s["lat"], lng=s["lng"], area=s["areaId"],
-                memo=s.get("memo"), dt=s.get("desiredTime") or None)
+                memo=s.get("memo"))  # 요청 사항(승하차 시간 등)은 승차(PICK) memo 에 예약당 하나 (팀 결정 11/05, 희망 시간 desired_time 은 받지 않음)
         r = req["rep"]
         run(c, """INSERT INTO booking_member (booking_no, seq, is_rep, name_ko, name_en, country_code, phone, email)
                   VALUES (:no, 1, 1, :nl, :ne, :cc, :ph, :em)""",
@@ -345,7 +287,7 @@ def get_booking(m: Member, no: str) -> dict:
         if b["member_id"] != m.memberId:
             fail("E-FORBID")
         d = one(c, DEP_SQL + " WHERE d.id = :id", id=b["departure_id"])
-        stops = rows(c, """SELECT kind, place_name placeName, place_id placeId, address, lat, lng, memo, desired_time desiredTime,
+        stops = rows(c, """SELECT kind, place_name placeName, place_id placeId, address, lat, lng, memo,
                                   stop_order stopOrder, pickup_time pickupTime
                            FROM booking_stop WHERE booking_no = :no ORDER BY kind DESC""", no=no)
         members = rows(c, """SELECT seq, is_rep isRep, name_ko nameLocal, name_en nameEn, country_code countryCode, phone, email

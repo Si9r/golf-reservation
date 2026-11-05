@@ -32,8 +32,7 @@ class StopIn(PlacePoint):
     placeName: str = Field(min_length=1, max_length=100)
     placeId: str | None = Field(default=None, max_length=100)
     address: str | None = Field(default=None, max_length=200)
-    memo: str | None = None
-    desiredTime: str | None = None  # 'HH:MM' 희망 시간 (승차 필수, 하차 선택). 형식·범위 검사는 V-12 (services/booking.py)
+    memo: str | None = None  # 승차(PICK): 요청 사항 (예약당 하나, V-11 최대 100자). 희망 승하차 시간은 받지 않음 (팀 결정 11/05)
 
 
 class RepIn(BaseModel):

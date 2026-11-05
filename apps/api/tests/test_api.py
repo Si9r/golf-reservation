@@ -23,9 +23,8 @@ def body(t=None, **over):
     """API-10 예약 만들기 요청. t = hold() 가 돌려준 (출발편, 인원)"""
     dep, people = t or (DEP, 2)
     b = {"departureId": dep, "people": people, "optionId": "PKG-001-mitsui", "lang": "ko",
-         # PKG-001 희망 시간 범위: 승차 10:00~11:00 (첫날 12:30 티오프 − 2시간 30분 ~ 12:30 − 삿포로→기타히로시마 40분 − 30분), 하차 11:00~21:00 (마지막 날 라운드 없음)
-         "stops": [{"kind": "PICK", "placeName": "JR 삿포로역 남쪽 출구", **SAPPORO, "memo": "남쪽 출구 앞", "desiredTime": "10:30"},
-                   {"kind": "DROP", "placeName": "JR 삿포로역 남쪽 출구", **SAPPORO, "desiredTime": "15:00"}],
+         "stops": [{"kind": "PICK", "placeName": "JR 삿포로역 남쪽 출구", **SAPPORO, "memo": "남쪽 출구 앞"},
+                   {"kind": "DROP", "placeName": "JR 삿포로역 남쪽 출구", **SAPPORO}],
          "rep": {"nameLocal": "이정훈", "nameEn": "lee junghoon", "countryCode": "+82", "phone": "10-1234-5678", "email": "a@example.com"},
          "companions": [{"nameEn": x} for x in COMP[: people - 1]]}
     b.update(over)
@@ -178,72 +177,28 @@ def test_closed_after_judge_date(client):
 def test_area_and_validation_errors(client):
     set_booked(DEP, 0)
     hid = hold(client)
-    bad = body(hid, stops=[{"kind": "PICK", "placeName": "오타루역", "lat": 43.1979, "lng": 140.9937, "desiredTime": "10:30"},
-                           {"kind": "DROP", "placeName": "삿포로역", **SAPPORO, "desiredTime": "15:00"}])
+    bad = body(hid, stops=[{"kind": "PICK", "placeName": "오타루역", "lat": 43.1979, "lng": 140.9937},
+                           {"kind": "DROP", "placeName": "삿포로역", **SAPPORO}])
     assert client.post(U + "/bookings", json=bad, headers=A).json()["error"] == "E-AREA"
     v = client.post(U + "/bookings", json=body(hid, rep={"nameLocal": "", "nameEn": "이정훈", "countryCode": "+82", "phone": "1", "email": "x"}), headers=A).json()
     assert v["error"] == "E-VALID"
     assert [f["rule"] for f in v["fields"]] == ["V-20", "V-21", "V-22", "V-23"]
 
 
-def stops_with(pick=None, drop=None):
+def test_request_note_no_desired_time(client):  # 희망 승하차 시간은 받지 않고 요청 사항(승차 memo, 예약당 하나)만 (팀 결정 11/05)
+    set_booked(DEP, 0)
     st = body()["stops"]
-    for s, t in zip(st, (pick, drop)):
-        if t is None:
-            s.pop("desiredTime")
-        else:
-            s["desiredTime"] = t
-    return st
-
-
-def test_desired_time_required(client):  # V-12: 승차 희망 시간은 필수, 형식·30분 단위 검사는 하차에도
-    set_booked(DEP, 0)
-    hid = hold(client)
-    r = client.post(U + "/bookings", json=body(hid, stops=stops_with(drop="15:00")), headers=A).json()
-    assert r["error"] == "E-VALID" and r["fields"] == [{"field": "stops.0.desiredTime", "rule": "V-12"}]
-    r = client.post(U + "/bookings", json=body(hid, stops=stops_with(pick="10:15", drop="15:00")), headers=A).json()  # 30분 단위 아님
-    assert r["fields"] == [{"field": "stops.0.desiredTime", "rule": "V-12"}]
-    r = client.post(U + "/bookings", json=body(hid, stops=stops_with(pick="10:30", drop="15:15")), headers=A).json()
-    assert r["fields"] == [{"field": "stops.1.desiredTime", "rule": "V-12"}]
-
-
-def test_drop_time_optional(client):  # 희망 하차 시간은 선택: 없어도 예약되고 상세에는 null
-    set_booked(DEP, 0)
-    no = book_confirmed(client, stops=stops_with(pick="10:30"))
+    st[0]["memo"] = "아침 식사 후 9시 이후 승차를 희망합니다"
+    st[0]["desiredTime"], st[1]["desiredTime"] = "13:00", "21:30"  # 예전 화면이 보내도 무시 (범위 검사·저장 없음)
+    no = book_confirmed(client, stops=st)
     stops = client.get(U + f"/bookings/{no}", headers=A).json()["stops"]
-    assert {s["kind"]: s["desiredTime"] for s in stops} == {"PICK": "10:30", "DROP": None}
-
-
-def test_desired_time_range(client):  # V-12-range: 첫날 티오프(12:30) 이후 승차, 범위 끝(11:00) 넘김, 티오프 2시간 30분 전(10:00)보다 이름
-    set_booked(DEP, 0)
+    assert {x["kind"]: x["memo"] for x in stops} == {"PICK": "아침 식사 후 9시 이후 승차를 희망합니다", "DROP": None}
+    assert all("desiredTime" not in x for x in stops)
+    assert db1("SELECT COUNT(*) n FROM booking_stop WHERE booking_no = :no AND desired_time IS NOT NULL", no=no)["n"] == 0
     hid = hold(client)
-    for t in ("13:00", "11:30", "09:30", "06:00"):
-        r = client.post(U + "/bookings", json=body(hid, stops=stops_with(pick=t, drop="15:00")), headers=A).json()
-        assert r["error"] == "E-VALID" and r["fields"] == [{"field": "stops.0.desiredTime", "rule": "V-12-range"}]
-    r = client.post(U + "/bookings", json=body(hid, stops=stops_with(pick="10:00", drop="21:30")), headers=A).json()
-    assert r["fields"] == [{"field": "stops.1.desiredTime", "rule": "V-12-range"}]
-
-
-def test_desired_time_saved(client):
-    set_booked(DEP, 0)
-    no = book_confirmed(client, stops=stops_with(pick="10:00", drop="11:00"))  # 범위 시작
-    stops = client.get(U + f"/bookings/{no}", headers=A).json()["stops"]
-    assert {s["kind"]: s["desiredTime"] for s in stops} == {"PICK": "10:00", "DROP": "11:00"}
-
-
-def test_stop_time_range():  # 서버 계산 (화면 logic.ts stopTimeRange 와 같은 규칙)
-    from app.services.booking import stop_time_range
-
-    day = lambda tee=None, area=None, dep=None: {"tee_time": tee, "depart_time": dep, "course_area": area}  # noqa: E731
-    days = [day("12:30", "KITAHIROSHIMA"), day("08:30", "SAPPORO")]
-    assert stop_time_range(days, "PICK", "SAPPORO") == (10 * 60, 11 * 60)  # 12:30 − 2시간 30분 = 10:00 ~ 12:30 − 40 − 30 = 11:20 → 11:00
-    assert stop_time_range([day("12:15", "KITAHIROSHIMA")], "PICK", "SAPPORO") == (10 * 60, 11 * 60)  # 09:45 → 올림 10:00, 11:05 → 내림 11:00
-    assert stop_time_range(days, "DROP", "SAPPORO") == (14 * 60 + 30, 21 * 60)  # 08:30 + 5시간 + 40 = 14:10 → 올림 14:30
-    no_round = [day("07:30", "TOMAKOMAI"), day()]
-    assert stop_time_range(no_round, "PICK", "SAPPORO") == (6 * 60, 5 * 60 + 30)  # 시작 05:00 → 06:00, 끝 07:30 − 70 − 30 = 05:50 → 고를 시간 없음
-    assert stop_time_range([day(dep="09:00"), day()], "PICK", "SAPPORO") == (6 * 60, 8 * 60 + 30)  # 첫날 라운드 없음: 06:00 ~ 출발 − 30분
-    assert stop_time_range([], "PICK", "SAPPORO") == (6 * 60, 21 * 60)  # 일정이 없는 패키지(데이터 오류)도 500 대신 기본 범위
-    assert stop_time_range(no_round, "DROP", "SAPPORO") == (11 * 60, 21 * 60)  # 마지막 날 라운드 없음 → 11:00
+    st[0]["memo"] = "가" * 101
+    r = client.post(U + "/bookings", json=body(hid, stops=st), headers=A).json()
+    assert r["error"] == "E-VALID" and r["fields"] == [{"field": "stops.0.memo", "rule": "V-11"}]
 
 
 def test_payment_failed_or_expired_releases_seats(client):  # failed · expired → UNPAID, 좌석 해제
