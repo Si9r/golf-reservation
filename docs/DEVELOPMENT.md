@@ -39,7 +39,7 @@
 | API-01 ~ 04, 06 ~ 14, 18 ~ 21 | `routes.py` | 동작 (`/api/golf/docs`에서 확인) |
 | API-05 장소 검색 | — | 틀만 (지금은 화면이 Google을 직접 호출) |
 | V-01 ~ V-24 입력 검사 | `schemas.py`(pydantic) + `services/booking.py` `_validate` | 서버 쪽 완료 |
-| V-12 희망 승하차 시간 (형식 `V-12`, 범위 `V-12-range`) | `services/booking.py` `_validate` `stop_time_range`, 화면 `apps/web/src/logic.ts` `stopTimeRange` | 완료 |
+| V-12 희망 승하차 시간 | — | 없앰 (팀 결정 11/05: 요청 사항 한 칸으로, 3장) |
 
 ## 2. 화면 연결 순서
 
@@ -140,6 +140,7 @@ API를 빼면(`VITE_USE_API` 없음) 지금처럼 브라우저 안 데이터로�
 | **모바일 승하차 지도 중심**: 고른 장소를 화면 가운데보다 **지도 높이의 15%만큼 위**에 표시, 처음 전체 보기도 같은 만큼 위로 (`Place.tsx` → `GoogleMap.tsx` `centerLift`). PC는 그대로 가운데 | 팀 요청 (2026-11-02). 아래 시트가 지도 아래쪽을 가림
 | **예약 단계 비활성 버튼 안내 (패키지 상세부터)**: 다음 버튼이 비활성일 때 누르면 부족한 항목(인원·출발일)을 빨간 글씨로 표시하고 첫 항목으로 스크롤. 고르면 바로 사라짐. `disabled` 대신 `aria-disabled` (`Detail.tsx`, `index.css`). 승하차(S-06)도 같은 방식: 승차 장소 → 하차 장소 → 희망 승차 시간 순으로 그 탭·항목으로 이동 (`Place.tsx`, 문구 `needPick`·`needDrop`·`needPickTime`). 호텔(S-05)은 항상 활성이라 해당 없음. 그 뒤 단계는 아직 | 팀 요청 (2026-11-02). `disabled` 버튼은 눌러도 반응이 없어 무엇이 부족한지 알 수 없음 → 화면설계서 S-03·S-06 반영 필요
 | **정기 실행 시간표 (서버 안에서)**: `apps/api/app/jobs/schedule.py`. 매분 0초에 확인해 때가 된 배치를 차례로 실행 (JST). **10분마다** B-08 결제 확인 · **매일 09:00** B-08 → B-01 출발 판정 → B-03 여행 완료 → B-04 출발편 만들기 (판정 직전에 결제 확인을 한 번 더 돌려 늦게 끝난 결제도 인원에 넣음) · **매시 30분** B-07 환불 재시도 · B-09 안내 메일 재발송 (09:00 판정과 겹치지 않게). B-02는 시간표에 넣지 않음 (좌석 확보 `seat_hold`를 지금 쓰지 않음). `.env` `JOBS_ENABLED=1`일 때만 서버(uvicorn)가 켜질 때 함께 돎 (기본 꺼짐: 로컬 개발·테스트에서는 돌지 않음, 손으로는 그대로 `python -m app.jobs B-01`). 서버를 여러 개 띄워도 MySQL `GET_LOCK('golf_jobs')`로 동시에는 한 곳만 돌고, 뒤이어 돌아도 배치는 남은 일만 함. 서버가 꺼져 있던 시각의 실행은 건너뜀 (09:00에 꺼져 있었으면 판정은 다음 날 09:00, 지난 판정일도 함께 처리) | 팀 결정 (2026-11-05). 스케줄러가 없어 개발 DB에 판정일이 지난 모집 중 출발편 41개·결제 대기 1건이 쌓여 있었음 (DB 점검 11/04). 새 패키지 없이 표준 라이브러리 스레드로 |
+| **희망 승하차 시간을 받지 않고 요청 사항 한 칸으로**: 승하차 단계(S-06)는 승차·하차 장소만 필수. '만날 위치 메모'를 **요청 사항 (선택, 100자)**으로 바꿔 예약당 하나 받음 (저장은 그대로 승차 `booking_stop.memo`, 장소를 바꿔도 지우지 않음). 확인·결제·예약 상세에 '요청 사항 · …'으로 표시, 일정표 첫 승차는 확정 시간이 없으면 '확정 후'. 서버 V-12(`desiredTime` 형식·범위 검사)와 `stop_time_range`, 화면 `stopTimeRange`, 관련 설정값(`STOP_TIME_FIRST`·`STOP_TIME_LAST`·`PICK_EARLIEST_BEFORE_TEE_MIN`·`ROUND_HOURS`·`NO_ROUND_DROP_FROM`, 서버 `TRAVEL_MIN`)을 지움. 예전 화면이 `desiredTime`을 보내도 무시. DB 칸 `desired_time`은 기존 예약 데이터 때문에 남겨 둠 (새 예약은 NULL). 실제 승차 시간은 운영이 티오프·동선을 보고 정해 출발 3일 전까지 안내 (API-17) | 팀 결정 (2026-11-05). 희망 시간이 있든 없든 그룹별 승차 시간은 누군가 조율해야 하고, 고를 수 있는 범위가 1시간 남짓이라 받는 정보가 적음. 희망대로 안 됐을 때 불만·범위 계산 불일치(10/26 버그)도 없앰. 위 10/19~10/26 희망 시간 행들을 대체. **운영사 확인 필요** (질문표 14번) |
 
 #### 화면 문구 줄이기: 설계서 메시지(M-xxx) 변경 (10/29)
 
@@ -176,7 +177,7 @@ API를 빼면(`VITE_USE_API` 없음) 지금처럼 브라우저 안 데이터로�
 | 5 | 최소 출발 인원 (**운영사 확인 중**. 지금은 **테스트용 15명**(10/29), 운영 값 20명 기준이면 정원 20 = 최소 20이라 20석이 다 차야 출발. 되돌리는 법은 3장 '최소 출발 인원 20 → 15명' 행) | `settings.py` `BUS_SEATS`·`MIN_DEPARTURE` (화면 `data.ts`·`packages/shared`), `rules.py` `departure_view` |
 | 6 | 로그인 연동 자료 (**조교님과 상의 후 전달**). 지금은 작업 지시(10/27)대로 `user_session` 쿠키 → 본 사이트 `/api/partner/session` | `adapters/auth.py`, 화면 `api/sync.ts` `loadMe` |
 | 13 | Google 지도 키·비용 (**조교님과 상의 후 전달**) | 화면 `apps/web/.env.local` `VITE_GOOGLE_MAPS_API_KEY`, `gmaps.ts` `MAP_ID`, API-05 (틀만) |
-| 3 | 희망 승차 시간 범위: 첫 티오프 2시간 30분 전 ~ 티오프 − 이동 − 30분 (팀 결정 10/20). 10/29 답변에 없음 | 서버 `settings.py` `PICK_EARLIEST_BEFORE_TEE_MIN`·`PICK_MARGIN_MIN`, `services/booking.py` `stop_time_range` / 화면 `logic.ts` `stopTimeRange` |
+| 3 | 희망 승차 시간 범위 → 희망 시간을 받지 않기로 바꿈 (팀 결정 11/05). 대신 질문표 14번 | 화면 `Place.tsx` 요청 사항 (`pickMemo` → 승차 `booking_stop.memo`) |
 | 7 | 결제·환불 연동 **Partner API 사양서 원본** (`docs/partner-api-golf.md`는 작업 지시만 있음): 키 헤더 이름·응답 모양·오류 본문 | `adapters/partner.py` 맨 위 '가정' 목록 |
 | 14 | 리조트 패키지 승하차 범위·예외 장소 (10/29: 예외 장소는 지금 만들지 않음) | 아래 '리조트 패키지 승하차 범위' 참고 |
 | 15 | 본 사이트 주문 만료 시간 (그동안 좌석 유지) | `adapters/partner.py` 주문 상태, `jobs` `check_payments` |
