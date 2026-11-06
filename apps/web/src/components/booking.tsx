@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Bed, CaretLeft, CaretRight, Check, Plus, Snowflake } from "@phosphor-icons/react";
 import { motion } from "motion/react";
 import { PKGS, SET, hotelOf, type Pkg } from "../data";
-import { useT } from "../i18n";
+import { useT, dot, wave } from "../i18n";
 import { useDb } from "../store";
 import {
   addMonths, daysInMonth, dow, dowNames, fMonth, fShort, inClosed, inSeason, judgeDate, monthInSeason, monthsAhead, optionOf, pkgCountOn, roomsOf, rounds, stayHotel, todayISO, totalPrice, ymOf, yen, yenDiff,
@@ -174,15 +174,15 @@ export function PkgCard({ p, date, d, seats, onOpen, cmp, onCmp, showCmp, i = 0 
           <PkgTags p={p} seats={d ? seats ?? 0 : undefined} />
           <p className="flex min-w-0 items-center gap-1.5 text-[13px] text-ink-2">
             <Bed size={15} className="flex-none text-muted" />
-            <span className="min-w-0">{h ? `${n(h.name)} · ${n(h.near)}` : t("noHotel")}</span>
+            <span className="min-w-0">{h ? `${n(h.name)}${dot()}${n(h.near)}` : t("noHotel")}</span>
           </p>
           <p className="text-[13px] text-muted">{d ? (date ? t("onDate", { d: fShort(d, L) }) : t("earliest", { d: fShort(d, L) })) : "-"}</p>
         </div>
       </button>
       <div className="mt-auto flex items-end justify-between gap-2 px-4 pb-4">
         <button onClick={onOpen} className="text-left">
-          <span className="text-[12px] text-muted">{t("perPerson")} · {t("busIncl")}</span>
-          <span className="num block text-[20px] font-extrabold leading-tight">{yen(p.price)}~</span>
+          <span className="text-[12px] text-muted">{t("perPerson")}{dot()}{t("busIncl")}</span>
+          <span className="num block text-[20px] font-extrabold leading-tight">{yen(p.price)}{wave()}</span>
         </button>
         {showCmp && (
           <button onClick={onCmp} aria-pressed={cmp} className={`btn btn-xs border-[1.5px] ${cmp ? "border-brand bg-brand-soft text-brand" : "border-dashed border-line-strong bg-surface text-ink-2"}`}>
@@ -209,9 +209,9 @@ export function PriceDetail({ p, opt, people, singles }: { p: Pkg; opt: string |
       <span className={`num flex-none font-semibold ${ok ? "text-ok" : ""}`}>{v}</span>
     </li>
   );
-  const incl = [t("pdGolf", { r: rounds(p) }), p.nights ? t("pdStay", { n: p.nights }) : null].filter(Boolean).join(" · ");
+  const incl = [t("pdGolf", { r: rounds(p) }), p.nights ? t("pdStay", { n: p.nights }) : null].filter(Boolean).join(dot());
   // 호텔 줄: 호텔·객실·방 구성은 설명 한 줄, 금액은 합계만 (1인 차액은 설명 둘째 줄). 1인실이 없으면 객실 줄은 숨김
-  const stay = h ? [n(h.name), o && !o.hotel ? n(o.sub) : n(h.room), r ? t("roomsSum0", { t: r.twins }) : null].filter(Boolean).join(" · ") : o ? n(o.sub) : null;
+  const stay = h ? [n(h.name), o && !o.hotel ? n(o.sub) : n(h.room), r ? t("roomsSum0", { t: r.twins }) : null].filter(Boolean).join(dot()) : o ? n(o.sub) : null;
   return (
     <ul className="grid gap-2 text-[13.5px] lg:text-[14px]">
       <Row k={t("lineBase", { p: yen(p.price), n: people })} sub={[t("pdIncl", { s: incl })]} v={yen(p.price * people)} />

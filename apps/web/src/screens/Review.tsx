@@ -3,7 +3,7 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { Bed, Bus, CalendarBlank, CaretDown, Info, UsersThree, WarningCircle } from "@phosphor-icons/react";
 import { pkgOf } from "../data";
 import { SET } from "../data";
-import { useT } from "../i18n";
+import { useT, dot, to } from "../i18n";
 import { useDb } from "../store";
 import { addDays, depView, fDayLong, fShort, hasHotelStep, itinerary, judgeDate, optionOf, stayHotel, totalPrice, tripEnd, yen } from "../logic";
 import { Anno, BottomBar, Collapse, Img, PriceBlock, Q, ScreenTag, Sheet, StepHead } from "../components/ui";
@@ -64,7 +64,7 @@ export default function Review() {
   const need = Math.max(0, SET.MIN_DEPARTURE - v.sum); // 우리 인원까지 더해서 출발 확정까지 남은 인원
   const roomsTxt = price.rooms ? t(price.rooms.singles ? "roomsSum" : "roomsSum0", { t: price.rooms.twins, s: price.rooms.singles }) : null;
   const stayTitle = hotel ? n(hotel.name) : opt?.none ? n(opt.name) : t("noHotel");
-  const staySub = hotel ? [opt && !opt.hotel ? n(opt.sub) : n(hotel.room), roomsTxt].filter(Boolean).join(" · ") : opt?.none ? n(opt.sub) : null;
+  const staySub = hotel ? [opt && !opt.hotel ? n(opt.sub) : n(hotel.room), roomsTxt].filter(Boolean).join(dot()) : opt?.none ? n(opt.sub) : null;
   // 요약 카드 안 한 줄: 항목 이름 · 내용 · 변경
   const Row = ({ icon: I, title, to, children }: { icon: typeof Bed; title: string; to?: string; children: ReactNode }) => (
     <div className="flex gap-3 border-t border-line py-3.5 first:border-t-0">
@@ -102,7 +102,7 @@ export default function Review() {
             <div className="px-4 py-1">
               {/* 출발일·인원 (11/2 사진 위 '변경'을 이 줄로 옮김) */}
               <Row icon={CalendarBlank} title={t("rowDate")} to={`/golf/packages/${p.id}`}>
-                <span className="num font-semibold">{fShort(dep, L)}{p.nights ? ` ~ ${fShort(tripEnd(p, dep), L)}` : ""} · {t("peopleN", { n: d.people })}</span>
+                <span className="num font-semibold">{fShort(dep, L)}{p.nights ? `${to()}${fShort(tripEnd(p, dep), L)}` : ""}{dot()}{t("peopleN", { n: d.people })}</span>
               </Row>
               {/* 2 숙박 */}
               <Row icon={Bed} title={t("rowHotel")} to={hasHotelStep(p) ? "/golf/book/hotel" : undefined}>
@@ -111,11 +111,11 @@ export default function Review() {
               </Row>
               {/* 3 버스 승하차 */}
               <Row icon={Bus} title={t("pick")} to="/golf/book/place">
-                <b className="font-semibold">{n(d.pick!.name)}</b> · {t("wishAt", { t: d.pickTime! })}
+                <b className="font-semibold">{n(d.pick!.name)}</b>{dot()}{t("wishAt", { t: d.pickTime! })}
                 {d.pickMemo && <span className="block text-[12.5px] text-muted">{d.pickMemo}</span>}
               </Row>
               <Row icon={Bus} title={t("drop")} to="/golf/book/place">
-                <b className="font-semibold">{drop ? n(drop.name) : "-"}</b>{d.dropSame && <span className="text-muted"> ({t("sameAsPick")})</span>}{d.dropTime ? ` · ${t("wishAt", { t: d.dropTime })}` : ""}
+                <b className="font-semibold">{drop ? n(drop.name) : "-"}</b>{d.dropSame && <span className="text-muted"> ({t("sameAsPick")})</span>}{d.dropTime ? `${dot()}${t("wishAt", { t: d.dropTime })}` : ""}
               </Row>
             </div>
           </section>
@@ -130,7 +130,7 @@ export default function Review() {
             {/* 접혀 있어도 1일차 '버스 승차 → 첫 라운드'는 미리 보여 줌 */}
             {!itinOpen && (
               <div className="-mt-1 pb-2">
-                <p className="px-4 pb-1 text-[13px] font-bold text-brand">{t("dayN", { i: 1 })} · {fShort(dep, L)}</p>
+                <p className="px-4 pb-1 text-[13px] font-bold text-brand">{t("dayN", { i: 1 })}{dot()}{fShort(dep, L)}</p>
                 <ItinList items={itin[0].slice(0, 2)} memo={d.pickMemo} />
               </div>
             )}
@@ -138,7 +138,7 @@ export default function Review() {
               <div className="grid gap-1">
                 {itin.map((items, i) => (
                   <div key={i}>
-                    <p className="px-4 pb-1 text-[13px] font-bold text-brand">{t("dayN", { i: i + 1 })} · {fShort(addDays(dep, i), L)}</p>
+                    <p className="px-4 pb-1 text-[13px] font-bold text-brand">{t("dayN", { i: i + 1 })}{dot()}{fShort(addDays(dep, i), L)}</p>
                     <ItinList items={items} memo={i === 0 ? d.pickMemo : undefined} />
                   </div>
                 ))}
@@ -184,7 +184,7 @@ export default function Review() {
 
       <BottomBar pcHidden>
         <span className="absolute -top-3 left-3"><Anno n={7} t="하단: 로그인 안 했으면 '로그인하고 예약' → 메인 사이트 로그인 → S-09, 했으면 '정보 입력하기' → S-09. 잔여석 < 인원이면 비활성 (M-120), 같은 출발편 예약이 있으면 확인 창 (M-152)" /></span>
-        <PriceBlock main={yen(total)} sub={`${t("totalL", { n: d.people })} · ${t("busIncl")}`} />
+        <PriceBlock main={yen(total)} sub={`${t("totalL", { n: d.people })}${dot()}${t("busIncl")}`} />
         <button className="btn btn-primary min-w-[140px]" disabled={seatErr} onClick={proceed}>{user ? t("rvGoInfo") : t("rvGoLogin")}</button>
       </BottomBar>
 

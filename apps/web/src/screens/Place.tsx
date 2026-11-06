@@ -3,7 +3,7 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
 import { Airplane, Bed, Buildings, Bus, CheckCircle, Clock, GoogleLogo, MagnifyingGlass, MapPin, Train, WarningCircle, X } from "@phosphor-icons/react";
 import { AREA_NAME, PLACES, SET, ZONES_STRICT, courseOf, serviceArea, type Place as P, type PlaceKind } from "../data";
-import { useT } from "../i18n";
+import { useT, dot } from "../i18n";
 import { hasHotelStep, nearestKnown, norm, placeZone, stayHotel, stopTimeRange, zoneAt, type StopRange } from "../logic";
 import { Anno, BottomBar, Q, ScreenTag, StepHead } from "../components/ui";
 import { DriveChip, MapView, type MapMarker } from "../components/GoogleMap";
@@ -303,7 +303,7 @@ export default function Place() {
   const tabPlace = tab === "pick" ? d.pick : dropShown;
   const rangeText = (k: "pick" | "drop", r: StopRange | null) =>
     !r ? null : !r.options.length ? t("rangeNone") : k === "pick" && r.base?.kind === "tee" ? t("rangePickTee", { tee: r.base.tee, from: r.from, to: r.to }) : k === "drop" && r.base?.kind === "end" ? t("rangeDropEnd", { end: r.base.end, from: r.from }) : t("rangeAny", { from: r.from, to: r.to });
-  const withTime = (name: string, time: string | null) => (time ? `${name} · ${t("wishAt", { t: time })}` : name);
+  const withTime = (name: string, time: string | null) => (time ? `${name}${dot()}${t("wishAt", { t: time })}` : name);
 
   const tabsEl = (compact: boolean) => (
     <div className={`relative grid grid-cols-2 gap-1 rounded-xl p-1 ${compact ? "bg-surface/95 shadow-md backdrop-blur" : "mb-2 bg-surface-2"}`} role="tablist">
@@ -366,7 +366,7 @@ export default function Place() {
           <span className={`grid h-9 w-9 flex-none place-items-center rounded-full ${isSt(h) ? "bg-brand-soft text-brand" : "bg-surface-2 text-ink-2"}`}><I size={18} /></span>
           <span className="min-w-0 flex-1">
             <b className="block truncate text-[14.5px]">{h.local ? n(h.local.name) : h.g!.main}</b>
-            <span className="block truncate text-[12.5px] text-muted">{h.local ? `${t(`kind_${h.local.kind}`)} · ${n(AREA_NAME[h.local.area])}` : h.g!.sub}</span>
+            <span className="block truncate text-[12.5px] text-muted">{h.local ? `${t(`kind_${h.local.kind}`)}${dot()}${n(AREA_NAME[h.local.area])}` : h.g!.sub}</span>
           </span>
           {ok !== null && <AreaBadge ok={ok} />}
         </button>
@@ -380,7 +380,7 @@ export default function Place() {
       {hitSt.length > 0 && <ul className="divide-y divide-line">{hitSt.map(hitRow)}</ul>}
       {hitSt.length > 0 && hitNear.length > 0 && <p className="border-t border-line px-4 pb-1 pt-2.5 text-[12px] font-bold text-muted">{t("nearPlaces")}</p>}
       {hitNear.length > 0 && <ul className="divide-y divide-line">{hitNear.map(hitRow)}</ul>}
-      {(sugLoading || gOnly.length > 0) && <p className="flex items-center justify-end gap-1 border-t border-line px-4 py-1.5 text-[11px] text-muted"><GoogleLogo size={12} weight="bold" /> {t("gSuggest")}{sugLoading && ` · ${t("searching")}`}</p>}
+      {(sugLoading || gOnly.length > 0) && <p className="flex items-center justify-end gap-1 border-t border-line px-4 py-1.5 text-[11px] text-muted"><GoogleLogo size={12} weight="bold" /> {t("gSuggest")}{sugLoading && `${dot()}${t("searching")}`}</p>}
     </div>
   );
   const chipsEl = (
@@ -393,7 +393,7 @@ export default function Place() {
           const z = placeZone(x);
           return (
             <button key={x.name.ko} className="fchip" onClick={() => assign(x)} style={z ? undefined : { color: "var(--bad)", borderColor: "var(--bad-line)" }}>
-              <I size={15} /> {n(x.name)}{!z && ` · ${t("outArea")}`}
+              <I size={15} /> {n(x.name)}{!z && `${dot()}${t("outArea")}`}
             </button>
           );
         })}
@@ -440,7 +440,7 @@ export default function Place() {
       )}
     </motion.div>
   );
-  const dropSameEl = <p className="rounded-2xl bg-surface-2 p-4 text-[14px] text-ink-2">{d.pick ? `${t("sameAsPick")} · ${n(d.pick.name)}` : t("notSet")}</p>;
+  const dropSameEl = <p className="rounded-2xl bg-surface-2 p-4 text-[14px] text-ink-2">{d.pick ? `${t("sameAsPick")}${dot()}${n(d.pick.name)}` : t("notSet")}</p>;
   const summaryEl = (
     <section className="relative card divide-y divide-line">
       {(["pick", "drop"] as const).map((k) => {
@@ -497,8 +497,8 @@ export default function Place() {
     <BottomBar width={isLg ? "narrow" : "step"}>
       <span className="absolute -top-3 left-3"><Anno n={9} t="하단 다음: 승차·하차 장소와 희망 승차 시간이 지정되면 활성 (희망 하차 시간은 선택). 비활성일 때 누르면 부족한 항목을 빨간 글씨로 표시하고 그 탭·항목으로 이동 → 잔여석 다시 확인(B-01) → S-08 (T-10) / 범위 밖 → 그대로 (T-31)" /></span>
       <div className="min-w-0 flex-1 text-[12.5px] leading-tight text-muted">
-        <p className="truncate">{t("pick")} · {d.pick ? withTime(n(d.pick.name), d.pickTime) : "-"}</p>
-        <p className="truncate">{t("drop")} · {dropShown ? withTime(n(dropShown.name), d.dropTime) : "-"}</p>
+        <p className="truncate">{t("pick")}{dot()}{d.pick ? withTime(n(d.pick.name), d.pickTime) : "-"}</p>
+        <p className="truncate">{t("drop")}{dot()}{dropShown ? withTime(n(dropShown.name), d.dropTime) : "-"}</p>
       </div>
       <button className="btn btn-primary min-w-[140px]" aria-disabled={!done} onClick={() => (done ? guard(() => { if (d.dropSame) d.patch({ drop: d.pick }); nav(d.editReturn ? editBackTo(d.editReturn) : "/golf/book/review"); }) : showFirstMissing())}>{d.editReturn ? t("editBack") : t("next")}</button>
     </BottomBar>

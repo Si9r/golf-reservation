@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { Crown } from "@phosphor-icons/react";
 import { hotelOf, pkgOf } from "../data";
-import { useT } from "../i18n";
+import { useT, dot } from "../i18n";
 import { useDb, useDraft } from "../store";
 import { coursesOf, firstAvailable, fShort, monthInSeason, monthsAhead, rounds, seatsLeft, yen } from "../logic";
 import { useDepartures } from "../api/sync";
@@ -26,12 +26,12 @@ export default function Compare() {
   const rows: { k: string; cells: { v: string; best?: boolean }[] }[] = [
     { k: t("cmpPeriod"), cells: pk.map((p) => ({ v: p.nights ? t("nightsDays", { n: p.nights, d: p.nights + 1 }) : t("dayTrip") })) },
     { k: t("cmpRounds"), cells: pk.map((p) => ({ v: t("roundsN", { n: rounds(p) }), best: rounds(p) === maxRounds })) },
-    { k: t("cmpCourses"), cells: pk.map((p) => ({ v: coursesOf(p).map((c) => n(c.name)).join(", ") })) },
+    { k: t("cmpCourses"), cells: pk.map((p) => ({ v: coursesOf(p).map((c) => n(c.name)).join(L === "ja" ? "、" : ", ") })) },
     { k: t("cmpHotel"), cells: pk.map((p) => ({ v: hotelOf(p.hotel) ? n(hotelOf(p.hotel)!.name) : t("noHotel") })) },
     { k: t("cmpPrice"), cells: pk.map((p) => ({ v: yen(p.price), best: p.price === minPrice })) },
-    { k: t("cmpDep"), cells: early.map((d, i) => ({ v: d ? `${fShort(d, L)} · ${t("seatsLeft", { s: seatsLeft(pk[i].id, d, extra) })}` : "-", best: !!d && d === firstDep })) },
+    { k: t("cmpDep"), cells: early.map((d, i) => ({ v: d ? `${fShort(d, L)}${dot()}${t("seatsLeft", { s: seatsLeft(pk[i].id, d, extra) })}` : "-", best: !!d && d === firstDep })) },
   ];
-  const cols = `76px repeat(${pk.length}, minmax(0, 1fr))`;
+  const cols = `76px repeat(${pk.length}, minmax(104px, 1fr))`; // 칸이 너무 좁아지면 표를 옆으로 넘김 (휴대폰 3개 비교)
   return (
     <div className="page step">
       <ScreenTag id="S-04" name="패키지 비교 (2단계)" refs="FN-05 · API-01 · T-05" />
@@ -42,13 +42,15 @@ export default function Compare() {
       </div>
       <div className="relative card p-3">
         <Anno n={1} t="비교 표: 열 = 패키지(최대 3), 행 = 유형·일정·라운드·골프장·호텔·1인 가격·출발일, 열의 '예약' → S-03 (T-05)" />
+        <div className="-mx-1 overflow-x-auto px-1">
+        <div style={{ minWidth: 76 + pk.length * 112 }}>
         <div className="grid gap-2" style={{ gridTemplateColumns: cols }}>
           <span />
           <AnimatePresence>
             {pk.map((p) => (
               <motion.div key={p.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="grid content-start gap-2">
                 <div className="aspect-[4/3] overflow-hidden rounded-xl"><Img src={p.photos[0]} alt={n(p.name)} /></div>
-                <b className="line-clamp-3 text-[13px] leading-snug [overflow-wrap:anywhere]">{n(p.name)}</b>
+                <b className="text-[13px] leading-snug [overflow-wrap:anywhere]">{n(p.name)}</b>
               </motion.div>
             ))}
           </AnimatePresence>
@@ -77,6 +79,8 @@ export default function Compare() {
           {pk.map((p, i) => (
             <button key={p.id} className="btn btn-primary btn-sm px-2" onClick={() => { choosePkg(p.id); if (early[i] && date) patch({ dep: early[i] }); nav(`/golf/packages/${p.id}`); }}>{t("reserveShort")}</button>
           ))}
+        </div>
+        </div>
         </div>
       </div>
       <p className="mt-3 text-[12.5px] text-muted">{t("busInclFull")}</p>

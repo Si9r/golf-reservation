@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
 import { Sparkle } from "@phosphor-icons/react";
 import { PKGS, hotelOf } from "../data";
-import { useT } from "../i18n";
+import { useT, dot, wave } from "../i18n";
 import { Img, Sheet } from "../components/ui";
 import { PkgTags } from "../components/booking";
 import { yen } from "../logic";
@@ -73,7 +73,7 @@ export function AiSheet({ open, onClose }: { open: boolean; onClose: () => void 
               <p className="text-[13px] font-bold text-brand">{best.s >= 5 ? t("aiResult") : t("aiNone")}</p>
               <h3 className="font-bold">{n(best.p.name)}</h3>
               <PkgTags p={best.p} />
-              <p className="num text-[18px] font-extrabold">{yen(best.p.price)}~ <span className="text-[12px] font-normal text-muted">{t("perPerson")} · {t("busIncl")}</span></p>
+              <p className="num text-[18px] font-extrabold">{yen(best.p.price)}{wave()} <span className="text-[12px] font-normal text-muted">{t("perPerson")}{dot()}{t("busIncl")}</span></p>
               <div className="grid grid-cols-[auto_1fr] gap-2">
                 <button className="btn btn-sm btn-ghost" onClick={() => setAns([])}>{t("aiRestart")}</button>
                 <button className="btn btn-sm btn-primary" onClick={() => { onClose(); nav(`/golf/packages/${best.p.id}`); }}>{t("aiOpen")}</button>

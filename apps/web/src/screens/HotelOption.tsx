@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { ArrowSquareOut, Bed, CaretDown, Minus, Plus, Star } from "@phosphor-icons/react";
 import { SET, type Hotel, type Pkg } from "../data";
-import { useT } from "../i18n";
+import { useT, dot } from "../i18n";
 import { coursesOf, distM, fShort, hasHotelStep, optionOf, roomsOf, stayHotel, totalPrice, yen, yenDiff } from "../logic";
 import { Anno, BottomBar, gmapLink, PriceBlock, Q, ScreenTag, StepHead } from "../components/ui";
 import { DriveChip, MapView } from "../components/GoogleMap";
@@ -33,7 +33,7 @@ export default function HotelOption() {
       <section className="relative mb-5">
         <Anno n="S-05" t="제목·선택 요약 (패키지·출발일·인원)" />
         <h1 className="text-[22px] font-black leading-snug tracking-[-0.02em] lg:text-[26px]">{t("s05T")}</h1>
-        <p className="mt-1 text-[14px] text-muted">{n(p.name)} · {fShort(d.dep!, L)} {L === "ko" ? "출발" : "出発"} · {t("peopleN", { n: d.people })}</p>
+        <p className="mt-1 text-[14px] text-muted">{n(p.name)}{dot()}{fShort(d.dep!, L)} {L === "ko" ? "출발" : "出発"}{dot()}{t("peopleN", { n: d.people })}</p>
       </section>
       {fixed && hotel && (
         <section className="relative grid gap-2.5">
@@ -68,10 +68,10 @@ export default function HotelOption() {
               >
                 <span className="radio mt-0.5" />
                 <span className="min-w-0 flex-1">
-                  <b className="block text-[15.5px]">{n(o.name)}{!o.hotel && !o.none && h ? <span className="font-normal text-ink-2"> · {n(h.name)}</span> : null}</b>
+                  <b className="block text-[15.5px]">{n(o.name)}{!o.hotel && !o.none && h ? <span className="font-normal text-ink-2">{dot()}{n(h.name)}</span> : null}</b>
                   <span className="block text-[13px] text-muted">{n(o.sub)}</span>
                   {h?.rating && o.hotel && (
-                    <span className="mt-1 flex items-center gap-1 text-[12.5px] text-ink-2"><Star size={12} weight="fill" className="text-[#F59E0B]" /><span className="num">{h.rating}</span> · {n(h.near)}</span>
+                    <span className="mt-1 flex items-center gap-1 text-[12.5px] text-ink-2"><Star size={12} weight="fill" className="text-[#F59E0B]" /><span className="num">{h.rating}</span>{dot()}{n(h.near)}</span>
                   )}
                 </span>
                 <span className="flex flex-none flex-col items-end gap-1.5">
@@ -115,7 +115,7 @@ export default function HotelOption() {
       </div>
       <BottomBar width="narrow">
         <span className="absolute -top-3 left-3"><Anno n={3} t="하단: 총액(1인실 추가 포함) + 다음: 항상 활성 (기본 옵션 선택됨) → 잔여석 다시 확인(B-01) → S-06 (T-08) / 변경 중 → S-08" /></span>
-        <PriceBlock main={yen(price.total)} sub={`${t("totalL", { n: d.people })}${price.singleAdd ? ` · ${t("lineSingle", { p: yen(SET.SINGLE_ADD), n: rooms.singles })}` : ""}`} />
+        <PriceBlock main={yen(price.total)} sub={`${t("totalL", { n: d.people })}${price.singleAdd ? `${dot()}${t("lineSingle", { p: yen(SET.SINGLE_ADD), n: rooms.singles })}` : ""}`} />
         <button className="btn btn-primary min-w-[140px]" onClick={next}>{d.editReturn ? t("editBack") : t("next")}</button>
       </BottomBar>
     </div>
@@ -139,7 +139,7 @@ function HotelCard({ p, h, room, map = true, mapKey }: { p: Pkg; h: Hotel; room?
       )}
       <div className="grid gap-1 p-4">
         <b className="text-[15px]">{n(h.name)}</b>
-        <p className="text-[13px] text-muted">{room ?? n(h.room)} · {n(h.near)}</p>
+        <p className="text-[13px] text-muted">{room ?? n(h.room)}{dot()}{n(h.near)}</p>
         <div className="mt-1.5 flex flex-wrap gap-1.5">
           {coursesOf(p).map((c, k) => (
             <DriveChip key={c.id} from={h} to={c} label={`${k + 1}. ${n(c.name)}`} />

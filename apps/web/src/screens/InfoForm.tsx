@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type MutableRefObject, type ReactNode } fr
 import { Navigate, useNavigate } from "react-router-dom";
 import { ArrowSquareOut, CaretRight, WarningCircle } from "@phosphor-icons/react";
 import { SET, TERMS_URL } from "../data";
-import { useT, type Key } from "../i18n";
+import { useT, type Key, dot, to } from "../i18n";
 import { useDb, useDraft, useToast, type Info } from "../store";
 import { depView, fShort, hasHotelStep, optionOf, stayHotel, totalPrice, tripEnd, yen, seatsLeft } from "../logic";
 import { Anno, BottomBar, Img, PriceBlock, ScreenTag, Sheet, StepHead } from "../components/ui";
@@ -22,9 +22,10 @@ const V23 = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 export const validEn = (s: string) => s.length <= 60 && V21.test(s); // 성 + 이름 (영문 풀네임) — 단어 2개 이상은 V21이 검사
 // 영문 성·이름 칸 하나: 대문자 영문, 단어 사이 공백·하이픈 1개, 1~30자
 const VPART = /^[A-Z]+(?:[ -][A-Z]+)*$/;
-export const validPart = (s: string) => s.length >= 1 && s.length <= 30 && VPART.test(s);
+export const validPart = (s: string) => { const x = s.trim(); return x.length >= 1 && x.length <= 30 && VPART.test(x); }; // 앞뒤 공백은 보낼 때 지움 (joinEn)
 export const splitEn = (s: string): [string, string] => { const w = s.trim().split(/\s+/); return [w[0] ?? "", w.slice(1).join(" ")]; };
 export const joinEn = ([a, b]: [string, string]) => `${a.trim()} ${b.trim()}`.trim();
+export const tooLongEn = (x: [string, string]) => joinEn(x).length > 60; // 성 + 공백 + 이름: 서버 NAME_EN_MAX 와 같음
 export const upper = (s: string) => s.toUpperCase().replace(/[^A-Z -]/g, ""); // 영문·공백·하이픈만 입력됨
 // 국가번호 (고를 때 국가 이름도 함께: +82 (대한민국))
 const CC = ["+82", "+81", "+86", "+886", "+1"] as const;
@@ -82,10 +83,10 @@ export default function InfoForm() {
   const nameKo = f.nameKo.trim();
   const errs: Record<string, string | null> = {
     nameKo: nameKo.length >= 1 && nameKo.length <= 30 ? null : t("M-161"), // V-20
-    nameEn: en.every(validPart) ? null : en.some((x) => x.trim()) ? t("M-162") : t("M-161"), // V-21 성·이름 모두 필수
+    nameEn: !en.every(validPart) ? (en.some((x) => x.trim()) ? t("M-162") : t("M-161")) : tooLongEn(en) ? t("enLong") : null, // V-21 성·이름 모두 필수
     phone: ph.every((x) => PH.test(x)) && V22.test(`${f.cc} ${ph.join("-")}`) && V22.test(ph.join("-")) ? null : ph.some((x) => x) ? t("M-163") : t("M-161"), // V-22 시작·중간·끝 번호 모두 필수
-    email: V23.test(f.email.trim()) ? null : f.email ? t("M-164") : t("M-161"), // V-23
-    comps: compN === 0 || compEn.every((x) => x.every(validPart)) ? null : compEn.some((x) => x.some((y) => y.trim())) ? t("M-162") : t("M-161"), // V-24 동반자 전원 성·이름 필수
+    email: V23.test(f.email.trim()) && f.email.trim().length <= 100 ? null : f.email ? t("M-164") : t("M-161"), // V-23
+    comps: compN === 0 ? null : !compEn.every((x) => x.every(validPart)) ? (compEn.some((x) => x.some((y) => y.trim())) ? t("M-162") : t("M-161")) : compEn.some(tooLongEn) ? t("enLong") : null, // V-24 동반자 전원 성·이름 필수
     agree: AGREE.every((k) => f.agree[k]) ? null : t("M-165"), // V-25
   };
   const show = (k: string) => (tried || touched[k] ? errs[k] : null);
@@ -106,7 +107,7 @@ export default function InfoForm() {
       toast(t("M-120", { s: v.seats, n: d.people }), "bad");
       return;
     }
-    const info = { ...f, nameEn: joinEn(en), phone: ph.join("-"), companions: compEn.map(joinEn) };
+    const info = { ...f, nameKo, email: f.email.trim(), nameEn: joinEn(en), phone: ph.join("-"), companions: compEn.map(joinEn) };
     if (USE_API) {
       // API-10 예약 만들기: 결제 대기(PENDING_PAYMENT)로 저장, 예약번호 발급, 좌석을 잡음 (본 사이트 결제 연동 10/27).
       // 입력값(대표자·동반자·승하차·객실 구성)도 이때 저장. 실패하면 E-SEAT → 서버 최신 잔여석으로 M-120
@@ -169,8 +170,8 @@ export default function InfoForm() {
         </Field>
         <Field id="nameEn" n={2} anno="대표자 영문 이름 (V-21): 성·이름 두 칸 모두 필수, 자동 대문자, 영문·공백·하이픈 1~30자. 보낼 때 '성 이름'" label={t("nameEn")} err={show("nameEn")} refs={refs}>
           <div className="grid grid-cols-2 gap-2">
-            <input id="f-nameEn" className="input uppercase" value={en[0]} maxLength={30} aria-label={t("enSur")} placeholder={t("enSurPh")} aria-invalid={!!show("nameEn") && !validPart(en[0])} onBlur={() => blur("nameEn")} onChange={(e) => set({ en: [upper(e.target.value), en[1]] })} autoComplete="family-name" />
-            <input className="input uppercase" value={en[1]} maxLength={30} aria-label={t("enGiven")} placeholder={t("enGivenPh")} aria-invalid={!!show("nameEn") && !validPart(en[1])} onBlur={() => blur("nameEn")} onChange={(e) => set({ en: [en[0], upper(e.target.value)] })} autoComplete="given-name" />
+            <input id="f-nameEn" className="input uppercase" value={en[0]} maxLength={30} aria-label={t("enSur")} placeholder={t("enSurPh")} aria-invalid={!!show("nameEn") && (!validPart(en[0]) || tooLongEn(en))} onBlur={() => blur("nameEn")} onChange={(e) => set({ en: [upper(e.target.value), en[1]] })} autoComplete="family-name" />
+            <input className="input uppercase" value={en[1]} maxLength={30} aria-label={t("enGiven")} placeholder={t("enGivenPh")} aria-invalid={!!show("nameEn") && (!validPart(en[1]) || tooLongEn(en))} onBlur={() => blur("nameEn")} onChange={(e) => set({ en: [en[0], upper(e.target.value)] })} autoComplete="given-name" />
           </div>
           <div className="grid grid-cols-2 gap-2 text-[12px] text-muted"><span>{t("enSur")}</span><span>{t("enGiven")}</span></div>
         </Field>
@@ -190,7 +191,7 @@ export default function InfoForm() {
           </div>
         </Field>
         <Field id="email" n={4} anno="이메일 (V-23): 확인서·출발 확정·취소 안내 주소" label={t("email")} err={show("email")} help={t("emailNote")} refs={refs}>
-          <input id="f-email" className="input" type="email" value={f.email} aria-invalid={!!show("email")} onBlur={() => blur("email")} onChange={(e) => set({ email: e.target.value })} autoComplete="email" />
+          <input id="f-email" className="input" type="email" value={f.email} maxLength={100} aria-invalid={!!show("email")} onBlur={() => blur("email")} onChange={(e) => set({ email: e.target.value })} autoComplete="email" />
         </Field>
       </section>
 
@@ -205,7 +206,7 @@ export default function InfoForm() {
                 <span className="text-[13px] font-semibold text-ink-2">{t("compN", { i: i + 1 })}</span>
                 <div className="grid grid-cols-2 gap-2">
                   {[0, 1].map((k) => (
-                    <input key={k} className="input uppercase" value={c[k]} maxLength={30} aria-label={`${t("compN", { i: i + 1 })} ${t(k ? "enGiven" : "enSur")}`} placeholder={t(k ? "enGivenPh" : "enSurPh")} aria-invalid={(tried || touched.comps) && !validPart(c[k])} onBlur={() => blur("comps")}
+                    <input key={k} className="input uppercase" value={c[k]} maxLength={30} aria-label={`${t("compN", { i: i + 1 })} ${t(k ? "enGiven" : "enSur")}`} placeholder={t(k ? "enGivenPh" : "enSurPh")} aria-invalid={(tried || touched.comps) && (!validPart(c[k]) || tooLongEn(c))} onBlur={() => blur("comps")}
                       onChange={(e) => { const next = compEn.map((x) => [...x] as [string, string]); next[i][k] = upper(e.target.value); set({ compEn: next }); }} />
                   ))}
                 </div>
@@ -257,9 +258,9 @@ export default function InfoForm() {
           <div className="relative aspect-[16/8]"><Img src={p.photos[0]} alt={n(p.name)} className="absolute inset-0 h-full w-full" /></div>
           <div className="grid gap-2 p-4 text-[13.5px]">
             <b className="text-[15px] font-extrabold leading-snug">{n(p.name)}</b>
-            <p className="flex flex-wrap items-center gap-2 text-ink-2">{fShort(d.dep!, L)}{p.nights ? ` ~ ${fShort(tripEnd(p, d.dep!), L)}` : ""} <span className="badge brand">{t("peopleN", { n: d.people })}</span></p>
-            {(() => { const h = stayHotel(p, d.opt); const o = optionOf(d.opt); return <p className="text-ink-2">{h ? `${n(h.name)} · ${o && !o.hotel ? n(o.sub) : n(h.room)}` : o?.none ? n(o.name) : t("noHotel")}</p>; })()}
-            <p className="text-ink-2">{t("pick")} · {d.pick ? n(d.pick.name) : "-"} · {t("wishAt", { t: d.pickTime ?? "-" })}</p>
+            <p className="flex flex-wrap items-center gap-2 text-ink-2">{fShort(d.dep!, L)}{p.nights ? `${to()}${fShort(tripEnd(p, d.dep!), L)}` : ""} <span className="badge brand">{t("peopleN", { n: d.people })}</span></p>
+            {(() => { const h = stayHotel(p, d.opt); const o = optionOf(d.opt); return <p className="text-ink-2">{h ? `${n(h.name)}${dot()}${o && !o.hotel ? n(o.sub) : n(h.room)}` : o?.none ? n(o.name) : t("noHotel")}</p>; })()}
+            <p className="text-ink-2">{t("pick")}{dot()}{d.pick ? n(d.pick.name) : "-"}{dot()}{t("wishAt", { t: d.pickTime ?? "-" })}</p>
             <div className="mt-1 flex items-baseline justify-between border-t border-line pt-3">
               <span className="font-semibold">{t("totalL", { n: d.people })}</span>
               <span className="num text-[22px] font-extrabold text-brand">{yen(total)}</span>

@@ -3,7 +3,7 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { CreditCard, Info, Lock, Timer, WarningCircle } from "@phosphor-icons/react";
 import { SET } from "../data";
-import { useT } from "../i18n";
+import { useT, dot, to } from "../i18n";
 import { DESIGN_TOOLS, releaseHold, useApp, useAuth, useDb, useDraft, type Booking, type PayResult } from "../store";
 import { addDays, bookingNo, depView, fDayLong, fShort, hasHotelStep, itinerary, judgeDate, optionOf, stayHotel, todayISO, totalPrice, tripEnd, yen } from "../logic";
 import { Anno, BottomBar, Img, ScreenTag, StepHead } from "../components/ui";
@@ -182,13 +182,13 @@ export default function Pay() {
               <span className="absolute left-4 top-3 text-[13px] font-semibold text-white/90">{t("payCheckT")}</span>
               <div className="absolute inset-x-4 bottom-3 grid gap-0.5 text-white">
                 <b className="line-clamp-2 text-[17px] font-black leading-snug lg:text-[19px]">{n(p.name)}</b>
-                <span className="num text-[13.5px]">{fShort(d.dep!, L)}{p.nights ? ` ~ ${fShort(tripEnd(p, d.dep!), L)}` : ""} · {t("peopleN", { n: d.people })}</span>
+                <span className="num text-[13.5px]">{fShort(d.dep!, L)}{p.nights ? `${to()}${fShort(tripEnd(p, d.dep!), L)}` : ""}{dot()}{t("peopleN", { n: d.people })}</span>
               </div>
             </div>
             <dl className="grid gap-1.5 border-t border-line px-4 py-3 text-[13.5px]">
-              <div className="flex gap-3"><dt className="w-16 flex-none text-muted">{t("rowHotel")}</dt><dd className="min-w-0">{hotel ? `${n(hotel.name)} · ${opt && !opt.hotel ? n(opt.sub) : n(hotel.room)}` : opt?.none ? n(opt.name) : t("noHotel")}</dd></div>
-              <div className="flex gap-3"><dt className="w-16 flex-none text-muted">{t("pick")}</dt><dd className="min-w-0">{d.pick ? n(d.pick.name) : "-"} · {t("wishAt", { t: d.pickTime ?? "-" })}</dd></div>
-              <div className="flex gap-3"><dt className="w-16 flex-none text-muted">{t("drop")}</dt><dd className="min-w-0">{drop ? n(drop.name) : "-"}{d.dropTime ? ` · ${t("wishAt", { t: d.dropTime })}` : ""}</dd></div>
+              <div className="flex gap-3"><dt className="w-16 flex-none text-muted">{t("rowHotel")}</dt><dd className="min-w-0">{hotel ? `${n(hotel.name)}${dot()}${opt && !opt.hotel ? n(opt.sub) : n(hotel.room)}` : opt?.none ? n(opt.name) : t("noHotel")}</dd></div>
+              <div className="flex gap-3"><dt className="w-16 flex-none text-muted">{t("pick")}</dt><dd className="min-w-0">{d.pick ? n(d.pick.name) : "-"}{dot()}{t("wishAt", { t: d.pickTime ?? "-" })}</dd></div>
+              <div className="flex gap-3"><dt className="w-16 flex-none text-muted">{t("drop")}</dt><dd className="min-w-0">{drop ? n(drop.name) : "-"}{d.dropTime ? `${dot()}${t("wishAt", { t: d.dropTime })}` : ""}</dd></div>
             </dl>
             <dl className="grid gap-1.5 border-t border-line px-4 py-3 text-[13.5px]">
               <div className="flex gap-3"><dt className="w-16 flex-none text-muted">{t("payRep")}</dt><dd className="min-w-0"><b className="font-semibold">{info.nameEn}</b> ({info.nameKo})<span className="block whitespace-nowrap">{info.cc} {info.phone}</span><span className="block text-muted">{info.email}</span></dd></div>
@@ -200,11 +200,11 @@ export default function Pay() {
           {/* 일정표: 마지막 확인이라 전체 일정을 펼쳐서 보여 줌 (승하차·골프·숙박 시간 흐름) */}
           <section className="relative card overflow-hidden rounded-[20px]">
             <Anno n={6} t="일정표 (L-11): 결제 전 마지막 확인이라 모든 일차를 펼친 상태, 고른 승하차 장소·호텔이 들어간 일정" />
-            <p className="border-b border-line px-4 py-2.5 text-[13px] font-semibold text-muted">{t("itin")} · {fShort(d.dep!, L)}{p.nights ? ` ~ ${fShort(tripEnd(p, d.dep!), L)}` : ""}</p>
+            <p className="border-b border-line px-4 py-2.5 text-[13px] font-semibold text-muted">{t("itin")}{dot()}{fShort(d.dep!, L)}{p.nights ? `${to()}${fShort(tripEnd(p, d.dep!), L)}` : ""}</p>
             <div className="grid gap-1 pt-2">
               {itinerary(p, d.opt, d.pick, drop, { pickTime: d.pickTime, dropTime: d.dropTime }).map((items, i) => (
                 <div key={i} className={!itinAll && i > 0 ? "hidden lg:block" : undefined}>
-                  <p className="px-4 pb-1 text-[13px] font-bold text-brand">{t("dayN", { i: i + 1 })} · {fShort(addDays(d.dep!, i), L)}</p>
+                  <p className="px-4 pb-1 text-[13px] font-bold text-brand">{t("dayN", { i: i + 1 })}{dot()}{fShort(addDays(d.dep!, i), L)}</p>
                   <ItinList items={i === 0 && !itinAll ? items.slice(0, 2) : items} memo={i === 0 ? d.pickMemo : undefined} />
                 </div>
               ))}
