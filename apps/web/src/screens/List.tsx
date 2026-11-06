@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { CalendarBlank, CaretDown, MagnifyingGlass, MagnifyingGlassMinus, SlidersHorizontal, X } from "@phosphor-icons/react";
 import { PKGS, SET } from "../data";
-import { useT } from "../i18n";
+import { useT, dot } from "../i18n";
 import { DEFAULT_FILTERS, useDraft, useToast } from "../store";
 import { fShort, type SearchFilters } from "../logic";
 import { usePackageSearch } from "../api/usePackageSearch";
@@ -57,7 +57,7 @@ export default function List() {
         <button className="relative flex min-h-[48px] items-center gap-2 rounded-xl bg-surface-2 px-4 text-left" onClick={() => setSheet(true)}>
           <Anno n={3} t="조건 요약 바 '출발일 · 인원 · 변경' → 날짜·인원 시트" />
           <CalendarBlank size={18} className="flex-none text-brand" />
-          <span className="min-w-0 flex-1 truncate text-[14.5px] font-semibold">{date ? fShort(date, L) : t("dateAny")} · {peopleSet ? t("peopleN", { n: people }) : t("peopleAny")}</span>
+          <span className="min-w-0 flex-1 truncate text-[14.5px] font-semibold">{date ? fShort(date, L) : t("dateAny")}{dot()}{peopleSet ? t("peopleN", { n: people }) : t("peopleAny")}</span>
           <span className="link text-[14px]">{t("change")}</span>
         </button>
       </div>
@@ -122,7 +122,7 @@ export default function List() {
             <BottomBar width="wide">
               <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-2 text-[14px] font-bold">{t("M-112", { n: cmp.length })} <StageTag s={2} /></p>
-                <p className="truncate text-[12px] text-muted">{cmp.map((id) => PKGS.find((p) => p.id === id)?.name[L]).join(" · ")}</p>
+                <p className="truncate text-[12px] text-muted">{cmp.map((id) => PKGS.find((p) => p.id === id)?.name[L]).join(dot())}</p>
               </div>
               <button className="btn btn-ghost btn-sm" disabled={cmp.length < 2} onClick={() => nav("/golf/compare")}>{t("cmpView")}</button>
             </BottomBar>

@@ -31,7 +31,9 @@ export default function PayReturn() {
       .then(async (r) => {
         if (r.status === "CONFIRMED") {
           const b = toBooking(await api.booking(no));
-          useDb.getState().add(b); // 화면 저장소에도 서버 예약을 넣어 둠 (S-11·S-13 표시용)
+          const db = useDb.getState(); // 화면 저장소에도 서버 예약을 넣어 둠 (S-11·S-13 표시용). 이 화면에 다시 들어와도 중복 저장하지 않음
+          if (db.bookings.some((x) => x.no === b.no)) db.update(b.no, b);
+          else db.add(b);
           await refreshMonth(b.pkgId, b.dep.slice(0, 7));
           nav(`/golf/bookings/${no}/complete`, { replace: true }); // T-17
         } else if (r.status === "UNPAID") setView("unpaid");

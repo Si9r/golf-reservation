@@ -39,8 +39,8 @@ class RepIn(BaseModel):
     nameLocal: str
     nameEn: str
     countryCode: str = Field(max_length=6)
-    phone: str
-    email: str
+    phone: str = Field(max_length=30)
+    email: str = Field(max_length=100)
 
 
 class CompanionIn(BaseModel):

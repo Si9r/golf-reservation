@@ -153,5 +153,5 @@ export const fmtDrive = (d: Drive, L: Lang) => {
   const h = Math.floor(d.min / 60);
   const m = d.min % 60;
   const t = L === "ko" ? (h ? `${h}시간 ${m}분` : `${m}분`) : h ? `${h}時間${m}分` : `${m}分`;
-  return `${t} · ${d.km}km`;
+  return `${t}${L === "ja" ? "・" : " · "}${d.km}km`;
 };

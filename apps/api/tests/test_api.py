@@ -343,6 +343,15 @@ def test_companions_required(client):  # V-24: 동반자 이름이 인원 − 1�
     assert r["error"] == "E-VALID" and {"field": "companions", "rule": "V-24"} in r["fields"]
 
 
+def test_rep_contact_too_long(client):  # 칸 길이를 넘는 연락처·이메일은 서버 오류(500)가 아니라 E-VALID
+    set_booked(SITE_DEP, 0)
+    t = hold(client, SITE_DEP, 2)
+    for k, v in (("phone", "1" * 31), ("email", "a" * 89 + "@example.com")):
+        rep = {**body(t)["rep"], k: v}
+        res = client.post(U + "/bookings", json=body(t, rep=rep), headers=A)
+        assert res.status_code == 400 and res.json()["error"] == "E-VALID" and res.json()["fields"][0]["field"] == f"rep.{k}"
+
+
 def test_booking_list_tab(client):  # S-12 탭: 고객 취소 → cancel
     set_booked(SITE_DEP, 0)
     no = book_confirmed(client, SITE_DEP, 2)

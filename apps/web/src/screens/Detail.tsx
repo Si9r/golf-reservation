@@ -3,7 +3,7 @@ import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { motion } from "motion/react";
 import { ArrowSquareOut, Bed, Bus, CaretDown, CheckCircle, Flag, Info, MapPin, MinusCircle, Star, Sun, Warning } from "@phosphor-icons/react";
 import { AREA_NAME, SET, courseOf, hotelOf, pkgOf, type Pkg } from "../data";
-import { useT } from "../i18n";
+import { useT, dot, to, wave } from "../i18n";
 import { useDb, useDraft } from "../store";
 import { useDepartures } from "../api/sync";
 import { addDays, coursesOf, departuresIn, depView, dowNames, fDate, fDayLong, fMonth, fMonthShort, fShort, hasHotelStep, itinerary, judgeDate, monthInSeason, monthsAhead, optionOf, prevAt, todayISO, tripEnd, yen, yenDiff, ymOf, type ItinItem } from "../logic";
@@ -55,7 +55,7 @@ function DetailInner({ p }: { p: Pkg }) {
   // 지도 핀마다 무엇인지: 골프장은 라운드하는 일차, 호텔은 숙박 (호텔 옵션 화면 지도는 없애고 위치는 여기서만 보여 줌)
   const dayRole = (cid: number) => {
     const ds = p.days.map((r, i) => (r?.course === cid ? i + 1 : 0)).filter(Boolean);
-    const txt = ds.length > 1 && ds[ds.length - 1] - ds[0] === ds.length - 1 ? `${ds[0]}~${ds[ds.length - 1]}` : ds.join("·");
+    const txt = ds.length > 1 && ds[ds.length - 1] - ds[0] === ds.length - 1 ? `${ds[0]}${wave()}${ds[ds.length - 1]}` : ds.join(L === "ja" ? "・" : "·");
     return L === "ko" ? `${txt}일차` : `${txt}日目`;
   };
   const places = [
@@ -64,7 +64,7 @@ function DetailInner({ p }: { p: Pkg }) {
   ];
   const [mapKey, setMapKey] = useState<string>("all"); // 9 위치 지도: 처음엔 전체(골프장·호텔 핀 모두), 버튼을 누르면 그곳으로
   const mapPlace = mapKey === "all" ? null : places.find((x) => x.key === mapKey) ?? null;
-  const markers = useMemo<MapMarker[]>(() => places.map((x) => ({ lat: x.lat, lng: x.lng, title: `${x.label} · ${x.role}`, kind: x.kind, glyph: x.glyph })), [p.id, hotel?.id, L]); // eslint-disable-line react-hooks/exhaustive-deps
+  const markers = useMemo<MapMarker[]>(() => places.map((x) => ({ lat: x.lat, lng: x.lng, title: `${x.label}${dot()}${x.role}`, kind: x.kind, glyph: x.glyph })), [p.id, hotel?.id, L]); // eslint-disable-line react-hooks/exhaustive-deps
   const reserveRef = useRef<HTMLDivElement>(null);
   const peopleRef = useRef<HTMLDivElement>(null);
   const depRef = useRef<HTMLDivElement>(null);
@@ -100,8 +100,8 @@ function DetailInner({ p }: { p: Pkg }) {
     <div ref={reserveRef} className="relative grid gap-4">
       <div className="hidden items-end justify-between lg:flex">
         <div>
-          <p className="text-[12.5px] text-muted">{t("perPerson")} · {t("busIncl")}</p>
-          <p className="num text-[26px] font-extrabold leading-tight">{yen(p.price)}~</p>
+          <p className="text-[12.5px] text-muted">{t("perPerson")}{dot()}{t("busIncl")}</p>
+          <p className="num text-[26px] font-extrabold leading-tight">{yen(p.price)}{wave()}</p>
         </div>
         <Q id="Q-08" t="가격·통화" />
       </div>
@@ -111,7 +111,7 @@ function DetailInner({ p }: { p: Pkg }) {
       </div>
       <p className="-mt-2 flex items-center gap-1.5 text-[13px] text-ink-2">
         <Info size={16} className="flex-none text-brand" />
-        {t("weekdays", { w: p.wd.map((x) => dowNames(L)[x]).join("·") })}
+        {t("weekdays", { w: p.wd.map((x) => dowNames(L)[x]).join(L === "ja" ? "・" : "·") })}
       </p>
       {/* 3 인원 (출발일 목록과 같은 칸) */}
       <div ref={peopleRef}>
@@ -156,7 +156,7 @@ function DetailInner({ p }: { p: Pkg }) {
       {dep && v && (
         <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="relative grid gap-2 rounded-2xl bg-surface-2 p-4">
           <Anno n={5} t="출발 확정 현황 (1단계, L-04): M-121 + 막대 + 상태 문구 M-122 / M-125 / M-123" />
-          <p className="num text-[14px] font-bold">{fDate(dep, L)} ~ {fShort(tripEnd(p, dep), L)}</p>
+          <p className="num text-[14px] font-bold">{fDate(dep, L)}{to()}{fShort(tripEnd(p, dep), L)}</p>
           {(
             <>
               <MeterHead total={v.sum} ours={d.peopleSet ? d.people : 0} />
@@ -224,7 +224,7 @@ function DetailInner({ p }: { p: Pkg }) {
                     <span className="relative h-14 w-14 flex-none overflow-hidden rounded-xl"><Img src={p.days[i] ? courseOf(p.days[i]!.course).photo : p.photos[Math.min(i, p.photos.length - 1)]} alt="" className="absolute inset-0 h-full w-full" /></span>
                     <b className="text-[15px]">{t("dayN", { i: i + 1 })}</b>
                     {dep && <span className="num text-[13px] font-semibold text-brand">{fShort(addDays(dep, i), L)}</span>}
-                    <span className="min-w-0 flex-1 text-[13px] text-muted">{items.filter((x) => x.kind === "golf").map((x) => x.title[L].split(/ · |・/)[0]).join(", ") || items[0]?.title[L]}</span>
+                    <span className="min-w-0 flex-1 text-[13px] text-muted">{items.filter((x) => x.kind === "golf").map((x) => x.title[L].split(/ · |・/)[0]).join(L === "ja" ? "、" : ", ") || items[0]?.title[L]}</span>
                     <CaretDown size={16} className={`transition-transform ${openDays[i] ? "rotate-180" : ""}`} />
                   </button>
                   <Collapse open={openDays[i]}>
@@ -274,8 +274,8 @@ function DetailInner({ p }: { p: Pkg }) {
                   {p.opts.length > 1 && <span className="badge brand">{t("defaultHotel")}</span>}
                 </b>
                 <p className="text-[13px] text-muted">
-                  {t("roomType")} {n(hotel.room)} · {n(hotel.near)}
-                  {hotel.rating && <> · ★ <span className="num">{hotel.rating}</span></>}
+                  {t("roomType")} {n(hotel.room)}{dot()}{n(hotel.near)}
+                  {hotel.rating && <>{dot()}★ <span className="num">{hotel.rating}</span></>}
                 </p>
                 {hotel.zone === "CITY" && <a className="link inline-flex items-center gap-1 text-[13px]" href="https://travender-hokkaido.com/hotels" target="_blank" rel="noreferrer">{t("hotelPage")} <ArrowSquareOut size={13} /></a>}
                 {!p.opts.length && <p className="text-[13px] text-ink-2">{t("hotelFixed")}</p>}
@@ -287,7 +287,7 @@ function DetailInner({ p }: { p: Pkg }) {
                       {p.opts.slice(1).map((id) => {
                         const o = optionOf(id)!;
                         const oh = o.hotel ? hotelOf(o.hotel) : null;
-                        const label = oh ? n(oh.name) : `${n(o.name)} · ${n(o.sub)}`;
+                        const label = oh ? n(oh.name) : `${n(o.name)}${dot()}${n(o.sub)}`;
                         return (
                           <li key={id} className="flex justify-between gap-3">
                             <span className="min-w-0">· {label}</span>
@@ -317,7 +317,7 @@ function DetailInner({ p }: { p: Pkg }) {
               ))}
             </div>
             <MapView markers={markers} center={mapPlace ? { lat: mapPlace.lat, lng: mapPlace.lng } : null} zoom={13} focusKey={mapKey} label={t("mapT")} className="aspect-[16/10] lg:aspect-video" />
-            {mapPlace && (<a className="link mt-2 inline-flex items-center gap-1 text-[13px]" href={gmapLink(mapPlace.q, mapPlace.placeId)} target="_blank" rel="noreferrer">{mapPlace.label} · {t("openGmap")} <ArrowSquareOut size={14} /></a>)}
+            {mapPlace && (<a className="link mt-2 inline-flex items-center gap-1 text-[13px]" href={gmapLink(mapPlace.q, mapPlace.placeId)} target="_blank" rel="noreferrer">{mapPlace.label}{dot()}{t("openGmap")} <ArrowSquareOut size={14} /></a>)}
           </section>
 
           {/* 10 렌탈 안내·예약 전 확인 */}
@@ -335,7 +335,7 @@ function DetailInner({ p }: { p: Pkg }) {
       <div className="lg:hidden">
         <BottomBar>
           <span className="absolute -top-3 left-3"><Anno n={11} t="하단 예약 버튼: 출발일 선택 + 잔여석 ≥ 인원일 때만 '이 패키지 예약', S-08에서 왔으면 '변경 완료 · 확인으로'. 비활성일 때 누르면 부족한 항목(인원·출발일)을 빨간 글씨로 표시하고 그곳으로 이동" /></span>
-          <PriceBlock main={`${yen(p.price)}~`} sub={dep && d.peopleSet ? `${fShort(dep, L)} · ${t("peopleN", { n: d.people })} · ${t("busIncl")}` : `${t("perPerson")} · ${t("busIncl")}`} />
+          <PriceBlock main={`${yen(p.price)}${wave()}`} sub={dep && d.peopleSet ? `${fShort(dep, L)}${dot()}${t("peopleN", { n: d.people })}${dot()}${t("busIncl")}` : `${t("perPerson")}${dot()}${t("busIncl")}`} />
           <button className="btn btn-primary min-w-[150px]" aria-disabled={!canGo} onClick={go}>{btnLabel}</button>
         </BottomBar>
       </div>

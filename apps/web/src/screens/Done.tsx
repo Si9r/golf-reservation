@@ -3,7 +3,7 @@ import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { motion, useReducedMotion } from "motion/react";
 import { CalendarCheck, Check, Copy, EnvelopeSimple, UsersThree } from "@phosphor-icons/react";
 import { pkgOf } from "../data";
-import { useT } from "../i18n";
+import { useT, dot, to } from "../i18n";
 import { fullReset, useDb, useToast } from "../store";
 import { fDayLong, fShort, judgeDate, stayHotel, tripEnd, yen } from "../logic";
 import { Anno, Img, Q, ScreenTag } from "../components/ui";
@@ -34,7 +34,7 @@ export default function Done() {
     { icon: CalendarCheck, text: t("M-182", { d: fDayLong(judgeDate(b.dep), L) }) },
     ...(b.people > 1 ? [{ icon: UsersThree, text: t("compFixInfo") }] : []), // 동반자 이름은 예약 때 모두 받음 → 고칠 수 있는 기간만 안내 (팀 결정 10/23)
   ];
-  const dates = p.nights ? `${fShort(b.dep, L)} – ${fShort(tripEnd(p, b.dep), L)}` : fShort(b.dep, L);
+  const dates = p.nights ? `${fShort(b.dep, L)}${to()}${fShort(tripEnd(p, b.dep), L)}` : fShort(b.dep, L);
   return (
     <div className="page step">
       <ScreenTag id="S-11" name="예약 완료" refs="FN-24, FN-25 · API-12 · T-19" />
@@ -96,7 +96,7 @@ export default function Done() {
           <div className="grid gap-4 p-5">
             <div>
               <b className="line-clamp-2 text-[18px] font-black leading-snug">{n(p.name)}</b>
-              <span className="num text-[14px] text-muted">{dates} · {t("peopleN", { n: b.people })}</span>
+              <span className="num text-[14px] text-muted">{dates}{dot()}{t("peopleN", { n: b.people })}</span>
             </div>
             <div className="grid grid-cols-[auto_1fr] gap-x-3.5 gap-y-2.5 text-[14px]">
               <span className="text-muted">{t("pick")}</span><span className="min-w-0">{b.pick ? n(b.pick.name) : "-"}</span>
@@ -104,7 +104,7 @@ export default function Done() {
               <span className="text-muted">{t("rowHotel")}</span><span className="min-w-0">{hotel ? n(hotel.name) : t("noHotel")}</span>
             </div>
             <div className="flex items-baseline justify-between border-t border-line pt-4">
-              <span className="text-[14px] text-muted">{t("totalL", { n: b.people })} · {t("busIncl")}</span>
+              <span className="text-[14px] text-muted">{t("totalL", { n: b.people })}{dot()}{t("busIncl")}</span>
               <b className="num text-[24px] font-black">{yen(b.total)}</b>
             </div>
             <div className="relative grid gap-2">

@@ -2,14 +2,14 @@ import { useEffect, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ArrowSquareOut, Bed, Bus, CaretDown, CaretRight, Copy, FileText, Flag, Headset, Printer, UsersThree } from "@phosphor-icons/react";
 import { AREA_NAME, SET, courseOf, pkgOf } from "../data";
-import { useT } from "../i18n";
+import { useT, dot, to, wave } from "../i18n";
 import { DESIGN_TOOLS, useApp, useAuth, useDb, useToast, viewOf, type Booking } from "../store";
 import { addDays, coursesOf, fDate, fDayLong, fShort, itinerary, judgeDate, optionOf, pickupWindow, stayHotel, todayISO, tripEnd, yen } from "../logic";
 import { Anno, Collapse, Img, Q, ScreenTag, Sheet, gmapLink } from "../components/ui";
 import { useDrive } from "../gmaps";
 import { GoalMeter, ItinList } from "./Detail";
 import { PriceDetail } from "../components/booking";
-import { joinEn, splitEn, upper, validPart } from "./InfoForm";
+import { joinEn, splitEn, tooLongEn, upper, validPart } from "./InfoForm";
 import { USE_API, api } from "../api/client";
 import { toBooking, useApiVersion } from "../api/sync";
 
@@ -66,7 +66,7 @@ export default function MyDetail() {
   const demoOn = (k: string) => (k === "open" ? v.label === "OPEN" || v.label === "ENOUGH" : k === "go" ? v.label === "GO" : k === "cancel" ? v.label === "OP_CANCEL" : k === "user" ? v.label === "USER_CANCEL" : v.label === "DONE");
 
   const draft: [string, string][] = comps ?? Array.from({ length: b.people - 1 }, (_, i) => (b.info.companions[i] ? splitEn(b.info.companions[i]) : ["", ""]));
-  const draftOk = draft.every((x) => x.every(validPart));
+  const draftOk = draft.every((x) => x.every(validPart) && !tooLongEn(x));
   const judge = fDayLong(judgeDate(b.dep), L); // 6: '10월 30일(금)에 …' 문장용
   const need = Math.max(0, SET.MIN_DEPARTURE - v.booked);
   // 1 상태 띠: 상태마다 제목 1개 + 설명 1문장 ('판정일' 대신 날짜 문장, 모집 중·인원 충족 문구가 겹치지 않게)
@@ -125,7 +125,7 @@ export default function MyDetail() {
               <span className="rounded-full bg-white/20 px-2.5 py-1 text-[13px] font-bold">{t(`lab_${v.label}`)}</span>
             </span>
             <h1 className="line-clamp-2 text-[22px] font-black leading-snug lg:text-[32px]">{n(p.name)}</h1>
-            <span className="num text-[14px] lg:text-[16px]">{fShort(b.dep, L)}{p.nights ? ` ~ ${fShort(tripEnd(p, b.dep), L)}` : ""} · {t("peopleN", { n: b.people })}</span>
+            <span className="num text-[14px] lg:text-[16px]">{fShort(b.dep, L)}{p.nights ? `${to()}${fShort(tripEnd(p, b.dep), L)}` : ""}{dot()}{t("peopleN", { n: b.people })}</span>
           </div>
         </section>
 
@@ -164,7 +164,7 @@ export default function MyDetail() {
             {/* 숙소 한 줄 (패키지 이름·일정은 사진 띠에) */}
             <p className="flex items-center gap-2 rounded-2xl bg-surface px-4 py-3 text-[13.5px] text-ink-2">
               <Bed size={18} className="flex-none text-brand" />
-              <span className="min-w-0">{hotel ? `${n(hotel.name)} · ${opt && !opt.hotel ? n(opt.sub) : n(hotel.room)}` : opt?.none ? n(opt.name) : t("noHotel")}</span>
+              <span className="min-w-0">{hotel ? `${n(hotel.name)}${dot()}${opt && !opt.hotel ? n(opt.sub) : n(hotel.room)}` : opt?.none ? n(opt.name) : t("noHotel")}</span>
             </p>
 
             {/* 2 버스 승하차 (지도 대신 지도 앱 링크, PC는 승차·하차 나란히) */}
@@ -177,7 +177,7 @@ export default function MyDetail() {
                     <span className={`badge ${k === "pick" ? "brand" : "wait"}`}>{k === "pick" ? t("pick") : t("drop")}</span>
                     <span className="min-w-0 flex-1 text-[14px]">
                       <b className="block">{pl ? n(pl.name) : "-"}</b>
-                      {k === "pick" && b.pickMemo && <span className="block text-[13px] text-ink-2">{t("reqL")} · {b.pickMemo}</span>}
+                      {k === "pick" && b.pickMemo && <span className="block text-[13px] text-ink-2">{t("reqL")}{dot()}{b.pickMemo}</span>}
                       <span className="block text-[12.5px]">
                         {k === "pick" ? (confirmedPickup ? <b className="text-ok">{t("pickupConfirmed", { t: `${fShort(b.dep, L)} ${confirmedPickup}` })}</b> : <span className="text-muted">{t("M-205")}</span>) : <span className="text-muted">{t("dropDay", { d: fShort(tripEnd(p, b.dep), L) })}</span>}
                       </span>
@@ -196,7 +196,7 @@ export default function MyDetail() {
                 <div className="grid gap-1">
                   {itin.map((items, i) => (
                     <div key={i}>
-                      <p className="px-4 pb-1 text-[13px] font-bold text-brand">{t("dayN", { i: i + 1 })} · <span className="num">{fShort(addDays(b.dep, i), L)}</span></p>
+                      <p className="px-4 pb-1 text-[13px] font-bold text-brand">{t("dayN", { i: i + 1 })}{dot()}<span className="num">{fShort(addDays(b.dep, i), L)}</span></p>
                       <ItinList items={items} />
                     </div>
                   ))}
@@ -215,7 +215,7 @@ export default function MyDetail() {
                       <div className="min-w-0 flex-1">
                         <b className="block text-[14px]">{n(x!.c.name)}</b>
                         <p className="text-[12.5px] text-muted">{n(x!.c.addr)}</p>
-                        <p className="num text-[13px] font-semibold">{fShort(x!.date, L)} · {t("tee", { t: x!.r.tee })}</p>
+                        <p className="num text-[13px] font-semibold">{fShort(x!.date, L)}{dot()}{t("tee", { t: x!.r.tee })}</p>
                       </div>
                       <a className="link flex-none text-[13px]" href={gmapLink(x!.c.name.ja, x!.c.placeId)} target="_blank" rel="noreferrer">{t("openApp")} <ArrowSquareOut size={13} className="inline" /></a>
                     </div>
@@ -225,8 +225,8 @@ export default function MyDetail() {
                       <span className="grid h-[72px] w-[72px] flex-none place-items-center rounded-lg bg-brand-soft text-brand lg:h-20 lg:w-24"><Bed size={26} /></span> {/* 호텔 사진은 데이터에 없음 */}
                       <div className="min-w-0 flex-1 text-[13.5px]">
                         <b className="block text-[14px]">{n(hotel.name)}</b>
-                        <p className="text-ink-2">{t("nightsN", { n: p.nights })} · {fShort(b.dep, L)}{p.nights ? ` ~ ${fShort(tripEnd(p, b.dep), L)}` : ""}</p>
-                        <p className="text-muted">{n(AREA_NAME[hotel.area])} · {t("checkin")} · {opt && !opt.hotel ? n(opt.sub) : n(hotel.room)}</p>
+                        <p className="text-ink-2">{t("nightsN", { n: p.nights })}{dot()}{fShort(b.dep, L)}{p.nights ? `${to()}${fShort(tripEnd(p, b.dep), L)}` : ""}</p>
+                        <p className="text-muted">{n(AREA_NAME[hotel.area])}{dot()}{t("checkin")}{dot()}{opt && !opt.hotel ? n(opt.sub) : n(hotel.room)}</p>
                       </div>
                     </div>
                   )}
@@ -257,7 +257,7 @@ export default function MyDetail() {
                         </div>
                       </div>
                     ))}
-                    {!draftOk && <p className="help">{t("M-162")}</p>}
+                    {!draftOk && <p className="help">{t(draft.every((x) => x.every(validPart)) ? "enLong" : "M-162")}</p>}
                     <div className="flex gap-2">
                       <button className="btn btn-ghost btn-sm flex-1" onClick={() => setComps(null)}>{t("cancel")}</button>
                       <button className="btn btn-primary btn-sm flex-1" disabled={!draftOk} onClick={saveComps}>{t("compSave")}</button>
@@ -274,7 +274,7 @@ export default function MyDetail() {
 
             {/* 결제 금액: 총액만 보이고, 항목별 금액은 '금액 상세'를 눌러야 펼침 (10/30) */}
             <section className="card p-4 lg:p-5 lg:shadow-[var(--shadow-lg)]">
-              <p className="mb-1 text-[13px] font-bold text-brand">{t("mdPay")} · {t("peopleN", { n: b.people })}</p>
+              <p className="mb-1 text-[13px] font-bold text-brand">{t("mdPay")}{dot()}{t("peopleN", { n: b.people })}</p>
               <div className="flex items-baseline justify-between">
                 <span className="text-[14px] font-semibold">{t("totalL", { n: b.people })}</span>
                 <span className="num text-[22px] font-extrabold text-brand">{yen(b.total)}</span>
@@ -319,15 +319,15 @@ export default function MyDetail() {
           {[
             [t("noLabel"), b.no],
             [t("stateL"), t(`lab_${v.label}`)],
-            [t("repT"), `${b.info.nameKo} (${b.info.nameEn}) · ${b.info.cc} ${b.info.phone} · ${b.info.email}`],
+            [t("repT"), `${b.info.nameKo} (${b.info.nameEn})${dot()}${b.info.cc} ${b.info.phone}${dot()}${b.info.email}`],
             [t("rowPkg"), n(p.name)],
-            [t("rowDep"), p.nights ? `${fDate(b.dep, L)} ~ ${fDate(tripEnd(p, b.dep), L)}` : fDate(b.dep, L)],
+            [t("rowDep"), p.nights ? `${fDate(b.dep, L)}${to()}${fDate(tripEnd(p, b.dep), L)}` : fDate(b.dep, L)],
             [t("rowPeople"), t("peopleN", { n: b.people })],
-            [t("rowHotel"), hotel ? `${n(hotel.name)}${opt ? ` · ${n(opt.sub)}` : ""}` : t("noHotel")],
+            [t("rowHotel"), hotel ? `${n(hotel.name)}${opt ? `${dot()}${n(opt.sub)}` : ""}` : t("noHotel")],
             [t("rowPick"), b.pick ? n(b.pick.name) : "-"],
             [t("rowDrop"), b.drop ? n(b.drop.name) : "-"],
             [t("totalL", { n: b.people }), `${yen(b.total)} (${t("busIncl")})`],
-            [t("supT"), `${SET.SUPPORT_TEL} · 10:00~17:00`],
+            [t("supT"), `${SET.SUPPORT_TEL}${dot()}10:00${wave()}17:00`],
           ].map(([k, val]) => (
             <div key={k} className="grid grid-cols-[96px_1fr] gap-3 border-b border-line pb-2">
               <span className="font-semibold text-muted">{k}</span>

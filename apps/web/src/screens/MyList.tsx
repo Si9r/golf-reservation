@@ -4,7 +4,7 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
 import { CaretRight, Copy, Headset, Suitcase } from "@phosphor-icons/react";
 import { SET } from "../data";
-import { useT } from "../i18n";
+import { useT, dot, to } from "../i18n";
 import { useAuth, useDb, useToast, viewOf, type Booking } from "../store";
 import { fShort, judgeDate, stayHotel, todayISO, tripEnd, yen } from "../logic";
 import { Anno, Img, ScreenTag } from "../components/ui";
@@ -55,19 +55,19 @@ export default function MyList() {
     const recruiting = v.label === "OPEN" || v.label === "ENOUGH";
     return { txt, sub: recruiting ? t("judge", { d: fShort(judgeDate(b.dep), L) }) : "", bar: recruiting };
   };
-  const pickTxt = (b: Booking) => (b.pick ? `${n(b.pick.name)}${b.pickupTime ? ` · ${b.pickupTime}` : ""}` : "-");
-  const dates = ({ b, v }: Row) => (v.p.nights ? `${fShort(b.dep, L)} – ${fShort(tripEnd(v.p, b.dep), L)}` : fShort(b.dep, L));
+  const pickTxt = (b: Booking) => (b.pick ? `${n(b.pick.name)}${b.pickupTime ? `${dot()}${b.pickupTime}` : ""}` : "-");
+  const dates = ({ b, v }: Row) => (v.p.nights ? `${fShort(b.dep, L)}${to()}${fShort(tripEnd(v.p, b.dep), L)}` : fShort(b.dep, L));
   const hotelTxt = ({ b, v }: Row) => {
     const h = stayHotel(v.p, b.opt);
     return h ? n(h.name) : t("noHotel");
   };
 
   const tabs = (
-    <div className="relative flex gap-2 lg:gap-1 lg:rounded-xl lg:bg-surface-2 lg:p-1" role="tablist">
+    <div className="relative flex gap-1.5 overflow-x-auto [scrollbar-width:none] lg:gap-1 lg:rounded-xl lg:bg-surface-2 lg:p-1" role="tablist">
       <Anno n={1} t="탭: 예정(CONFIRMED) / 지난(DONE) / 취소(OP_CANCEL·USER_CANCEL), 탭마다 건수. 카드 예약번호 옆 복사 버튼 (복사하면 안내 토스트). 좁은 화면(380px 미만)은 '예약번호' 글자를 숨겨 상태 배지와 겹치지 않게" />
       {(["up", "past", "cancel"] as const).map((k) => (
         <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
-          className={`min-h-[40px] rounded-full px-4 text-[14px] font-bold lg:rounded-lg ${tab === k ? "bg-ink text-surface lg:bg-surface lg:text-ink lg:shadow-sm" : "border border-line-strong bg-surface text-ink-2 lg:border-0 lg:bg-transparent lg:text-muted"}`}>
+          className={`min-h-[40px] flex-none whitespace-nowrap rounded-full px-2.5 text-[13.5px] font-bold lg:rounded-lg lg:px-4 lg:text-[14px] ${tab === k ? "bg-ink text-surface lg:bg-surface lg:text-ink lg:shadow-sm" : "border border-line-strong bg-surface text-ink-2 lg:border-0 lg:bg-transparent lg:text-muted"}`}>
           {t(`tab_${k}`)} <span className="num opacity-70">{count(k)}</span>
         </button>
       ))}
@@ -101,8 +101,8 @@ export default function MyList() {
             <button onClick={() => open(r.b)} className="text-left text-[16px] font-black leading-snug hover:text-brand lg:text-[18px]">
               {dday(r.b) && <span className="num mr-1.5 align-middle text-[12px] font-black text-brand">{dday(r.b)}</span>}{n(r.v.p.name)}
             </button>
-            <span className="num text-[13.5px] text-ink-2">{dates(r)} · {t("peopleN", { n: r.b.people })}</span>
-            <span className="hidden text-[13.5px] text-ink-2 lg:block"><span className="text-muted">{t("pick")}</span> {pickTxt(r.b)} · <span className="text-muted">{t("rowHotel")}</span> {hotelTxt(r)}</span>
+            <span className="num text-[13.5px] text-ink-2">{dates(r)}{dot()}{t("peopleN", { n: r.b.people })}</span>
+            <span className="hidden text-[13.5px] text-ink-2 lg:block"><span className="text-muted">{t("pick")}</span> {pickTxt(r.b)}{dot()}<span className="text-muted">{t("rowHotel")}</span> {hotelTxt(r)}</span>
             {s.bar ? (
               <span className="mt-1 grid max-w-[420px] gap-1.5">
                 <b className={`text-[12.5px] ${tone.chip.split(" ")[1]}`}>{s.txt}</b>
@@ -124,7 +124,7 @@ export default function MyList() {
     <div className="mt-6 grid gap-3 sm:grid-cols-2">
       <button onClick={() => nav("/golf/support")} className="flex items-center gap-4 rounded-[18px] bg-surface-2 p-4 text-left hover:bg-surface hover:shadow-[var(--shadow)] lg:p-5">
         <span className="grid h-11 w-11 flex-none place-items-center rounded-xl bg-surface text-brand"><Headset size={22} /></span>
-        <span className="grid flex-1 gap-0.5"><b className="text-[15px]">{t("support")}</b><span className="num text-[13px] text-muted">{SET.SUPPORT_TEL} · {t("hoursV")}</span></span>
+        <span className="grid flex-1 gap-0.5"><b className="text-[15px]">{t("support")}</b><span className="num text-[13px] text-muted">{SET.SUPPORT_TEL}{dot()}{t("hoursV")}</span></span>
         <CaretRight size={18} className="text-muted" />
       </button>
       <button onClick={() => nav("/golf/packages")} className="flex items-center gap-4 rounded-[18px] bg-surface-2 p-4 text-left hover:bg-surface hover:shadow-[var(--shadow)] lg:p-5">
