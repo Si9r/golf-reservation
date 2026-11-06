@@ -75,9 +75,9 @@ export default function Home() {
 
         {/* 1 큰 사진 + 제목 */}
         <section className="relative h-[440px] overflow-hidden bg-[#1d2b22] lg:mx-auto lg:h-[560px] lg:max-w-[1280px] lg:rounded-[28px]">
-          <Img className="absolute inset-0 object-[center_88%]" src={PHOTOS.swingCloud} alt={L === "ko" ? "구름 아래 페어웨이에서 스윙하는 골퍼" : "雲の下のフェアウェイでスイングするゴルファー"} eager />
-          <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(10,14,20,0.45) 0%, rgba(10,14,20,0.3) 45%, rgba(10,14,20,0) 70%, rgba(10,14,20,0.12) 100%)" }} />
-          <motion.div className="absolute inset-x-5 top-[14%] text-white lg:inset-x-12 lg:top-[20%]" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}>
+          <Img className="absolute inset-0" src={PHOTOS.swingCloud} alt={L === "ko" ? "구름 아래 페어웨이에서 스윙하는 골퍼" : "雲の下のフェアウェイでスイングするゴルファー"} eager />
+          <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(10,14,20,0.35) 0%, rgba(10,14,20,0) 30%, rgba(10,14,20,0.1) 55%, rgba(10,14,20,0.78) 100%)" }} />
+          <motion.div className="absolute inset-x-5 bottom-20 text-white lg:inset-x-12 lg:bottom-28" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}>
             <p className="mb-2.5 text-[12px] font-bold tracking-[0.14em]">{t("heroKicker")}</p>
             <h1 className="whitespace-pre-line text-[32px] font-black leading-[1.22] tracking-tight lg:text-[56px]">{t("s01Title")}</h1>
           </motion.div>
@@ -135,7 +135,7 @@ export default function Home() {
               {guides.map(({ icon: I, t: tt }, i) => (
                 <li key={i} className="flex items-center gap-3 py-3.5 text-[14px] font-bold text-ink-2 lg:justify-center lg:py-4">
                   <span className="grid h-9 w-9 flex-none place-items-center rounded-xl bg-brand-soft text-brand"><I size={19} weight="bold" /></span>
-                  <span className="whitespace-normal">{tt.replace(/\n/g, " ")}</span>
+                  <span className="whitespace-normal">{tt.replace(/\n/g, L === "ja" ? "" : " ")}</span>
                 </li>
               ))}
             </ul>

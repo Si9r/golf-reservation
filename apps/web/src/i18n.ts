@@ -637,7 +637,7 @@ const ja: Dict = {
   checks: "{min}名未満の場合は催行中止・全額返金|乗降は札幌市内のみ|変更・キャンセルはお問い合わせ窓口へ|ゴルフクラブのレンタルはゴルフ場へお問い合わせください",
   reserve: "このパッケージを予約",
   pickDepFirst: "出発日を選んでください",
-  peoplePh: "人数を選んでください",
+  peoplePh: "人数を選択",
   peopleAny: "人数未選択",
   recruitOnly: "募集状況",
   countOk: "{n}名達成",
