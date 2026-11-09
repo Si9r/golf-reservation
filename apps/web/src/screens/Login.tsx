@@ -14,7 +14,8 @@ export default function Login() {
   const { t } = useT();
   const nav = useNavigate();
   const [sp] = useSearchParams();
-  const next = sp.get("next") || "/golf";
+  const raw = sp.get("next") || "";
+  const next = raw.startsWith("/golf") && !raw.startsWith("//") ? raw : "/golf"; // 골프 화면 안으로만 돌아감 (v1.7 NF-08)
   const login = useAuth((s) => s.login);
   useEffect(() => {
     if (!USE_API) return;

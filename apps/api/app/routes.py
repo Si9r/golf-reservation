@@ -29,14 +29,22 @@ def member(req: Request) -> Member:
 
 
 def admin(x_admin_key: Annotated[str | None, Header()] = None) -> None:
-    if not env.ADMIN_KEY or x_admin_key != env.ADMIN_KEY:
+    """운영 API 키 (헤더 X-Admin-Key = .env ADMIN_KEY). 비교는 걸리는 시간으로 키를 짐작할 수 없게 compare_digest (v1.7 NF-05)"""
+    if not _same_key(x_admin_key, env.ADMIN_KEY):
         fail("E-AUTH")
 
 
 def site(x_site_key: Annotated[str | None, Header()] = None) -> None:
     # TODO: 본 사이트 → 이 서비스 호출의 실제 인증 방식(서명·IP 제한 등)은 결제 연동 협의 때 정함. 지금은 공유 키 비교
-    if not env.SITE_KEY or not x_site_key or not secrets.compare_digest(x_site_key, env.SITE_KEY):
+    if not _same_key(x_site_key, env.SITE_KEY):
         fail("E-AUTH")
+
+
+def _same_key(given: str | None, expected: str) -> bool:
+    """키 비교: 설정이 비었거나 헤더가 없으면 거부. 바이트로 비교해 영문 밖 글자가 와도 500 이 아니라 401"""
+    if not expected or not given:
+        return False
+    return secrets.compare_digest(given.encode("utf-8", "surrogateescape"), expected.encode("utf-8"))
 
 
 Me = Annotated[Member, Depends(member)]
@@ -153,6 +161,23 @@ def settings_public():
         areas = rows(c, "SELECT id, name_ko nameKo, name_ja nameJa, shape FROM service_area")
     return {"support": S.SUPPORT, "terms": S.TERMS_URL, "minDeparture": S.MIN_DEPARTURE, "maxPeople": S.MAX_PEOPLE,
             "holdMinutes": S.HOLD_MINUTES, "closedSeason": S.CLOSED_SEASON, "singleAdd": S.SINGLE_ADD, "serviceAreas": areas}
+
+
+# API-24 상태 확인 (v1.7): 감시 도구가 부름. DB 연결(SELECT 1), 정기 실행 마지막 시각(JOBS_ENABLED=1일 때), 버전. 개인정보 없음.
+# DB가 안 되면 503 + status degraded
+@router.get("/health")
+def health(response: Response):
+    from .jobs.schedule import LAST_RUN
+
+    try:
+        with conn() as c:
+            one(c, "SELECT 1 ok")
+        db = "ok"
+    except Exception:  # noqa: BLE001
+        db = "down"
+        response.status_code = 503
+    return {"status": "ok" if db == "ok" else "degraded", "db": db, "jobsEnabled": env.JOBS_ENABLED,
+            "jobsLastRun": LAST_RUN["at"], "env": env.APP_ENV, "version": "0.1.0"}
 
 
 # API-18 로그인 회원 정보: 본 사이트 세션의 이름·이메일·전화 (영문 이름은 골프 화면에서 입력).

@@ -115,7 +115,7 @@ uvicorn app.main:app --reload --port 8787
 ```
 
 - `Activate.ps1`이 "스크립트를 실행할 수 없습니다"로 막히면 한 번만: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`
-- 확인: http://localhost:8787/health → `{"ok":true}`, http://localhost:8787/api/golf/docs → API 문서 (바로 호출해 볼 수 있음)
+- 확인: http://localhost:8787/api/golf/health → `{"status":"ok","db":"ok",…}` (DB 연결·정기 실행 마지막 시각, 예전 `/health`도 그대로), http://localhost:8787/api/golf/docs → API 문서 (바로 호출해 볼 수 있음)
 - `http://localhost:8787/`은 화면 빌드(`apps/web/dist`)가 있으면 메인 화면, 없으면 빌드 방법 안내가 나옵니다 (6번 참고).
 
 ### 5. 화면 (React)
@@ -179,6 +179,8 @@ $env:VITE_USE_API="1"; npm run dev:web
 
 화면을 고치지 않고 보기만 할 거라면 1)만 켜고 http://localhost:8787 로 접속해도 됩니다 (빌드는 6번).
 
+새 코드를 받은 뒤에는 서버를 켜기 전에 `apps/api`에서 `alembic upgrade head`로 DB 구조를 맞춥니다 (예: 11/09 `0007` — 알림 기록 칸 추가, 운영 작업 기록 `audit_log`). 안 맞추면 운영자 알림을 기록할 때 오류가 납니다. 되돌리기는 `alembic downgrade <이전 번호>`.
+
 ### Mac / Linux
 
 순서는 같고 명령만 다릅니다: `cp .env.example .env`, `python3 -m venv .venv && source .venv/bin/activate`, `VITE_USE_API=1 npm run dev:web`.
@@ -206,7 +208,8 @@ npm test                  # 화면 쪽 규칙 (packages/shared)
 
 통합 테스트는 `golf_test` DB의 테이블을 모두 지우고 다시 만듭니다 (`TEST_DATABASE_URL`로 변경).
 좌석 동시 확보, 결제 대기·확정·미결제(본 사이트 가짜 연결), 중복 주문·중복 확정, 운행 취소 환불·재시도, 출발 판정, 고객 취소(API-16·API-19),
-요청 사항(희망 승하차 시간은 받지 않음), 영문 풀네임(V-21·V-24), 동반자 이름 필수·수정까지 확인합니다.
+요청 사항(희망 승하차 시간은 받지 않음), 영문 풀네임(V-21·V-24), 동반자 이름 필수·수정,
+늦은 결제(미결제 뒤 paid → 자동 환불)·취소된 주문·오래 걸리는 주문 알림·판정 실패 기록·운영 작업 기록(`tests/test_v17.py`)까지 확인합니다.
 
 ## 로그인 · 결제 · 환불 (본 사이트 연동)
 
@@ -220,8 +223,10 @@ npm test                  # 화면 쪽 규칙 (packages/shared)
 - `partner`: 실제 본 사이트 (`PARTNER_API_BASE`, `PARTNER_API_KEY`. 값은 배포 환경에만)
   - 로그인: 본 사이트 `user_session` 쿠키 → `GET /api/partner/session`. 로그인 안 됐으면 `LOGIN_URL?next=<골프 화면>`으로
   - 결제: S-09 '다음' = 결제 대기 예약(`PENDING_PAYMENT`) → S-10 결제 = 본 사이트 주문 → 결제창 → 결과 화면 `#/golf/payment/return?no=`(`PAYMENT_RETURN_URL`)
-  - 환불: 운행 취소 `operator_cancel`, 고객 취소 `customer_cancel`. 실패하면 `refund_status=FAIL` + 운영자 알림(`OPS_EMAIL`), 배치 B-07이 다시 시도
-- 결제 확인 배치 B-08(10분마다): 주문 전 결제 대기 10분 만료, 주문 후 결제 대기는 본 사이트에 다시 조회
+  - 환불: 운행 취소·늦은 결제 `operator_cancel`, 고객 취소 `customer_cancel`. 실패하면 `refund_status=FAIL` + 운영자 알림(`OPS_EMAIL`), 배치 B-07이 다시 시도
+- 결제 확인 배치 B-08(10분마다): 주문 전 결제 대기 10분 만료, 주문 후 결제 대기는 본 사이트에 다시 조회(failed·expired·canceled → 미결제), 60분 넘게 결제 대기면 운영자 알림 1번
+- 늦은 결제: 미결제로 바뀐 뒤 본 사이트에서 paid가 오면 예약을 확정하지 않고 자동 전액 환불 + 운영자 알림 (결과 화면·B-08 어느 쪽에서 와도 한 번만)
+- 운영자 알림은 `notification`(`OPS_ALERT`)에, 운영 키·본 사이트 키·배치가 바꾼 것은 `audit_log`에 기록 (개인정보는 넣지 않음)
 - 본 사이트 Partner API 사양서 원본을 받기 전이라 요청·응답 모양은 가정입니다. `partner.py` 맨 위 '가정' 목록만 맞추면 됩니다
 - 메일: 이 서비스가 직접 보냄 (`apps/api/app/adapters/mail.py`). `.env` `MAIL_BACKEND=smtp`(`.env.example` 기본, 팀 공용 Resend 계정)는 실제 발송, `log`는 보내지 않고 로그만. Resend API 키(`SMTP_PASSWORD`)는 `.env`에만 넣고 git에 올리지 않음. 결과는 `notification` 테이블에 OK/FAIL로 기록. 보내는 주소는 모든 메일이 `golf-test@resend.dev` (테스트용 Resend: `SMTP_HOST=smtp.resend.com`, `SMTP_USER=resend`, `SMTP_PASSWORD`=API 키). 시험 발송: `python -m app.mail_samples <받는 주소>`. 예약 확인(CONFIRM)은 본 사이트가 보냄. 보낼 대상은 `services/booking.py` `send_due_mails`가 고르고(판정 직후·판정 뒤 결제·B-09), 실패한 메일은 B-09가 3회까지 다시 보냄
 
@@ -229,4 +234,4 @@ npm test                  # 화면 쪽 규칙 (packages/shared)
 
 고객 사정 취소·환불은 본 사이트가 처리하고 결과를 `POST /api/golf/site/bookings/{no}/cancel`로 알려 줍니다.
 헤더 `X-Site-Key`를 `.env`의 `SITE_KEY`와 비교하며, `SITE_KEY`가 비어 있으면 모두 거부합니다 (실제 인증 방식은 결제 연동 협의 때).
-`.env`의 `APP_ENV`(test | production)는 테스트 서버·본 서버 구분용 자리이고 아직 동작 차이는 없습니다.
+`.env`의 `APP_ENV`(test | production)는 테스트 서버·본 서버 구분입니다. `production`이면 `PAYMENT_BACKEND=partner`가 아니거나 `FIXED_TODAY`가 있으면 서버가 켜지지 않고, `JOBS_ENABLED=0`이면 경고를 남깁니다.

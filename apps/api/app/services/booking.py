@@ -12,8 +12,9 @@ from ..adapters.auth import Member
 from ..adapters.mail import alert_ops, notify
 from ..adapters import payment
 from ..adapters.partner import ORDER_CANCELED, ORDER_FINAL_FAIL, ORDER_PAID, PartnerError
+from ..audit import audit, audit_fail
 from ..db import conn, one, rows, run, tx
-from ..errors import fail
+from ..errors import ApiError, fail
 from ..rules import add_days, booking_no, booking_tab, in_area, is_bookable_date, quote
 from .catalog import DEP_SQL, dep_seats, sale_rule, stay_info
 
@@ -212,39 +213,66 @@ def checkout(m: Member, no: str) -> dict:
     o = payment.create_order(reference=no, amount=amount, title_ja=f"{info['name_ja']} {info['dep_date']}", title_ko=f"{info['name_ko']} {info['dep_date']}",
                              user_id=m.memberId, departure_date=info["dep_date"], heads=int(b["people"]), return_url=payment.return_url(no))
     with tx() as c:
+        cur = one(c, "SELECT status FROM booking WHERE no = :no FOR UPDATE", no=no)
         run(c, """UPDATE booking SET order_id = COALESCE(order_id, :o), order_status = :st, order_checked_at = UTC_TIMESTAMP(3)
                   WHERE no = :no""", o=o["order_id"], st=o.get("status"), no=no)
-    final = apply_order(no, o) if o.get("status") in (ORDER_PAID, *ORDER_FINAL_FAIL) else "PENDING_PAYMENT"
-    return {"bookingNo": no, "orderId": o["order_id"], "checkoutUrl": o.get("checkout_url"), "status": final}
+    if cur["status"] == "UNPAID":
+        # 주문을 만드는 사이에 결제 대기가 끝남 (10분 만료 B-08 · 뒤로 가기 · 같은 회원의 새 예약). 결제창 주소를 주지 않아 손님이 결제하지 않게.
+        # 주문 번호는 남겨 두므로 그래도 결제되면 B-08·API-21 이 늦은 결제로 보고 자동 환불 (apply_order)
+        fail("E-HOLD")
+    if cur["status"] != "PENDING_PAYMENT":
+        # 그 사이 이미 결과가 반영됨 (예: 두 번째 '결제하기' 중에 결제가 끝나 확정). 결제창 대신 결과 화면으로 보내 상태를 보여 줌
+        return {"bookingNo": no, "orderId": o["order_id"], "checkoutUrl": payment.return_url(no), "status": cur["status"]}
+    final = apply_order(no, o, actor="API-20") if o.get("status") in (ORDER_PAID, *ORDER_DEAD) else "PENDING_PAYMENT"
+    return {"bookingNo": no, "orderId": o["order_id"], "checkoutUrl": o.get("checkout_url"), "status": "UNPAID" if final == "LATE_PAID" else final}
 
 
 def payment_status(m: Member, no: str) -> dict:
-    """API-21 결제 결과 확인 (결과 화면이 부름): return_url 도착만으로 성공 처리하지 않고 본 사이트 주문 상태를 조회해 반영"""
+    """API-21 결제 결과 확인 (결과 화면이 부름): return_url 도착만으로 성공 처리하지 않고 본 사이트 주문 상태를 조회해 반영.
+    미결제(UNPAID)로 바뀐 예약이라도 주문 결과가 아직이면 다시 조회 → 늦게 paid 면 자동 환불 (apply_order)"""
     with conn() as c:
         b = _my_booking(c, m, no)
     st, ost = b["status"], b["order_status"]
-    if st == "PENDING_PAYMENT" and b["order_id"]:
+    if b["order_id"] and (st == "PENDING_PAYMENT" or (st == "UNPAID" and b["refund_status"] is None and ost not in ORDER_DEAD)):
         o = payment.get_order(b["order_id"])
         ost = o.get("status")
-        st = apply_order(no, o)
-    return {"bookingNo": no, "status": st, "orderStatus": ost}
+        st = apply_order(no, o, actor="API-21")
+    return {"bookingNo": no, "status": "UNPAID" if st == "LATE_PAID" else st, "orderStatus": ost}
 
 
-def apply_order(no: str, order: dict) -> str:
-    """본 사이트 주문 상태를 예약에 반영. 여러 번(결과 화면·배치 동시) 불려도 한 번만: 출발편 행 잠금 → 예약 잠금 → 상태 다시 확인.
+# 주문이 끝났지만 결제되지 않은 상태: 실패 · 만료 · 취소 (본 사이트에서 주문을 취소한 경우도 좌석을 풀어야 함)
+ORDER_DEAD = (*ORDER_FINAL_FAIL, ORDER_CANCELED)
+
+
+def apply_order(no: str, order: dict, actor: str = "BATCH:B-08") -> str:
+    """L-21 본 사이트 주문 상태를 예약에 반영. 여러 번(결과 화면·배치 동시) 불려도 한 번만: 출발편 행 잠금 → 예약 잠금 → 상태 다시 확인.
     paid → CONFIRMED + 확정 인원 += 인원 (판정이 끝나 운행 취소된 출발편이면 OP_CANCEL 후 바로 환불)
-    failed·expired → UNPAID (좌석 풀림) / pending·authenticating → 결제 대기 유지 (좌석 유지)
-    판정 뒤에 결제가 끝난 예약은 B-01 판정 메일을 받지 못했으므로 여기서 보냄: 출발 확정(GO) 출발편 → GO, 운행 취소 → 환불 후 CANCEL"""
+    failed·expired·canceled → UNPAID (좌석 풀림) / pending·authenticating → 결제 대기 유지 (좌석 유지)
+    판정 뒤에 결제가 끝난 예약은 B-01 판정 메일을 받지 못했으므로 여기서 보냄: 출발 확정(GO) 출발편 → GO, 운행 취소 → 환불 후 CANCEL
+    [v1.7] 이미 미결제(UNPAID)인 예약에 paid 가 오면 (주문을 만드는 사이 만료 등): 좌석이 풀렸으므로 확정하지 않고 전액 환불 + 운영자 알림 (1번만)"""
     st = order.get("status")
-    late_refund = late_go = False
+    late_refund = late_go = late_paid = False
     with tx() as c:
         dep_id = (one(c, "SELECT departure_id FROM booking WHERE no = :no", no=no) or fail("E-NOTFOUND"))["departure_id"]
         run(c, "SELECT id FROM departure WHERE id = :id FOR UPDATE", id=dep_id)
-        b = one(c, "SELECT status, people, order_id FROM booking WHERE no = :no FOR UPDATE", no=no)
+        b = one(c, "SELECT status, people, order_id, refund_status FROM booking WHERE no = :no FOR UPDATE", no=no)
         run(c, "UPDATE booking SET order_status = :st, order_checked_at = UTC_TIMESTAMP(3) WHERE no = :no", st=st, no=no)
-        if b["status"] != "PENDING_PAYMENT":
+        if b["status"] == "UNPAID":
+            if not (st == ORDER_PAID and b["order_id"] and b["refund_status"] is None):
+                return "UNPAID"
+            # 환불을 요청하기 전에 '요청함'으로 표시해 둠 → 결과 화면과 배치가 동시에 와도 환불은 한 번만.
+            # 운영자 알림도 이때 남김: 환불 요청 직전에 서버가 멈춰 '요청함'으로 남아도 운영자가 알 수 있게 (환불이 실패하면 L-15 가 따로 알림)
+            run(c, "UPDATE booking SET refund_status = 'REQUESTED' WHERE no = :no", no=no)
+            audit(c, actor, "LATE_PAID", no, {"from": "UNPAID", "orderStatus": st, "action": "refund"})
+            alert_ops(c, no, "미결제 처리 뒤 결제 완료 → 자동 환불",
+                      "결제 대기 시간이 지나 미결제로 바뀐 예약에 본 사이트 결제 완료(paid)가 들어왔습니다. 좌석은 이미 풀렸으므로 예약을 확정하지 않고 "
+                      "본 사이트에 전액 환불(operator_cancel)을 요청합니다.",
+                      "환불이 실패하면 '환불 실패' 알림이 따로 오고 B-07이 다시 요청합니다. 이 예약의 환불 상태가 오래 '요청함'으로 남아 있으면 "
+                      "본 사이트 관리 화면에서 주문의 환불 여부를 직접 확인해 주세요. 고객이 문의하면 이 예약번호로 안내해 주세요.")
+            late_paid = True
+        elif b["status"] != "PENDING_PAYMENT":
             return b["status"]  # 이미 반영됨
-        if st == ORDER_PAID:
+        elif st == ORDER_PAID:
             d = one(c, "SELECT status FROM departure WHERE id = :id", id=dep_id)
             if d["status"] in ("OPEN", "GO"):
                 run(c, "UPDATE booking SET status = 'CONFIRMED' WHERE no = :no", no=no)
@@ -255,11 +283,14 @@ def apply_order(no: str, order: dict) -> str:
                 # 판정이 끝나 운행 취소(·완료)된 출발편: 판정은 확정 예약만 세므로 이 예약은 출발할 수 없음 → 운행 취소 + 바로 환불
                 run(c, "UPDATE booking SET status = 'OP_CANCEL', cancel_by = 'OP', canceled_at = UTC_TIMESTAMP(3) WHERE no = :no", no=no)
                 late_refund = True
-        elif st in ORDER_FINAL_FAIL:
+        elif st in ORDER_DEAD:
             run(c, "UPDATE booking SET status = 'UNPAID' WHERE no = :no", no=no)
             return "UNPAID"
         else:
             return "PENDING_PAYMENT"
+    if late_paid:
+        refund_booking(no, "operator_cancel")
+        return "LATE_PAID"  # 예약 상태는 UNPAID 그대로. API 응답에서는 UNPAID 로 바꿔 보냄 (배치는 건수 세기에 씀)
     if late_refund:
         refund_booking(no, "operator_cancel")
     if late_refund or late_go:
@@ -308,7 +339,7 @@ def save_companions(m: Member, no: str, companions: list[dict]) -> dict:
     마감(출발 COMPANION_DUE_DAYS일 전) 전 CONFIRMED만, 인원 − 1명 모두 필수 (빈 이름으로 저장 불가)"""
     with tx() as c:
         b = one(c, """SELECT b.member_id, b.status, b.people, d.dep_date FROM booking b JOIN departure d ON d.id = b.departure_id
-                      WHERE b.no = :no FOR UPDATE""", no=no) or fail("E-NOTFOUND")
+                      WHERE b.no = :no FOR UPDATE OF b""", no=no) or fail("E-NOTFOUND")  # 예약 행만 잠금 (출발편까지 잠그면 출발편 → 예약 순서와 엇갈려 교착)
         if b["member_id"] != m.memberId:
             fail("E-FORBID")
         if b["status"] != "CONFIRMED" or clock.today() > add_days(b["dep_date"], -S.COMPANION_DUE_DAYS):
@@ -390,24 +421,31 @@ def send_due_mails(no: str | None = None, dep_id: str | None = None, kinds: tupl
 
 
 def _booking_for_cancel(c: Connection, no: str) -> dict:
+    """취소할 예약을 잠금. 잠금 순서는 출발편 → 예약 (v1.7 D-52, apply_order · 출발 판정과 같은 순서). 예약을 먼저 잠그면 판정과 동시에 돌 때 교착"""
+    dep = one(c, "SELECT departure_id FROM booking WHERE no = :no", no=no) or fail("E-NOTFOUND")
+    _lock_departure(c, dep["departure_id"])
     return one(c, "SELECT status, departure_id, people, order_id, total_price FROM booking WHERE no = :no FOR UPDATE", no=no) or fail("E-NOTFOUND")
 
 
 def _cancel_confirmed(c: Connection, no: str, b: dict, note: str | None) -> None:
-    """L-14: CONFIRMED 예약을 고객 취소로. 출발편 잠금 → 예약 상태·취소 정보 → 출발편 인원 되돌림 (API-16, API-19 공통)"""
-    _lock_departure(c, b["departure_id"])
+    """L-14: CONFIRMED 예약을 고객 취소로. 예약 상태·취소 정보 → 출발편 인원 되돌림 (API-16, API-19 공통). 출발편은 _booking_for_cancel 이 이미 잠금"""
     run(c, "UPDATE booking SET status='USER_CANCEL', cancel_by='USER', cancel_note=:n, canceled_at=UTC_TIMESTAMP(3) WHERE no=:no",
         n=note[:200] if note else None, no=no)
     run(c, "UPDATE departure SET booked_count = booked_count - :p WHERE id = :id", p=b["people"], id=b["departure_id"])
 
 
 def cancel_by_user(no: str, note: str) -> dict:
-    """L-14 (API-16): 고객 취소 — 고객센터 담당자가 호출. 본 사이트 연동(API-19) 전 임시·운영 예비용"""
-    with tx() as c:
-        b = _booking_for_cancel(c, no)
-        if b["status"] != "CONFIRMED":
-            fail("E-STATE")
-        _cancel_confirmed(c, no, b, note)
+    """L-14 (API-16): 고객 취소 — 고객센터 담당자가 호출. 본 사이트 연동(API-19) 전 임시·운영 예비용. 작업 기록 ADMIN_CANCEL (L-24)"""
+    try:
+        with tx() as c:
+            b = _booking_for_cancel(c, no)
+            if b["status"] != "CONFIRMED":
+                fail("E-STATE")
+            _cancel_confirmed(c, no, b, note)
+            audit(c, "ADMIN", "ADMIN_CANCEL", no, {"from": "CONFIRMED", "to": "USER_CANCEL", "people": b["people"]})
+    except ApiError as e:
+        audit_fail("ADMIN", "ADMIN_CANCEL", no, {"error": e.code})
+        raise
     # L-15 환불: 본 사이트 customer_cancel (지금은 전액 환불만 가능, 고객 취소 수수료는 확인 대기)
     rs = refund_booking(no, "customer_cancel")
     with tx() as c:
@@ -422,15 +460,21 @@ def cancel_from_site(no: str, refund_id: str, refund_status: str, note: str | No
     - CONFIRMED: 고객 취소(L-14) + 환불 정보 저장 + USER_CANCEL 메일
     - USER_CANCEL: 환불 진행 상황(refund_id · refund_status)만 갱신
     - OP_CANCEL(운행 취소) · DONE(여행 완료): E-STATE"""
-    with tx() as c:
-        b = _booking_for_cancel(c, no)
-        if b["status"] not in ("CONFIRMED", "USER_CANCEL"):
-            fail("E-STATE")
-        first = b["status"] == "CONFIRMED"
-        if first:
-            _cancel_confirmed(c, no, b, note)
-        run(c, "UPDATE booking SET refund_id=:r, refund_status=:s WHERE no=:no", r=refund_id, s=refund_status, no=no)
-        rep = one(c, "SELECT email FROM booking_member WHERE booking_no=:no AND seq=1", no=no) if first else None
-        if rep:
+    try:
+        with tx() as c:
+            b = _booking_for_cancel(c, no)
+            if b["status"] not in ("CONFIRMED", "USER_CANCEL"):
+                fail("E-STATE")
+            first = b["status"] == "CONFIRMED"
+            if first:
+                _cancel_confirmed(c, no, b, note)
+            run(c, "UPDATE booking SET refund_id=:r, refund_status=:s WHERE no=:no", r=refund_id, s=refund_status, no=no)
+            audit(c, "SITE", "SITE_CANCEL", no, {"from": b["status"], "to": "USER_CANCEL", "refundStatus": refund_status})
+            rep = one(c, "SELECT email FROM booking_member WHERE booking_no=:no AND seq=1", no=no) if first else None
+    except ApiError as e:
+        audit_fail("SITE", "SITE_CANCEL", no, {"error": e.code})
+        raise
+    if rep:  # 메일은 커밋 뒤에 (메일 서버가 느려도 출발편 잠금을 잡고 있지 않게)
+        with tx() as c:
             notify(c, no, rep["email"], "USER_CANCEL")
     return {"status": "USER_CANCEL", "refundStatus": refund_status}

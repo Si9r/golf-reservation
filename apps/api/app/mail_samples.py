@@ -10,8 +10,11 @@ from .adapters import mail as M
 from .config import env
 
 SAMPLE = {"no": "GT-261113-0001", "package_name": "삿포로 시내 숙박 2박 3일", "dep_date": "2026-11-13", "judge_date": "2026-11-06",
-          "people": 3, "total": 221400, "name": "이정훈", "pickup_time": "10:20", "pick_place": "JR 삿포로역 남쪽 출구"}
-SAMPLE_JA = {**SAMPLE, "package_name": "札幌市内宿泊 2泊3日", "name": "田中 太郎", "pick_place": "JR札幌駅 南口"}
+          "people": 3, "singles": 1, "total": 221400, "name": "이정훈", "pickup_time": "10:20", "pick_place": "JR 삿포로역 남쪽 출구",
+          "pick_lat": 43.0675, "pick_lng": 141.3508, "stop_order": 2, "memo": "아침 식사 후 9시 이후에 타고 싶습니다",
+          "hotel_name": "미쓰이가든호텔 삿포로", "room_type": "std", "refund_status": "REQUESTED"}
+SAMPLE_JA = {**SAMPLE, "package_name": "札幌市内宿泊 2泊3日", "name": "田中 太郎", "pick_place": "JR札幌駅 南口",
+             "memo": "朝食後、9時以降の乗車を希望", "hotel_name": "三井ガーデンホテル札幌"}
 KINDS = ("CONFIRM", "GO", "CANCEL", "PICKUP", "USER_CANCEL")  # CONFIRM 은 지금 본 사이트가 보내지만 템플릿 확인용으로 함께
 
 

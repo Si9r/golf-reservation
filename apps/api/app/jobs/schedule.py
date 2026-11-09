@@ -15,6 +15,7 @@ from . import JOBS
 log = logging.getLogger("golf.jobs")
 JST = timezone(timedelta(hours=9))
 LOCK = "golf_jobs"
+LAST_RUN: dict = {"at": None, "jobs": []}  # API-24 상태 확인용: 이 서버가 마지막으로 정기 실행을 돈 시각(UTC)과 배치
 
 # (설명, 그 분에 돌지, 배치). 같은 분에 여러 줄이 걸리면 위에서부터, 겹치는 배치는 한 번만
 SCHEDULE = [
@@ -47,6 +48,7 @@ def run_due(ids: list[str]) -> bool:
                     log.exception("job %s failed", x)
         finally:
             c.execute(text("SELECT RELEASE_LOCK(:n)"), {"n": LOCK})
+            LAST_RUN.update(at=datetime.now(timezone.utc).isoformat(timespec="seconds"), jobs=list(ids))
     return True
 
 

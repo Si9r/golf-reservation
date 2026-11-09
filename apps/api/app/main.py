@@ -12,6 +12,16 @@ from .config import env
 from .routes import router
 
 logging.basicConfig(level=logging.INFO)
+log = logging.getLogger("golf")
+
+# 운영 서버 점검 (TBD-38): production 에서 가짜 결제·가짜 로그인(fake)으로 켜지면 누구나 결제 없이 예약할 수 있으므로 켜지 않음
+if env.APP_ENV.lower() == "production":
+    if env.PAYMENT_BACKEND.lower() != "partner":
+        raise RuntimeError("APP_ENV=production 에서는 PAYMENT_BACKEND=partner 여야 합니다 (fake = 가짜 결제·가짜 로그인)")
+    if not env.JOBS_ENABLED:
+        log.warning("APP_ENV=production 인데 JOBS_ENABLED=0: 결제 확인·출발 판정·환불 재시도가 자동으로 돌지 않습니다")
+    if not env.FIXED_TODAY == "":
+        raise RuntimeError("APP_ENV=production 에서는 FIXED_TODAY 를 비워야 합니다")
 
 
 @asynccontextmanager

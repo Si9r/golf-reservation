@@ -29,8 +29,11 @@ DEPARTURE_MONTHS_AHEAD = 13  # B-04
 HOLD_KEEP_AFTER_EXPIRE_MIN = 60  # B-02: 만료 후 이만큼 지난 확보만 삭제 (L-08 2) 용, 개발 결정)
 JUDGE_TRIES = 3  # B-01: 출발편 하나의 판정이 오류로 끝나면 이만큼 다시 시도, 그래도 실패하면 운영자 알림
 MAIL_TRIES = 3  # 안내 메일: 발송 실패(FAIL)는 이 횟수까지 다시 보냄 (B-09, 개발 결정)
-# 고객센터 (Q-13): 운영 시간은 운영사 답변 10:00~17:00. 전화번호·이메일은 확정 전이라 .env 설정값 (SUPPORT_TEL, SUPPORT_EMAIL)
-SUPPORT = {"tel": env.SUPPORT_TEL, "email": env.SUPPORT_EMAIL, "hours": "10:00-17:00"}
+ORDER_PENDING_ALERT_MIN = 60  # B-08 ③: 주문을 만든 뒤 이 시간 넘게 결제 대기(pending·authenticating)면 운영자 알림 1번 (v1.7, TBD-44 답에 따라 조정)
+LATE_PAID_CHECK_HOURS = 48  # B-08 ④: 미결제(UNPAID)로 바뀐 예약의 주문을 이 시간까지 다시 확인 → 늦게 paid 면 자동 환불 (v1.7 L-21)
+# 고객센터 (Q-13): 운영 시간은 운영사 답변 10:00~17:00. 전화번호·이메일은 .env 설정값 (SUPPORT_TEL, SUPPORT_EMAIL),
+# 비어 있으면 운영사 임시값 (10/29, 화면 packages/shared SUPPORT 와 같은 값). 실제 번호를 받으면 .env 만 바꿈
+SUPPORT = {"tel": env.SUPPORT_TEL or "00-0000-000", "email": env.SUPPORT_EMAIL or "golf@travender-hokkaido.com", "hours": "10:00-17:00"}
 TERMS_URL = {
     "terms": "https://travender-hokkaido.com/terms",
     "privacy": "https://travender-hokkaido.com/privacy",

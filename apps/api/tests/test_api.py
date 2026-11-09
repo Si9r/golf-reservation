@@ -383,33 +383,48 @@ def test_companions_fix_no_empty(client):  # API-13 동반자 이름 수정(오�
 
 
 # ---------- 안내 메일 (운영사 확정 10/26: 이 서비스가 직접 보냄) ----------
-def test_mail_templates():  # 4종 제목·본문에 예약번호·패키지·출발일·인원·금액
+MAIL_B = {"no": "GT-261030-0001", "dep_date": "2026-10-30", "judge_date": "2026-10-23", "people": 3, "singles": 1, "total": 221400,
+          "room_type": "std", "pick_lat": 43.0675, "pick_lng": 141.3508, "memo": "아침 식사 후 9시 이후", "refund_status": "REQUESTED"}
+
+
+def test_mail_templates():  # v1.7 메일 템플릿: 제목 형식, 본문에 예약 내용(예약번호·패키지·출발일·인원·호텔·객실·승차·요청 사항)·고객센터
     from app.adapters.mail import render
 
-    b = {"no": "GT-261030-0001", "package_name": "삿포로 시내 숙박 2박 3일", "dep_date": "2026-10-30", "judge_date": "2026-10-23",
-         "people": 3, "total": 221400, "name": "이정훈"}
-    for kind in ("CONFIRM", "GO", "CANCEL", "USER_CANCEL"):
-        subject, body = render(kind, b)
-        assert "GT-261030-0001" in subject
-        for x in ("GT-261030-0001", "삿포로 시내 숙박 2박 3일", "2026년 10월 30일(금)", "3명", "¥221,400", "10:00-17:00"):
+    b = {**MAIL_B, "package_name": "삿포로 시내 숙박 2박 3일", "name": "이정훈", "hotel_name": "미쓰이가든호텔 삿포로", "pick_place": "JR 삿포로역 남쪽 출구"}
+    assert render("GO", b)[0] == "[TRAVENDER 골프] 출발이 확정되었습니다 · 2026년 10월 30일(금) 삿포로 시내 숙박 2박 3일"
+    assert render("CANCEL", b)[0] == "[TRAVENDER 골프] 운행 취소와 환불 안내 (GT-261030-0001)"
+    assert render("PICKUP", b)[0] == "[TRAVENDER 골프] 승차 시간 안내 · 2026년 10월 30일(금)"
+    assert render("USER_CANCEL", b)[0] == "[TRAVENDER 골프] 예약 취소 확인 (GT-261030-0001)"
+    for kind in ("CONFIRM", "GO", "CANCEL", "PICKUP", "USER_CANCEL"):
+        body = render(kind, b)[1]
+        for x in ("GT-261030-0001", "삿포로 시내 숙박 2박 3일", "2026년 10월 30일(금)", "인원 3명", "¥221,400", "10:00~17:00 (일본 시간)",
+                  "미쓰이가든호텔 삿포로 (스탠다드 트윈) · 2인실 1실 · 1인실 1실", "이정훈 님"):
             assert x in body, (kind, x)
-    assert "전액 환불" in render("CANCEL", b)[1] and "2026년 10월 23일(금)" in render("CONFIRM", b)[1]
-    s, body_ = render("PICKUP", {**b, "pickup_time": "10:20", "pick_place": "JR 삿포로역 남쪽 출구"})  # 승차 시간 안내 (골프가 보냄)
-    assert "승차 시간 안내" in s and "2026년 10월 30일(금) 10:20" in body_ and "JR 삿포로역 남쪽 출구" in body_
+    go = render("GO", b)[1]
+    assert "승차       JR 삿포로역 남쪽 출구" in go and "요청 사항  아침 식사 후 9시 이후" in go and "출발 3일 전까지 메일로" in go
+    assert "2026년 10월 23일(금)까지 예약 상세에서" in go and "#/golf/my/GT-261030-0001" in go
+    assert "전액 환불" in render("CANCEL", b)[1] and "#/golf/packages" in render("CANCEL", b)[1]
+    assert "환불 상태: 환불 요청" in render("USER_CANCEL", b)[1]
+    s, body_ = render("PICKUP", {**b, "pickup_time": "10:20", "stop_order": 2})  # 승차 시간 안내 (골프가 보냄)
+    assert "2026년 10월 30일(금) 10:20 · JR 삿포로역 남쪽 출구 (정차 순서 2)" in body_ and "google.com/maps" in body_
+    assert "10:20 · JR 삿포로역 남쪽 출구" in render("GO", {**b, "pickup_time": "10:20"})[1]  # 등록됐으면 GO 메일에 시각
 
 
-def test_mail_templates_ja():  # 일본어 메일: 5종 제목·본문에 예약번호·패키지·출발일·인원·금액, 한글 없음
+def test_mail_templates_ja():  # 일본어 메일 (v1.7 ⑤): 제목 형식, 본문에 예약 내용, 한글 없음
     from app.adapters.mail import render_ja
 
-    b = {"no": "GT-261030-0001", "package_name": "札幌市内宿泊 2泊3日", "dep_date": "2026-10-30", "judge_date": "2026-10-23",
-         "people": 3, "total": 221400, "name": "田中 太郎", "pickup_time": "10:20", "pick_place": "JR札幌駅 南口"}
+    b = {**MAIL_B, "package_name": "札幌市内宿泊 2泊3日", "name": "田中 太郎", "hotel_name": "三井ガーデンホテル札幌", "pick_place": "JR札幌駅 南口",
+         "memo": "朝食後、9時以降", "pickup_time": "10:20"}
+    assert render_ja("GO", b)[0] == "【TRAVENDER Golf】催行決定のお知らせ・2026年10月30日（金） 札幌市内宿泊 2泊3日"
+    assert render_ja("CANCEL", b)[0] == "【TRAVENDER Golf】催行中止および返金のご案内（GT-261030-0001）"
     for kind in ("CONFIRM", "GO", "CANCEL", "PICKUP", "USER_CANCEL"):
         subject, body = render_ja(kind, b)
-        assert "GT-261030-0001" in subject and not re.search("[가-힣]", subject + body), kind
-        for x in ("GT-261030-0001", "札幌市内宿泊 2泊3日", "2026年10月30日(金)", "3名", "¥221,400", "10:00-17:00", "田中 太郎 様"):
+        assert not re.search("[가-힣]", subject + body), kind
+        for x in ("GT-261030-0001", "札幌市内宿泊 2泊3日", "2026年10月30日（金）", "人数 3名様", "¥221,400", "10:00〜17:00（日本時間）", "田中 太郎 様",
+                  "三井ガーデンホテル札幌（スタンダードツイン）・ツイン1室・シングル1室"):
             assert x in body, (kind, x)
-    assert "全額返金" in render_ja("CANCEL", b)[1] and "2026年10月23日(金)" in render_ja("CONFIRM", b)[1]
-    assert "2026年10月30日(金) 10:20" in render_ja("PICKUP", b)[1]
+    assert "全額返金" in render_ja("CANCEL", b)[1] and "2026年10月23日（金）" in render_ja("CONFIRM", b)[1]
+    assert "2026年10月30日（金） 10:20・JR札幌駅 南口" in render_ja("PICKUP", b)[1]
 
 
 def test_mail_follows_booking_lang(client, monkeypatch):  # 일본어로 예약하면 일본어 메일 (패키지 이름도 일본어), 한국어 예약은 한국어 그대로
@@ -425,9 +440,9 @@ def test_mail_follows_booking_lang(client, monkeypatch):  # 일본어로 예약�
         name_ja = db1("SELECT name_ja n FROM package WHERE id = 'PKG-001'")["n"]
         M.notify(c, ja, "a@example.com", "GO")
         M.notify(c, ko, "a@example.com", "GO")
-    (_, s_ja, b_ja), (_, s_ko, _) = rec.sent
-    assert ja in s_ja and "催行が決定しました" in s_ja and name_ja in b_ja
-    assert ko in s_ko and "출발이 확정" in s_ko
+    (_, s_ja, b_ja), (_, s_ko, b_ko) = rec.sent
+    assert "催行決定" in s_ja and name_ja in s_ja and ja in b_ja and name_ja in b_ja
+    assert "출발이 확정" in s_ko and ko in b_ko
 
 
 def test_mail_failure_keeps_booking(client, monkeypatch):  # 발송 실패해도 예약은 그대로, 기록은 FAIL
@@ -730,7 +745,7 @@ def test_paid_after_departure_go_sends_go(client, monkeypatch):  # 출발 확정
         run(c, "UPDATE departure SET status = 'GO' WHERE id = :id", id=dep)  # 그 사이 판정에서 출발 확정
     fake().set_status(db1("SELECT order_id o FROM booking WHERE no = :no", no=no)["o"], "paid")
     assert check_payments()["confirmed"] == 1 and db1("SELECT status FROM booking WHERE no = :no", no=no)["status"] == "CONFIRMED"
-    assert mails(no, "GO") == ["OK"] and any(no in s and "출발이 확정" in s for _, s, _ in rec.sent)
+    assert mails(no, "GO") == ["OK"] and any(no in b and "출발이 확정" in s for _, s, b in rec.sent)
     assert client.get(U + f"/bookings/{no}/payment", headers=A).json()["status"] == "CONFIRMED"
     assert resend_mails() >= 0 and mails(no, "GO") == ["OK"]  # 다시 돌려도 두 번 보내지 않음
 
@@ -866,7 +881,7 @@ def test_ops_alert_has_customer_and_booking(client, monkeypatch):  # 운영자 �
     fake().set_status(oid, "pending")  # 본 사이트에서 아직 paid 가 아닌 주문 → 409 refused
     client.post(U + f"/admin/bookings/{no}/cancel", json={"cancelNote": "고객 요청"}, headers=ADMIN)
     subject, body_ = next((s, b) for to, s, b in rec.sent if to == "ops@example.jp" and no in s)
-    assert "환불 실패 (customer_cancel)" in subject and "이정훈 님" in subject
+    assert subject == f"[골프 예약][환불 실패] {no}" and "■ 환불 실패 (customer_cancel)" in body_  # v1.7 '[골프 예약][종류] 대상'
     for x in ("발생 시각:", "본 사이트 409 refused", "고객 취소 환불(customer_cancel)", "이미 환불·취소된 주문",  # 무슨 일 · 원인 짐작
               "이정훈 (LEE JUNGHOON)", "a@example.com", "+82 10-1234-5678", "M0001",  # 고객
               f"예약번호: {no} (고객 취소)", "삿포로", "2명", oid, "환불: 실패", "■ 해야 할 일", "B-07"):  # 예약 · 주문 · 환불 · 조치

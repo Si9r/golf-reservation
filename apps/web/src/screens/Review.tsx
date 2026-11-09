@@ -62,6 +62,7 @@ export default function Review() {
   const proceed = () => guard(() => (dupB ? setDupOpen(true) : go())); // B-01: 잔여석 다시 확인 후
 
   const need = Math.max(0, SET.MIN_DEPARTURE - v.sum); // 우리 인원까지 더해서 출발 확정까지 남은 인원
+  const full = need === 0 && v.seats <= d.people; // 우리가 예약하면 정원(BUS_SEATS)이 다 참. 최소 인원만 넘은 것과 구분 (TBD-37)
   const roomsTxt = price.rooms ? t(price.rooms.singles ? "roomsSum" : "roomsSum0", { t: price.rooms.twins, s: price.rooms.singles }) : null;
   const stayTitle = hotel ? n(hotel.name) : opt?.none ? n(opt.name) : t("noHotel");
   const staySub = hotel ? [opt && !opt.hotel ? n(opt.sub) : n(hotel.room), roomsTxt].filter(Boolean).join(dot()) : opt?.none ? n(opt.sub) : null;
@@ -151,7 +152,7 @@ export default function Review() {
           {/* 4 출발 조건 (최소 인원 안내 + 현황을 한 상자로, '판정일' 대신 문장) */}
           <section className="relative rounded-[20px] border-[1.5px] p-4 lg:p-5" style={{ background: "var(--warn-soft)", borderColor: "var(--warn-line)" }}>
             <Anno n={3} t="출발 조건 (M-150 + L-04 현황): 남은 인원·막대·확정 날짜와 미달 시 전액 환불을 한 상자로" />
-            <h2 className="flex items-center gap-2 text-[16px] font-extrabold text-warn lg:text-[18px]"><UsersThree size={20} weight="fill" /> {need > 0 ? t("rvNeed", { n: need }) : t("rvFull", { m: SET.MIN_DEPARTURE })}</h2>
+            <h2 className="flex items-center gap-2 text-[16px] font-extrabold text-warn lg:text-[18px]"><UsersThree size={20} weight="fill" /> {need > 0 ? t("rvNeed", { n: need }) : full ? t("rvFull", { m: SET.BUS_SEATS }) : t("mdEnoughT")}</h2>
             <div className="my-2.5"><Meter now={v.booked} add={Math.min(d.people, v.seats)} /></div>
             <p className="text-[13px] text-ink-2 lg:text-[14px]">{need > 0 ? t("M-121", { a: v.booked, b: d.people, t: v.sum, m: SET.MIN_DEPARTURE }) : t("countOkOurs", { t: v.sum, b: d.people })}</p>
             <p className="mt-1.5 text-[13.5px] font-semibold leading-relaxed text-ink lg:text-[15px]">{t(need > 0 ? "rvRule" : "rvRuleFull", { d: fDayLong(judgeDate(dep), L), m: SET.MIN_DEPARTURE })}</p>

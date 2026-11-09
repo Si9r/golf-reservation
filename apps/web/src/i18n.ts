@@ -108,7 +108,7 @@ const ko = {
   inclBus: "버스·픽업 (추가 요금 없음)",
   depSelect: "출발일 선택",
   depMeta: "최소 {min}명 · 정원 {seats}명",
-  weekdays: "매주 {w} 출발 · 출발 7일 전까지 예약",
+  weekdays: "매주 {w} 출발 · 출발 {lastBook}일 전까지 예약",
   depNow: "현재 {b}명 / 최소 {min}명",
   depEnough: "현재 {b}명 · 인원 충족",
   depShort: "잔여석 부족 (우리 {n}명)",
@@ -559,7 +559,7 @@ const ja: Dict = {
   inclBus: "送迎バス（追加料金なし）",
   depSelect: "出発日を選ぶ",
   depMeta: "最少{min}名・定員{seats}名",
-  weekdays: "毎週{w}出発・出発7日前まで予約可",
+  weekdays: "毎週{w}出発・出発{lastBook}日前まで予約可",
   depNow: "現在{b}名 / 最少{min}名",
   depEnough: "現在{b}名・人数達成",
   depShort: "残席不足（{n}名）",
@@ -899,7 +899,8 @@ const ja: Dict = {
 export type Key = keyof Dict;
 const DICT: Record<Lang, Dict> = { ko, ja };
 // {min}·{seats}는 설정값 (최소 출발 인원·정원)을 바로 채움
-const BASE = { min: SET.MIN_DEPARTURE, seats: SET.BUS_SEATS };
+// lastBook: 예약할 수 있는 마지막 날 = 판정일(출발 JUDGE_DAYS일 전) 전날. 판정일 당일은 L-01 '판정일이 오늘 이후'에 걸려 예약 불가 (11/09, 문구 '7일 전까지' → '8일 전까지')
+const BASE = { min: SET.MIN_DEPARTURE, seats: SET.BUS_SEATS, lastBook: SET.JUDGE_DAYS + 1 };
 const fill = (s: string, v: Record<string, string | number> = {}) => s.replace(/\{(\w+)\}/g, (_, k) => String(v[k] ?? BASE[k as keyof typeof BASE] ?? ""));
 
 export const useT = () => {

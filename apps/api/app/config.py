@@ -34,6 +34,7 @@ class Env(BaseSettings):
     # 고객센터 연락처 (메일·화면 표시). 비우면 settings.SUPPORT 임시값 (운영사 10/29). 운영 시간은 settings.SUPPORT
     SUPPORT_TEL: str = ""
     SUPPORT_EMAIL: str = ""
+    APP_ENV: str = "test"  # test | production. production 이면 서버가 켜질 때 가짜 결제·가짜 로그인(PAYMENT_BACKEND=fake)을 막음 (main.py)
     FIXED_TODAY: str = ""  # 테스트·데모용 오늘 날짜 고정 (YYYY-MM-DD)
     JOBS_ENABLED: bool = False  # 정기 실행 시간표(jobs/schedule.py)를 서버 안에서 돌림. 운영 서버에서만 켬
 
