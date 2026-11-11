@@ -11,7 +11,7 @@ from .. import settings as S
 from ..adapters.auth import Member
 from ..adapters.mail import alert_ops, notify
 from ..adapters import payment
-from ..adapters.partner import ORDER_CANCELED, ORDER_FINAL_FAIL, ORDER_PAID, PartnerError
+from ..adapters.partner import ORDER_AUTH, ORDER_CANCELED, ORDER_FINAL_FAIL, ORDER_PAID, ORDER_PENDING, PartnerError
 from ..audit import audit, audit_fail
 from ..db import conn, one, rows, run, tx
 from ..errors import ApiError, fail
@@ -127,11 +127,12 @@ def create_booking(m: Member, req: dict) -> dict:
             area = _area_of(c, s) or fail("E-AREA", [{"field": f"stops.{s['kind']}", "rule": "L-06"}])
             stops.append({**s, "areaId": area})
         q = make_quote(c, req["departureId"], req.get("optionId"), people, req.get("singles"))
+    _release_my_ordered_pending(m)
 
     with tx() as c:
         p = _pkg_of_dep(c, req["departureId"]) or fail("E-NOTFOUND")
         _lock_departure(c, req["departureId"])
-        # 같은 회원이 다시 만드는 경우: 주문 전 결제 대기는 미결제로 (좌석 풀림). 주문을 만든 예약은 결제가 진행 중일 수 있어 그대로
+        # 같은 회원이 다시 만드는 경우: 주문 전 결제 대기는 미결제로 (좌석 풀림). 주문을 만든 예약은 위 _release_my_ordered_pending 이 주문 상태를 보고 정리
         run(c, "UPDATE booking SET status = 'UNPAID' WHERE member_id = :m AND status = 'PENDING_PAYMENT' AND order_id IS NULL", m=m.memberId)
         d = one(c, DEP_SQL + " WHERE d.id = :id", id=req["departureId"])
         if not is_bookable_date(sale_rule(p), d["dep_date"], clock.today(), d["status"]):
@@ -160,6 +161,27 @@ def create_booking(m: Member, req: dict) -> dict:
             run(c, "INSERT INTO booking_member (booking_no, seq, name_en) VALUES (:no, :s, :n)", no=no, s=i + 2, n=comps[i]["nameEn"].strip().upper())
         exp = one(c, f"SELECT created_at + INTERVAL {S.HOLD_MINUTES} MINUTE e FROM booking WHERE no = :no", no=no)["e"]
     return {"bookingNo": no, "status": "PENDING_PAYMENT", "total": q["total"], "expiresAt": exp}
+
+
+def _release_my_ordered_pending(m: Member) -> None:
+    """같은 회원이 새 예약을 만들 때, 주문까지 만든 이전 결제 대기 예약을 정리 (결제창에서 뒤로 와 다시 예약하면 좌석을 두 번 잡던 문제, 11/11).
+    본 사이트 주문 상태를 한 번 조회: pending(결제창만 열림) → 미결제로 바꿔 좌석을 바로 풂 / paid·failed·expired·canceled → 그대로 반영 (apply_order) /
+    authenticating(카드 인증 중) → 실제로 결제 중일 수 있어 그대로. 조회가 실패하면 그대로 두고 B-08 이 10분마다 다시 봄.
+    미결제로 바꾼 뒤 결제가 끝나도 늦은 결제로 보고 자동 전액 환불 (apply_order LATE_PAID, B-08 ④)"""
+    with conn() as c:
+        olds = rows(c, "SELECT no, order_id FROM booking WHERE member_id = :m AND status = 'PENDING_PAYMENT' AND order_id IS NOT NULL",
+                    m=m.memberId)
+    for b in olds:
+        try:
+            o = payment.get_order(b["order_id"])
+        except PartnerError:
+            continue
+        if o.get("status") == ORDER_PENDING:
+            with tx() as c:
+                run(c, """UPDATE booking SET status = 'UNPAID', order_status = :st, order_checked_at = UTC_TIMESTAMP(3)
+                          WHERE no = :no AND status = 'PENDING_PAYMENT'""", st=ORDER_PENDING, no=b["no"])
+        elif o.get("status") != ORDER_AUTH:
+            apply_order(b["no"], o, actor="API-10")
 
 
 def _my_booking(c: Connection, m: Member, no: str, lock: bool = False) -> dict:
@@ -427,10 +449,11 @@ def _booking_for_cancel(c: Connection, no: str) -> dict:
     return one(c, "SELECT status, departure_id, people, order_id, total_price FROM booking WHERE no = :no FOR UPDATE", no=no) or fail("E-NOTFOUND")
 
 
-def _cancel_confirmed(c: Connection, no: str, b: dict, note: str | None) -> None:
-    """L-14: CONFIRMED 예약을 고객 취소로. 예약 상태·취소 정보 → 출발편 인원 되돌림 (API-16, API-19 공통). 출발편은 _booking_for_cancel 이 이미 잠금"""
-    run(c, "UPDATE booking SET status='USER_CANCEL', cancel_by='USER', cancel_note=:n, canceled_at=UTC_TIMESTAMP(3) WHERE no=:no",
-        n=note[:200] if note else None, no=no)
+def _cancel_confirmed(c: Connection, no: str, b: dict, note: str | None, by: str = "USER") -> None:
+    """L-14: CONFIRMED 예약을 고객 취소로. 예약 상태·취소 정보 → 출발편 인원 되돌림 (API-16, API-19 공통). 출발편은 _booking_for_cancel 이 이미 잠금.
+    by: USER = 이 서비스가 취소하고 환불 요청 (API-16) / SITE = 본 사이트가 취소·환불 (API-19, B-07 재시도 대상 아님)"""
+    run(c, "UPDATE booking SET status='USER_CANCEL', cancel_by=:by, cancel_note=:n, canceled_at=UTC_TIMESTAMP(3) WHERE no=:no",
+        by=by, n=note[:200] if note else None, no=no)
     run(c, "UPDATE departure SET booked_count = booked_count - :p WHERE id = :id", p=b["people"], id=b["departure_id"])
 
 
@@ -467,9 +490,16 @@ def cancel_from_site(no: str, refund_id: str, refund_status: str, note: str | No
                 fail("E-STATE")
             first = b["status"] == "CONFIRMED"
             if first:
-                _cancel_confirmed(c, no, b, note)
+                _cancel_confirmed(c, no, b, note, by="SITE")
             run(c, "UPDATE booking SET refund_id=:r, refund_status=:s WHERE no=:no", r=refund_id, s=refund_status, no=no)
             audit(c, "SITE", "SITE_CANCEL", no, {"from": b["status"], "to": "USER_CANCEL", "refundStatus": refund_status})
+            if refund_status == "FAIL":
+                # 환불은 본 사이트 책임 → 이 서비스는 다시 요청하지 않고(B-07 대상 아님) 운영자가 확인하도록 알림만
+                alert_ops(c, no, "본 사이트 고객 취소 환불 실패",
+                          f"본 사이트에서 고객이 취소한 예약의 환불이 실패했다고 본 사이트가 알려 왔습니다 (환불 번호 {refund_id}). "
+                          "이 환불은 본 사이트가 처리하므로 골프 서비스는 다시 환불을 요청하지 않습니다.",
+                          "본 사이트 관리 화면에서 이 주문의 환불 상태를 확인하고, 필요하면 본 사이트 담당자에게 다시 처리를 요청해 주세요. "
+                          "본 사이트가 처리를 마치면 결과가 다시 전달되어 환불 상태가 바뀝니다.")
             rep = one(c, "SELECT email FROM booking_member WHERE booking_no=:no AND seq=1", no=no) if first else None
     except ApiError as e:
         audit_fail("SITE", "SITE_CANCEL", no, {"error": e.code})

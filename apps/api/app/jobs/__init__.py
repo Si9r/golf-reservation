@@ -146,10 +146,11 @@ def check_payments() -> dict:
 
 def retry_refunds() -> dict:
     """B-07 환불 재시도: 환불 실패(refund_status = FAIL)한 운행 취소·고객 취소·늦은 결제(미결제 뒤 paid) 예약을 본 사이트에 다시 환불 요청.
-    주문별로 차례로, 한 건이 또 실패해도(FAIL 유지 + 운영자 알림) 다음 건은 계속. 건마다 작업 기록 REFUND (L-24)"""
+    주문별로 차례로, 한 건이 또 실패해도(FAIL 유지 + 운영자 알림) 다음 건은 계속. 건마다 작업 기록 REFUND (L-24).
+    본 사이트가 취소·환불한 예약(cancel_by = SITE, API-19)은 빼고 다시 요청하지 않음: 환불 책임이 본 사이트라 두 번 환불될 수 있음 (11/11)"""
     with tx() as c:
         targets = rows(c, """SELECT no, status FROM booking WHERE refund_status = 'FAIL' AND status IN ('OP_CANCEL', 'USER_CANCEL', 'UNPAID')
-                             AND order_id IS NOT NULL ORDER BY canceled_at, no""")
+                             AND order_id IS NOT NULL AND (cancel_by IS NULL OR cancel_by <> 'SITE') ORDER BY canceled_at, no""")
     out = {"done": 0, "fail": 0}
     for t in targets:
         st = refund_booking(t["no"], "customer_cancel" if t["status"] == "USER_CANCEL" else "operator_cancel")

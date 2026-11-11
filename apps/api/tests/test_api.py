@@ -233,6 +233,31 @@ def test_abandon_pending(client):  # 결제 화면에서 뒤로: 주문 전이�
     assert client.delete(U + f"/bookings/{no}/pending", headers=B).json()["error"] == "E-FORBID"
 
 
+def test_new_booking_releases_ordered_pending(client):  # 결제창까지 갔다가 뒤로 와서 다시 예약: 이전 예약의 좌석을 풀어 한 사람이 두 번 잡지 않음 (11/11)
+    set_booked(DEP, 14)  # 남은 6석
+    fake().next_status = "pending"  # 결제창만 열고 결제하지 않은 주문
+    no1 = client.post(U + "/bookings", json=body((DEP, 4)), headers=A).json()["bookingNo"]
+    assert client.post(U + f"/bookings/{no1}/checkout", headers=A).status_code == 200
+    assert seats_of(client, DEP) == 2  # 주문 후에는 결과가 나올 때까지 좌석 유지
+    r = client.post(U + "/bookings", json=body((DEP, 4)), headers=A)  # 고치기 전: 남은 2석이라 E-SEAT (또는 자리가 넉넉하면 8석을 잡음)
+    assert r.status_code == 201, r.text
+    assert db1("SELECT status, order_status FROM booking WHERE no = :no", no=no1) == {"status": "UNPAID", "order_status": "pending"}
+    assert seats_of(client, DEP) == 2  # 새 예약 4석만
+    oid1 = db1("SELECT order_id o FROM booking WHERE no = :no", no=no1)["o"]
+    fake().set_status(oid1, "paid")  # 그래도 다른 탭에서 이전 주문을 결제했다면
+    assert check_payments()["late_paid"] == 1  # 늦은 결제 → 확정하지 않고 자동 환불
+    assert db1("SELECT status, refund_status FROM booking WHERE no = :no", no=no1) == {"status": "UNPAID", "refund_status": "DONE"}
+
+
+def test_new_booking_keeps_authenticating_order(client):  # 카드 인증 중인 이전 주문은 실제로 결제 중일 수 있어 그대로 (좌석 유지)
+    set_booked(DEP, 0)
+    fake().next_status = "authenticating"
+    no1 = client.post(U + "/bookings", json=body(), headers=A).json()["bookingNo"]
+    client.post(U + f"/bookings/{no1}/checkout", headers=A)
+    assert client.post(U + "/bookings", json=body(), headers=A).status_code == 201
+    assert db1("SELECT status FROM booking WHERE no = :no", no=no1)["status"] == "PENDING_PAYMENT"
+
+
 # ---------- 배치 · 운영 ----------
 def test_judge(client):
     """B-01: 20명 이상 GO, 미달은 운행 취소 + 환불 요청 (판정일 = 출발 7일 전)"""
@@ -290,7 +315,7 @@ def test_site_cancel_confirmed(client):
     assert r.status_code == 200 and r.json() == {"status": "USER_CANCEL", "refundStatus": "REQUESTED"}
     assert db1("SELECT booked_count n FROM departure WHERE id = :id", id=SITE_DEP)["n"] == 5
     assert db1("SELECT status, cancel_by, cancel_note, refund_id, refund_status, canceled_at IS NOT NULL canceled FROM booking WHERE no = :no", no=no) == \
-        {"status": "USER_CANCEL", "cancel_by": "USER", "cancel_note": "고객 사정", "refund_id": "RF-SITE-1", "refund_status": "REQUESTED", "canceled": 1}
+        {"status": "USER_CANCEL", "cancel_by": "SITE", "cancel_note": "고객 사정", "refund_id": "RF-SITE-1", "refund_status": "REQUESTED", "canceled": 1}
     assert db1("SELECT result FROM notification WHERE booking_no = :no AND kind = 'USER_CANCEL'", no=no) == {"result": "OK"}
 
 
@@ -303,6 +328,29 @@ def test_site_cancel_refund_update(client):
     assert db1("SELECT refund_id, refund_status FROM booking WHERE no = :no", no=no) == {"refund_id": "RF-SITE-2", "refund_status": "DONE"}
     assert db1("SELECT booked_count n FROM departure WHERE id = :id", id=SITE_DEP)["n"] == 5  # 인원은 한 번만 되돌림
     assert db1("SELECT COUNT(*) n FROM notification WHERE booking_no = :no AND kind = 'USER_CANCEL'", no=no)["n"] == 1
+
+
+def test_site_cancel_refund_fail_not_retried(client):  # 본 사이트가 '환불 실패'를 알려 와도 B-07 이 다시 환불 요청하지 않음 (환불은 본 사이트 책임, 11/11)
+    set_booked(SITE_DEP, 0)
+    no = book_confirmed(client, SITE_DEP, 2)
+    oid = db1("SELECT order_id o FROM booking WHERE no = :no", no=no)["o"]
+    assert site_cancel(client, no, refundStatus="FAIL").json() == {"status": "USER_CANCEL", "refundStatus": "FAIL"}
+    assert db1("SELECT COUNT(*) n FROM notification WHERE booking_no = :no AND kind = 'OPS_ALERT'", no=no)["n"] == 1  # 운영자가 확인하도록 알림
+    retry_refunds()
+    assert not [x for x in fake().calls if x[0] == "cancel_order" and x[1] == oid]  # 본 사이트에 환불 요청을 보내지 않음
+    assert db1("SELECT cancel_by, refund_status, order_status FROM booking WHERE no = :no", no=no) == \
+        {"cancel_by": "SITE", "refund_status": "FAIL", "order_status": "paid"}  # 본 사이트가 알려 준 '실패'가 그대로 남음
+
+
+def test_admin_cancel_refund_fail_retried(client):  # 이 서비스가 취소한 고객 취소(API-16)의 환불 실패는 B-07 이 그대로 다시 요청
+    set_booked(SITE_DEP, 0)
+    no = book_confirmed(client, SITE_DEP, 2)
+    oid = db1("SELECT order_id o FROM booking WHERE no = :no", no=no)["o"]
+    fake().fail_cancel[oid] = (502, "bad_gateway")
+    assert client.post(U + f"/admin/bookings/{no}/cancel", json={"cancelNote": "고객 요청"}, headers=ADMIN).json()["refundStatus"] == "FAIL"
+    del fake().fail_cancel[oid]
+    retry_refunds()
+    assert db1("SELECT cancel_by, refund_status FROM booking WHERE no = :no", no=no) == {"cancel_by": "USER", "refund_status": "DONE"}
 
 
 def test_site_cancel_op_cancel_state(client):
