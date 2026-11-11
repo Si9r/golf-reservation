@@ -103,6 +103,12 @@ export async function loadMe(): Promise<boolean> {
 const placeOf = (s: ApiBooking["stops"][number] | undefined): Place | null => // 서버는 예약 때 언어의 이름만 저장. 알려진 장소는 화면 언어로 표시
   s ? { name: PLACES.find((p) => p.name.ko === s.placeName || p.name.ja === s.placeName)?.name ?? { ko: s.placeName, ja: s.placeName }, kind: "spot", area: "SAPPORO", lat: Number(s.lat), lng: Number(s.lng), placeId: s.placeId ?? undefined, addr: s.address ?? undefined } as Place : null;
 
+// 서버는 시각을 UTC 로 줌 → 예약일은 일본 날짜로 (일본 아침 9시 전 예약이 전날로 보이지 않게, 11/11)
+const jstDate = (iso: unknown): string => {
+  const ms = Date.parse(String(iso));
+  return Number.isNaN(ms) ? String(iso).slice(0, 10) : new Date(ms + 9 * 3600e3).toISOString().slice(0, 10);
+};
+
 export function toBooking(b: ApiBooking): Booking {
   const pick = b.stops.find((s) => s.kind === "PICK");
   const drop = b.stops.find((s) => s.kind === "DROP");
@@ -117,7 +123,7 @@ export function toBooking(b: ApiBooking): Booking {
     pickMemo: pick?.memo ?? "", unit: b.unitPrice, singles: b.singles ?? undefined, total: b.total, currency: "JPY",
     info: { nameKo: rep?.nameLocal ?? "", nameEn: rep?.nameEn ?? "", cc: rep?.countryCode ?? "+82", phone: rep?.phone ?? "", email: rep?.email ?? "", companions: comps, agree: { cancel: true, shared: true } },
     status: b.status as Booking["status"], depStatus: b.departure.status as Booking["depStatus"], pickupTime: pick?.pickupTime ?? undefined,
-    refundStatus: b.refundStatus ?? undefined, createdAt: String(b.createdAt).slice(0, 10), lang: b.lang,
+    refundStatus: b.refundStatus ?? undefined, createdAt: jstDate(b.createdAt), lang: b.lang,
   };
 }
 
