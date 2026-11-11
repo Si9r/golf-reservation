@@ -29,6 +29,15 @@ export function Logo({ small }: { small?: boolean }) {
   );
 }
 
+// 본 사이트 로그아웃은 POST 만 받음 (GET 은 405, 테스트 서버 11/11 확인) → 폼을 만들어 전송. 본 사이트가 303 으로 첫 화면에 보냄
+function postLogout(url: string) {
+  const f = document.createElement("form");
+  f.method = "POST";
+  f.action = url;
+  document.body.appendChild(f);
+  f.submit();
+}
+
 function LangToggle() {
   const { lang, setLang } = useApp();
   return (
@@ -52,7 +61,7 @@ export function Header() {
   const demoLogout = useAuth((s) => s.logout);
   const [confirm, setConfirm] = useState(false);
   // 로그아웃: 본 사이트 로그아웃(partner 모드, /me 의 logoutUrl). 없으면 데모 로그아웃 (골프 쪽 로그아웃 화면은 없음)
-  const logout = () => (logoutUrl ? window.location.assign(logoutUrl) : demoLogout());
+  const logout = () => (logoutUrl ? postLogout(logoutUrl) : demoLogout());
   const goHome = () => {
     if (isBookingPath(loc.pathname)) setConfirm(true);
     else nav("/golf");

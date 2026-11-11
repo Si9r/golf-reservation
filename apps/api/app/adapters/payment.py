@@ -13,10 +13,16 @@ def return_url(booking_no: str) -> str:
     return env.PAYMENT_RETURN_URL.format(no=booking_no)
 
 
+def _user_id_value(user_id: str) -> int | str:
+    """본 사이트 회원 번호는 숫자. 문자열("5")로 보내면 테스트 서버가 400 'body is not valid JSON' 으로 거부 (11/11 확인).
+    골프 DB(member_id)에는 문자열로 두고, 보낼 때만 숫자로. 숫자가 아닌 값(가짜 본 사이트 M0001 등)은 그대로"""
+    return int(user_id) if user_id.isdigit() else user_id
+
+
 def create_order(*, reference: str, amount: int, title_ja: str, title_ko: str, user_id: str, departure_date: str, heads: int, return_url: str) -> dict:
     """POST /api/partner/orders. 같은 reference 로 이미 주문이 있으면(409 duplicate_reference) 응답 안의 기존 주문을 그대로 씀"""
     body = {"reference": reference, "amount": amount, "title": {"ja": title_ja, "ko": title_ko},  # [가정] title 다국어 객체, ja 필수
-            "user_id": user_id, "return_url": return_url, "departure_date": departure_date, "heads": heads}
+            "user_id": _user_id_value(user_id), "return_url": return_url, "departure_date": departure_date, "heads": heads}
     try:
         return partner.create_order(body)
     except PartnerError as e:

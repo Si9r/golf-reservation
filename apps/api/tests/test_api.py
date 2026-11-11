@@ -732,6 +732,17 @@ def test_partner_wrong_key_401(client, monkeypatch):  # 본 사이트가 잘못�
     assert db1("SELECT status, order_id FROM booking WHERE no = :no", no=no) == {"status": "PENDING_PAYMENT", "order_id": None}
 
 
+def test_order_user_id_sent_as_number(monkeypatch):  # 본 사이트 회원 번호는 숫자로 보냄 (문자열이면 테스트 서버가 400 body is not valid JSON, 11/11)
+    from app.adapters import payment
+
+    sent = []
+    monkeypatch.setattr(payment.partner, "create_order", lambda b: sent.append(b) or {"order_id": "O1", "status": "pending"})
+    kw = dict(reference="GT-1", amount=1000, title_ja="t", title_ko="t", departure_date="2027-04-27", heads=1, return_url="http://x")
+    payment.create_order(user_id="5", **kw)
+    payment.create_order(user_id="M0001", **kw)  # 가짜 본 사이트 회원은 그대로
+    assert [b["user_id"] for b in sent] == [5, "M0001"]
+
+
 def test_refund_unpaid_order_refused(client):  # 미결제 주문 환불 → 본 사이트 409 refused → refund_status FAIL + 운영자 알림 (취소는 그대로 처리)
     set_booked(SITE_DEP, 0)
     no = book_confirmed(client, SITE_DEP, 2)

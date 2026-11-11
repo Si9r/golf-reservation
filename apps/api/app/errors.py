@@ -53,7 +53,7 @@ def install(app: FastAPI) -> None:
     async def _partner(_: Request, e: PartnerError):
         import logging
 
-        logging.getLogger("golf.partner").warning("partner error %s %s", e.status, e.code)
+        logging.getLogger("golf.partner").warning("partner error %s %s %s", e.status, e.code, e.body)  # 본 사이트 응답 본문 (어떤 칸이 틀렸는지 등)
         return _body("E-PARTNER", extra={"partnerError": e.code})
 
     @app.exception_handler(RequestValidationError)

@@ -6,6 +6,10 @@ os.environ["FIXED_TODAY"] = "2026-10-19"
 os.environ["ADMIN_KEY"] = "test-admin"
 os.environ["SITE_KEY"] = "test-site"
 os.environ["MAIL_BACKEND"] = "log"  # .env 에 smtp 가 있어도 테스트는 실제로 보내지 않음
+os.environ["PAYMENT_BACKEND"] = "fake"  # .env 가 partner(테스트 서버 연결 시험 중)여도 테스트는 가짜 본 사이트
+os.environ["LOGIN_URL"] = "/login"  # .env 에 본 사이트 주소를 넣어도 테스트 기대값은 기본값
+os.environ["LOGOUT_URL"] = "/logout"
+os.environ["PAYMENT_RETURN_URL"] = "http://localhost:8787/#/golf/payment/return?no={no}"
 
 import pytest  # noqa: E402
 from alembic import command  # noqa: E402
