@@ -5,13 +5,13 @@ import { ArrowCounterClockwise, HourglassMedium, WarningCircle } from "@phosphor
 import { useT } from "../i18n";
 import { useDb, useDraft } from "../store";
 import { Anno, ScreenTag } from "../components/ui";
-import { USE_API, api } from "../api/client";
+import { ApiError, USE_API, api } from "../api/client";
 import { refreshMonth, toBooking } from "../api/sync";
 
 const RETRY_MS = 30_000; // 결제 대기(pending·authenticating)면 30초 간격으로
 const RETRIES = 3; // 3번 더 확인하고, 그래도 대기면 '확인 중' 안내 (확정은 B-08 결제 확인 배치가 이어서)
 
-type View = "checking" | "pending" | "unpaid" | "canceled";
+type View = "checking" | "pending" | "unpaid" | "canceled" | "notfound";
 
 // 결제 결과 (본 사이트 결제창에서 돌아오는 화면, return_url = #/golf/payment/return?no=예약번호).
 // API-21 로 서버에 결과를 물음: 확정 → S-11 / 미결제 → 출발일 다시 고르기 / 대기 → 30초 × 3번 다시 확인 후 '확인 중'
@@ -40,7 +40,11 @@ export default function PayReturn() {
         else if (r.status === "OP_CANCEL") setView("canceled"); // 결제 사이 운행 취소 → 서버가 전액 환불
         else again();
       })
-      .catch(again); // 연동 오류도 대기와 같게 다시 확인 (로그인 만료 401 은 client.ts 가 로그인으로 보냄)
+      .catch((e) => {
+        // 없는 예약(404)·남의 예약(403)은 기다려도 안 바뀜 → 바로 안내. 그 밖(통신 오류 등)은 대기와 같게 다시 확인 (로그인 만료 401 은 client.ts 가 로그인으로 보냄)
+        if (e instanceof ApiError && (e.status === 404 || e.status === 403)) setView("notfound");
+        else again();
+      });
   };
   const again = () => {
     if (tries.current >= RETRIES) return setView("pending");
@@ -86,6 +90,12 @@ export default function PayReturn() {
             <p className="max-w-[420px] text-[14px] leading-relaxed text-ink-2">{t(view === "unpaid" ? "payFailD" : "payCanceledD")}</p>
           </>
         )}
+        {view === "notfound" && (
+          <>
+            <span className="grid h-[64px] w-[64px] place-items-center rounded-full bg-surface-2 text-muted"><WarningCircle size={34} weight="fill" /></span>
+            <h1 className="text-[22px] font-bold">{t("notFound")}</h1>
+          </>
+        )}
       </section>
 
       {view !== "checking" && (
@@ -97,6 +107,7 @@ export default function PayReturn() {
             </>
           )}
           {view === "unpaid" && <button className="btn btn-primary w-full" onClick={reselect}>{t("expiredLink")}</button>}
+          {view === "notfound" && <button className="btn btn-primary w-full" onClick={() => nav("/golf/my", { replace: true })}>{t("myBookings")}</button>}
           <button className="btn btn-ghost w-full" onClick={() => nav("/golf", { replace: true })}>{t("golfHomeBtn")}</button>
         </section>
       )}

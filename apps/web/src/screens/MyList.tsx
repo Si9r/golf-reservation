@@ -45,6 +45,7 @@ export default function MyList() {
 
   // 공통 계산: D-day, 상태 문장·모집 막대, 승차·일정·숙소 표시
   const dday = (b: Booking) => {
+    if (b.status !== "CONFIRMED") return ""; // 취소·완료된 예약은 D-day 없음 (11/11)
     const d = Math.round((Date.parse(b.dep) - Date.parse(todayISO())) / 864e5);
     return d > 0 ? `D-${d}` : d === 0 ? "D-DAY" : "";
   };
@@ -99,7 +100,7 @@ export default function MyList() {
           <button onClick={() => open(r.b)} className="relative h-[88px] overflow-hidden rounded-xl lg:h-[120px]" aria-label={n(r.v.p.name)}><Img src={r.v.p.photos[0]} alt={n(r.v.p.name)} className="absolute inset-0 h-full w-full" /></button>
           <div className="grid min-w-0 content-start gap-1.5">
             <button onClick={() => open(r.b)} className="text-left text-[16px] font-black leading-snug hover:text-brand lg:text-[18px]">
-              {dday(r.b) && <span className="num mr-1.5 align-middle text-[12px] font-black text-brand">{dday(r.b)}</span>}{n(r.v.p.name)}
+              {dday(r.b) && <span className="num mr-1.5 align-middle text-[12px] font-black text-brand">{dday(r.b)}</span>}<span className={r.v.tab === "cancel" ? "line-through decoration-2 text-muted" : ""}>{n(r.v.p.name)}</span>
             </button>
             <span className="num text-[13.5px] text-ink-2">{dates(r)}{dot()}{t("peopleN", { n: r.b.people })}</span>
             <span className="hidden text-[13.5px] text-ink-2 lg:block"><span className="text-muted">{t("pick")}</span> {pickTxt(r.b)}{dot()}<span className="text-muted">{t("rowHotel")}</span> {hotelTxt(r)}</span>

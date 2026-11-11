@@ -10,7 +10,7 @@ import { useDrive } from "../gmaps";
 import { GoalMeter, ItinList } from "./Detail";
 import { PriceDetail } from "../components/booking";
 import { joinEn, splitEn, tooLongEn, upper, validPart } from "./InfoForm";
-import { USE_API, api } from "../api/client";
+import { ApiError, USE_API, api } from "../api/client";
 import { toBooking, useApiVersion } from "../api/sync";
 
 export default function MyDetail() {
@@ -49,21 +49,23 @@ export default function MyDetail() {
   const v = viewOf(b, extra);
   const hotel = stayHotel(p, b.opt);
   const opt = optionOf(b.opt);
-  const confirmedPickup = v.dep === "GO" || v.status === "DONE" ? b.pickupTime ?? pickupWindow(p, b.pick, pickDrive.drive?.min)?.exact ?? null : null;
-  const itin = itinerary(p, b.opt, b.pick, b.drop, { confirmedPickup });
+  // 승차 시간은 운영자가 등록한 값(API-17)만 보여 줌. 등록 전에는 계산값을 보이지 않고 '메일로 안내' (11/10 팀 결정, TBD-35)
+  const confirmedPickup = v.dep === "GO" || v.status === "DONE" ? b.pickupTime ?? null : null;
+  const itin = itinerary(p, b.opt, b.pick, b.drop, { confirmedPickup, noPickup: v.label === "OP_CANCEL" || v.label === "USER_CANCEL" });
   const due = addDays(b.dep, -SET.COMPANION_DUE_DAYS);
   const alive = v.status === "CONFIRMED";
   const canEdit = alive && todayISO() <= due; // 명단 마감 전, 살아 있는 예약만 (E-DUE)
-  const setDemo = (k: "open" | "go" | "cancel" | "user" | "done") => {
+  const setDemo = (k: "open" | "go0" | "go" | "cancel" | "user" | "done") => {
     const patch: Partial<Booking> =
       k === "open" ? { status: "CONFIRMED", depStatus: "OPEN", cancelBy: undefined, refundStatus: undefined, pickupTime: undefined } :
-      k === "go" ? { status: "CONFIRMED", depStatus: "GO", cancelBy: undefined, refundStatus: undefined, pickupTime: pickupWindow(p, b.pick, pickDrive.drive?.min)?.exact } :
+      k === "go0" ? { status: "CONFIRMED", depStatus: "GO", cancelBy: undefined, refundStatus: undefined, pickupTime: undefined } :
+      k === "go" ? { status: "CONFIRMED", depStatus: "GO", cancelBy: undefined, refundStatus: undefined, pickupTime: pickupWindow(p, b.pick, pickDrive.drive?.min)?.exact } : // 데모용 등록 시간 (실제는 운영자가 등록)
       k === "cancel" ? { status: "OP_CANCEL", depStatus: "CANCEL", cancelBy: "OP", refundStatus: "REQUESTED", canceledAt: todayISO() } :
       k === "user" ? { status: "USER_CANCEL", depStatus: undefined, cancelBy: "USER", refundStatus: "REQUESTED", canceledAt: todayISO() } :
       { status: "DONE", depStatus: "DONE" };
     update(b.no, patch);
   };
-  const demoOn = (k: string) => (k === "open" ? v.label === "OPEN" || v.label === "ENOUGH" : k === "go" ? v.label === "GO" : k === "cancel" ? v.label === "OP_CANCEL" : k === "user" ? v.label === "USER_CANCEL" : v.label === "DONE");
+  const demoOn = (k: string) => (k === "open" ? v.label === "OPEN" || v.label === "ENOUGH" : k === "go0" ? v.label === "GO" && !b.pickupTime : k === "go" ? v.label === "GO" && !!b.pickupTime : k === "cancel" ? v.label === "OP_CANCEL" : k === "user" ? v.label === "USER_CANCEL" : v.label === "DONE");
 
   const draft: [string, string][] = comps ?? Array.from({ length: b.people - 1 }, (_, i) => (b.info.companions[i] ? splitEn(b.info.companions[i]) : ["", ""]));
   const draftOk = draft.every((x) => x.every(validPart) && !tooLongEn(x));
@@ -94,8 +96,9 @@ export default function MyDetail() {
     if (USE_API) {
       try {
         await api.saveCompanions(b.no, names);
-      } catch {
-        toast(t("M-900"));
+      } catch (e) {
+        const code = e instanceof ApiError ? e.body.error : "";
+        toast(t(code === "E-DUE" ? "compLocked" : code === "E-VALID" ? "M-162" : "M-900")); // 마감 지남 · 이름 규칙 · 그 밖(통신 오류). 기존 문구 재사용 (11/11)
         return;
       }
     }
@@ -152,7 +155,7 @@ export default function MyDetail() {
           <div className="mt-3 grid gap-2 rounded-2xl border border-dashed p-3" style={{ borderColor: "var(--anno)" }}>
             <span className="text-[12.5px] font-bold" style={{ color: "var(--anno)" }}>{t("demoState")}</span>
             <div className="flex flex-wrap gap-1.5">
-              {(["open", "go", "cancel", "user", "done"] as const).map((k) => (
+              {(["open", "go0", "go", "cancel", "user", "done"] as const).map((k) => (
                 <button key={k} className="fchip" data-on={demoOn(k)} onClick={() => setDemo(k)}>{t(`demo_${k}`)}</button>
               ))}
             </div>
@@ -179,7 +182,7 @@ export default function MyDetail() {
                       <b className="block">{pl ? n(pl.name) : "-"}</b>
                       {k === "pick" && b.pickMemo && <span className="block text-[13px] text-ink-2">{t("reqL")}{dot()}{b.pickMemo}</span>}
                       <span className="block text-[12.5px]">
-                        {k === "pick" ? (confirmedPickup ? <b className="text-ok">{t("pickupConfirmed", { t: `${fShort(b.dep, L)} ${confirmedPickup}` })}</b> : <span className="text-muted">{t("M-205")}</span>) : <span className="text-muted">{t("dropDay", { d: fShort(tripEnd(p, b.dep), L) })}</span>}
+                        {k === "pick" ? (confirmedPickup ? <b className="text-ok">{t("pickupConfirmed", { t: `${fShort(b.dep, L)} ${confirmedPickup}` })}</b> : <span className="text-muted">{v.label === "DONE" || v.label === "OP_CANCEL" || v.label === "USER_CANCEL" ? "-" : t(v.label === "GO" ? "M-201" : "M-205")}</span>) : <span className="text-muted">{t("dropDay", { d: fShort(tripEnd(p, b.dep), L) })}</span>}
                       </span>
                       {pl && <a className="link mt-0.5 inline-flex items-center gap-1 text-[13px]" href={gmapLink(pl.placeId ? n(pl.name) : `${pl.lat},${pl.lng}`, pl.placeId)} target="_blank" rel="noreferrer">{t("openApp")} <ArrowSquareOut size={13} /></a>}
                     </span>

@@ -80,6 +80,7 @@ export default function Pay() {
           setPaying(false);
           const code = e instanceof ApiError ? e.body.error : "";
           if (code === "E-HOLD" || code === "E-CLOSED") { useDraft.setState({ pendingNo: null, holdUntil: 0 }); setLeft(0); } // 좌석 확보 만료 → 출발일 다시 고르기
+          else if (code === "E-STATE") { useDraft.setState({ pendingNo: null, holdUntil: 0 }); setLeft(0); } // 다른 탭에서 새 예약을 만들어 이 예약은 끝남 → 만료와 같게 출발일 다시 고르기 (11/11)
           else setError("M-173"); // 본 사이트 연동 오류 등: 결제 화면에 머묾 (T-18)
         });
       return;

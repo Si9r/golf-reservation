@@ -250,8 +250,8 @@ const leaveAt = (tee: string, from: { lat: number; lng: number }, fromArea: Area
   return fmtMin(Math.floor((toMin(tee) - travel - SET.PICK_MARGIN_MIN) / step) * step);
 };
 // L-11 일정표 만들기. 첫날 승차는 운영이 등록(API-17)한 확정 시간, 없으면 '확정 후' (희망 승하차 시간은 받지 않음, 팀 결정 11/05)
-export const itinerary = (p: Pkg, optId: string | null, pick: Place | null, drop: Place | null, o: { confirmedPickup?: string | null } = {}) => {
-  const { confirmedPickup } = o;
+export const itinerary = (p: Pkg, optId: string | null, pick: Place | null, drop: Place | null, o: { confirmedPickup?: string | null; noPickup?: boolean } = {}) => {
+  const { confirmedPickup, noPickup } = o; // noPickup: 취소된 예약 — 승차 시간 안내 없음 (11/11)
   const h = stayHotel(p, optId);
   const hAt = h ? { lat: h.lat, lng: h.lng } : undefined;
   const pAt = pick ? { lat: pick.lat, lng: pick.lng } : undefined;
@@ -261,7 +261,7 @@ export const itinerary = (p: Pkg, optId: string | null, pick: Place | null, drop
   const last = p.days.length - 1;
   return p.days.map((r, i) => {
     const items: ItinItem[] = [];
-    if (i === 0) items.push({ kind: "bus", at: pAt, time: confirmedPickup ?? undefined, tbd: !confirmedPickup, title: { ko: `버스 승차 · ${pickName.ko}`, ja: `バス乗車・${pickName.ja}` }, note: { ko: "확정 시간은 메일로 안내", ja: "確定時刻はメールでご案内" } });
+    if (i === 0) items.push({ kind: "bus", at: pAt, time: confirmedPickup ?? undefined, tbd: !confirmedPickup && !noPickup, title: { ko: `버스 승차 · ${pickName.ko}`, ja: `バス乗車・${pickName.ja}` }, ...(confirmedPickup || noPickup ? {} : { note: { ko: "확정 시간은 메일로 안내", ja: "確定時刻はメールでご案内" } }) });
     else if (h && !h.onsite) items.push({ kind: "bus", at: hAt, time: r ? leaveAt(r.tee, h, h.area, courseOf(r.course)) : "09:00", title: { ko: `${h.name.ko} 출발`, ja: `${h.name.ja} 出発` } });
     else if (!h && i > 0) items.push({ kind: "bus", at: pAt, time: r && pick ? leaveAt(r.tee, pick, placeZone(pick), courseOf(r.course)) : "09:00", title: { ko: `버스 승차 · ${pickName.ko}`, ja: `バス乗車・${pickName.ja}` } });
     if (r) {
