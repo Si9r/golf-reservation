@@ -71,16 +71,9 @@ export const AREA_NAME: Record<Area, L2> = {
 };
 
 // 승하차 가능 범위 SERVICE_AREA: 중심 반경 5km (운영사 확정 10/29). 값은 packages/shared settings.ts SERVICE_AREA (서버 settings.py·service_area 와 같음)
-// 공항 포함 여부는 회사 확인 필요 → 설계 도구에서 '넓은 범위'(이전 프로토타입: 기타히로시마·치토세·공항 포함)로 비교
 export type ZoneCircle = { zone: Zone; lat: number; lng: number; r: number };
 export const ZONES_STRICT: ZoneCircle[] = [{ zone: SETTINGS.SERVICE_AREA.id, lat: SETTINGS.SERVICE_AREA.lat, lng: SETTINGS.SERVICE_AREA.lng, r: SETTINGS.SERVICE_AREA.r }];
-export const ZONES_WIDE: ZoneCircle[] = [
-  { zone: "SAPPORO", lat: 43.055, lng: 141.375, r: 13000 },
-  { zone: "KITAHIROSHIMA", lat: 42.98, lng: 141.56, r: 7000 },
-  { zone: "CHITOSE", lat: 42.805, lng: 141.67, r: 6000 },
-];
-export const serviceArea = { wide: false };
-export const activeZones = () => (serviceArea.wide ? ZONES_WIDE : ZONES_STRICT);
+export const activeZones = () => ZONES_STRICT;
 
 export interface Course {
   id: number;

@@ -1,25 +1,16 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import { PKGS, SET, serviceArea, type Lang, type Place } from "./data";
+import { PKGS, SET, type Lang, type Place } from "./data";
 import { mapsLangDiffers } from "./gmaps";
 import { USE_API, api } from "./api/client";
 import { syncToken } from "./api/sync";
 import { addDays, booked, departuresIn, judgeDate, monthsAhead, todayISO, tripEnd, type Extra, type SearchFilters } from "./logic";
 
-// ---------- 앱 설정 (언어·테마·프로토타입 도구) ----------
-// 설계·데모 도구 (설계 버튼·시트, 설계 번호·Q·단계 배지, 데모 로그인·결제 결과·상태 바꾸기): 실서비스 빌드에서는 숨김 (팀 결정 10/29).
-// VITE_DESIGN_TOOLS=1 이면 켬, 0 이면 끔, 비우면 개발 서버(npm run dev)에서만 켬
-export const DESIGN_TOOLS = import.meta.env.VITE_DESIGN_TOOLS ? import.meta.env.VITE_DESIGN_TOOLS === "1" : import.meta.env.DEV;
+// ---------- 앱 설정 (언어·테마) ----------
 export type Theme = "system" | "light" | "dark";
-export type PayResult = "ok" | "fail" | "soldout";
 interface AppState {
   lang: Lang;
   theme: Theme;
-  anno: boolean; // 설계 번호·확인 필요(Q) 표시
-  stage: 1 | 2 | 3; // MVP 단계 미리보기
-  failNext: boolean; // 다음 불러오기에서 통신 오류 (C-09 데모)
-  payResult: PayResult; // 다음 결제 결과 (성공 / 실패 E-PAY / 결제 후 자리 없음 E-SOLDOUT)
-  wideArea: boolean; // 승하차 범위: false = 삿포로 중심 반경 (SETTINGS.SERVICE_AREA), true = 넓은 범위(공항 포함, 확인 필요)
   setLang: (l: Lang) => void;
   set: (p: Partial<AppState>) => void;
 }
@@ -29,27 +20,18 @@ export const useApp = create<AppState>()(
     (set) => ({
       lang: initialLang(),
       theme: "system",
-      anno: false,
-      stage: 3,
-      failNext: false,
-      payResult: "ok",
-      wideArea: false,
       setLang: (lang) => {
         set({ lang });
         if (mapsLangDiffers(lang)) window.setTimeout(() => window.location.reload(), 30); // 지도 언어까지 바꾸려면 다시 불러옴 (고른 내용은 저장소에 남음)
       },
-      set: (p) => {
-        if (p.wideArea !== undefined) serviceArea.wide = p.wideArea;
-        set(p);
-      },
+      set: (p) => set(p),
     }),
     {
       name: "golf-app",
-      version: 2,
-      migrate: (old) => ({ ...(old as object), payResult: "ok", wideArea: false }) as AppState,
-      onRehydrateStorage: () => (st) => {
-        if (st) serviceArea.wide = st.wideArea;
-      },
+      version: 3,
+      // 예전 저장값(설계 도구 설정)은 버리고 언어·테마만 남김
+      migrate: (old) => ({ lang: (old as Partial<AppState>)?.lang ?? initialLang(), theme: (old as Partial<AppState>)?.theme ?? "system" }) as AppState,
+      partialize: (st) => ({ lang: st.lang, theme: st.theme }),
     },
   ),
 );

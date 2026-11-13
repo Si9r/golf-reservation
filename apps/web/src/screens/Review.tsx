@@ -6,7 +6,7 @@ import { SET } from "../data";
 import { useT, dot, to } from "../i18n";
 import { useDb } from "../store";
 import { addDays, depView, fDayLong, fShort, hasHotelStep, itinerary, judgeDate, optionOf, stayHotel, totalPrice, tripEnd, yen } from "../logic";
-import { Anno, BottomBar, Collapse, Img, PriceBlock, Q, ScreenTag, Sheet, StepHead } from "../components/ui";
+import { BottomBar, Collapse, Img, PriceBlock, Sheet, StepHead } from "../components/ui";
 import { ItinList, Meter } from "./Detail";
 import { PriceDetail } from "../components/booking";
 import { useFlow } from "./flow";
@@ -77,7 +77,6 @@ export default function Review() {
 
   return (
     <div className="page step">
-      <ScreenTag id="S-08" name="비용 확인" refs="FN-16~18, FN-32 · L-04, L-05, L-11 · API-07 · T-14, T-28" />
       <StepHead at={3} hasHotel={hasHotelStep(p)} onBack={() => nav("/golf/book/place")} />
       <h1 className="mb-4 text-[22px] font-bold">{t("s08T")}</h1>
 
@@ -94,7 +93,6 @@ export default function Review() {
         <div className="grid gap-3 lg:gap-4">
           {/* 1 예약 요약: 사진 위에 패키지, 아래에 일정·인원·숙박·승하차 줄 (줄마다 '변경') */}
           <section className="relative overflow-hidden rounded-[20px] bg-surface shadow-[var(--shadow)]">
-            <Anno n={1} t="예약 내용 요약: 사진 카드(이름) + 일정·인원 / 숙박 / 승차 / 하차 줄별 '변경' → S-03/S-05/S-06 → S-08 복귀 (T-28)" />
             <div className="relative h-[180px] lg:h-[220px]">
               <Img src={p.photos[0]} alt={n(p.name)} className="absolute inset-0 h-full w-full" />
               <span className="absolute inset-0 bg-gradient-to-b from-transparent from-30% to-black/80" />
@@ -123,7 +121,6 @@ export default function Review() {
 
           {/* 5 일정표 (기본 펼침) */}
           <section className="relative card overflow-hidden rounded-[20px]">
-            <Anno n={5} t="일정표 (L-11): 고른 날짜·승차·하차 장소가 들어간 일정 (기본 펼침) + 구간 이동 시간" />
             <button className="flex w-full items-center justify-between px-4 py-3.5 text-left" aria-expanded={itinOpen} onClick={() => setItinOpen(!itinOpen)}>
               <b className="text-[14.5px]">{t("rvItin", { n: itin.length })}</b>
               <CaretDown size={16} className={`transition-transform ${itinOpen ? "rotate-180" : ""}`} />
@@ -151,7 +148,6 @@ export default function Review() {
         <div className="grid gap-3 lg:sticky lg:top-32">
           {/* 4 출발 조건 (최소 인원 안내 + 현황을 한 상자로, '판정일' 대신 문장) */}
           <section className="relative rounded-[20px] border-[1.5px] p-4 lg:p-5" style={{ background: "var(--warn-soft)", borderColor: "var(--warn-line)" }}>
-            <Anno n={3} t="출발 조건 (M-150 + L-04 현황): 남은 인원·막대·확정 날짜와 미달 시 전액 환불을 한 상자로" />
             <h2 className="flex items-center gap-2 text-[16px] font-extrabold text-warn lg:text-[18px]"><UsersThree size={20} weight="fill" /> {need > 0 ? t("rvNeed", { n: need }) : full ? t("rvFull", { m: SET.BUS_SEATS }) : t("mdEnoughT")}</h2>
             <div className="my-2.5"><Meter now={v.booked} add={Math.min(d.people, v.seats)} /></div>
             <p className="text-[13px] text-ink-2 lg:text-[14px]">{need > 0 ? t("M-121", { a: v.booked, b: d.people, t: v.sum, m: SET.MIN_DEPARTURE }) : t("countOkOurs", { t: v.sum, b: d.people })}</p>
@@ -160,11 +156,10 @@ export default function Review() {
 
           {/* 2 요금 (L-05) */}
           <section className="relative card rounded-[20px] border-[1.5px] p-4 shadow-[var(--shadow-lg)] lg:p-5" style={{ borderColor: "var(--brand)" }}>
-            <Anno n={2} t="요금 (L-05): 패키지 × 인원, 호텔 옵션 × 인원, 1인실 추가 × 1인실 인원, 버스 '포함', 총액" />
             <p className="mb-2 text-[13px] font-bold text-brand lg:text-[14px]">{t("rvPayT")}</p>
             <PriceDetail p={p} opt={d.opt} people={d.people} singles={d.singles} />
             <div className="mt-3 flex items-baseline justify-between border-t border-line pt-3">
-              <span className="text-[14px] font-semibold">{t("totalL", { n: d.people })} <Q id="Q-08" t="가격·통화 (JPY 가정)" /></span>
+              <span className="text-[14px] font-semibold">{t("totalL", { n: d.people })}</span>
               <span className="num text-[24px] font-extrabold text-brand lg:text-[30px]">{yen(total)}</span>
             </div>
             <p className="mt-1 text-right text-[12px] text-muted">{t("unitL")} {yen(unit)}</p>
@@ -175,7 +170,6 @@ export default function Review() {
           {/* 6 로그인 안내 */}
           {!user && (
             <p className="relative flex gap-2 rounded-2xl bg-brand-soft p-3 text-[13px] text-ink">
-              <Anno n={6} t="로그인 안내 (M-151): 로그인 안 했을 때만" />
               <Info size={18} className="flex-none text-brand" />
               {t("M-151")}
             </p>
@@ -184,7 +178,6 @@ export default function Review() {
       </div>
 
       <BottomBar pcHidden>
-        <span className="absolute -top-3 left-3"><Anno n={7} t="하단: 로그인 안 했으면 '로그인하고 예약' → 메인 사이트 로그인 → S-09, 했으면 '정보 입력하기' → S-09. 잔여석 < 인원이면 비활성 (M-120), 같은 출발편 예약이 있으면 확인 창 (M-152)" /></span>
         <PriceBlock main={yen(total)} sub={`${t("totalL", { n: d.people })}${dot()}${t("busIncl")}`} />
         <button className="btn btn-primary min-w-[140px]" disabled={seatErr} onClick={proceed}>{user ? t("rvGoInfo") : t("rvGoLogin")}</button>
       </BottomBar>
@@ -202,7 +195,6 @@ export default function Review() {
         }
       >
         <div className="relative grid gap-3 text-[15px] leading-relaxed">
-          <Anno n={8} t="중복 예약 확인 (EV-28 ④, M-152): 기존 예약번호·인원, 버튼 3개 — 기존 예약 보기(S-13) / 다른 일행으로 계속(S-09) / 닫기 (T-2 팀 결정 대기)" />
           {dupB && <p className="num rounded-xl bg-surface-2 px-4 py-3 font-bold">{t("dupInfo", { no: dupB.no, n: dupB.people })}</p>}
           {t("M-152", { d: fShort(dep, L), p: n(pkgOf(p.id)!.name) }).split(/(?<=\D[.。])\s*/).filter(Boolean).map((x) => <p key={x}>{x}</p>)}
         </div>

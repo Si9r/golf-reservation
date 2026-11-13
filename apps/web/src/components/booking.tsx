@@ -7,7 +7,7 @@ import { useDb } from "../store";
 import {
   addMonths, daysInMonth, dow, dowNames, fMonth, fShort, inClosed, inSeason, judgeDate, monthInSeason, monthsAhead, optionOf, pkgCountOn, roomsOf, rounds, stayHotel, todayISO, totalPrice, ymOf, yen, yenDiff,
 } from "../logic";
-import { Anno, Img, PeopleInput, Sheet } from "./ui";
+import { Img, PeopleInput, Sheet } from "./ui";
 import { useCalendar } from "../api/sync";
 
 // ---------- 달력 ----------
@@ -106,7 +106,6 @@ export function DatePeopleSheet({ open, onClose, date, people, peopleSet, onDone
       }
     >
       <div className="relative">
-        <Anno n="S-01 #3" t="출발일 선택 (필수): 날짜 칸에 그날 출발 가능한 패키지 수, 휴장기(11/16~4/19) 날짜는 '휴장', 판정일이 지나 고를 수 없는 날은 '마감' (M-110)" />
         {/* 7 (팀 테스트 10/23): 휴장기에 걸친 달은 왜 막혀 있는지 한 줄 안내 */}
         {[11, 12, 1, 2, 3, 4].includes(Number(ym.slice(5))) && (
           <p className="mb-2 flex items-start gap-1.5 rounded-xl bg-surface-2 px-3 py-2 text-[13px] text-ink-2"><Snowflake size={16} className="mt-0.5 flex-none text-brand" />{t("closedNote")}</p>
@@ -131,7 +130,7 @@ export function DatePeopleSheet({ open, onClose, date, people, peopleSet, onDone
         {count !== null && <p className="mt-2 text-[13.5px] font-bold text-brand">{t("M-111", { n: count })}</p>}
       </div>
       <div className="mt-4">
-        <PeopleInput label={t("people")} value={n} unset={!nSet} onChange={(x) => { setN(x); setNSet(true); }} anno={<Anno n="S-01 #4" t="인원 (V-02, 1~20명)" />} />
+        <PeopleInput label={t("people")} value={n} unset={!nSet} onChange={(x) => { setN(x); setNSet(true); }} />
       </div>
     </Sheet>
   );

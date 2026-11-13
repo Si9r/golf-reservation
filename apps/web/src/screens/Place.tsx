@@ -2,14 +2,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
 import { Airplane, Bed, Buildings, Bus, CheckCircle, GoogleLogo, MagnifyingGlass, MapPin, Train, WarningCircle, X } from "@phosphor-icons/react";
-import { AREA_NAME, PLACES, SET, ZONES_STRICT, courseOf, serviceArea, type Place as P, type PlaceKind } from "../data";
+import { AREA_NAME, PLACES, SET, ZONES_STRICT, courseOf, type Place as P, type PlaceKind } from "../data";
 import { useT, dot } from "../i18n";
 import { hasHotelStep, nearestKnown, norm, placeZone, stayHotel, zoneAt } from "../logic";
-import { Anno, BottomBar, Q, ScreenTag, StepHead } from "../components/ui";
+import { BottomBar, StepHead } from "../components/ui";
 import { DriveChip, MapView, type MapMarker } from "../components/GoogleMap";
 import { useMaps, type LL } from "../gmaps";
 import { editBackTo, useFlow } from "./flow";
-import { useApp } from "../store";
 import { USE_API, api } from "../api/client";
 import { useSeatGuard } from "../api/seatCheck";
 
@@ -47,7 +46,6 @@ const fromGoogle = (gp: google.maps.places.Place, fallbackName: string, L: "ko" 
 export default function Place() {
   const { t, n, L } = useT();
   const nav = useNavigate();
-  const anno = useApp((s) => s.anno);
   const { d, p, redirect } = useFlow();
   const { ready } = useMaps(L);
   const [tab, setTab] = useState<"pick" | "drop">(d.pick && !d.drop && !d.dropSame ? "drop" : "pick");
@@ -93,7 +91,7 @@ export default function Place() {
             .map((s) => s.placePrediction)
             .filter((x): x is google.maps.places.PlacePrediction => !!x)
             .slice(0, 8)
-            .map((x) => ({ id: x.placeId, main: x.mainText?.text ?? x.text.text, sub: x.secondaryText?.text ?? "", station: (x.types ?? []).some((y) => STATION_TYPES.includes(y)), inArea: serviceArea.wide || x.distanceMeters == null ? null : x.distanceMeters <= c.r })),
+            .map((x) => ({ id: x.placeId, main: x.mainText?.text ?? x.text.text, sub: x.secondaryText?.text ?? "", station: (x.types ?? []).some((y) => STATION_TYPES.includes(y)), inArea: x.distanceMeters == null ? null : x.distanceMeters <= c.r })),
         );
       } catch {
         if (alive) setSugs([]);
@@ -275,7 +273,6 @@ export default function Place() {
   const dropShown = d.dropSame ? d.pick : d.drop;
   const tabsEl = (compact: boolean) => (
     <div className={`relative grid grid-cols-2 gap-1 rounded-xl p-1 ${compact ? "bg-surface/95 shadow-md backdrop-blur" : "mb-2 bg-surface-2"}`} role="tablist">
-      <Anno n={1} t="승차/하차 탭: 각 탭에 지정한 장소명 또는 '아직 정하지 않았어요'" />
       {(["pick", "drop"] as const).map((k) => {
         const pl = k === "pick" ? d.pick : dropShown;
         return (
@@ -292,14 +289,12 @@ export default function Place() {
   );
   const sameEl = (
     <label className="relative flex min-h-[44px] items-center gap-3 text-[14.5px] font-semibold">
-      <Anno n={2} t="하차 탭에만 표시. 하차도 승차와 같은 곳 (기본 체크): 체크하면 하차 = 승차" />
       <input type="checkbox" className="check" checked={d.dropSame} onChange={(e) => toggleSame(e.target.checked)} />
       {t("dropSame")}
     </label>
   );
   const searchEl = (
     <div ref={placeRef} className="relative">
-      <Anno n={3} t="장소 검색 (Google Places I-02): 한·일·영, 결과에 '시내 / 시내 밖' 표시 (V-10, M-140, M-141)" />
       <label className="relative block">
         <span className="sr-only">{t("placeSearch")}</span>
         <MagnifyingGlass size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
@@ -337,7 +332,6 @@ export default function Place() {
   );
   const chipsEl = (
     <div className="relative">
-      <Anno n={5} t="자주 고르는 곳 (POPULAR_PLACES): 삿포로역·오도리·스스키노·TV타워 + 시내 밖 예시(공항·오타루)" />
       <p className="mb-1.5 text-[13px] font-bold text-muted">{t("popular")}</p>
       <div className="hscroll -mx-4 px-4 pb-1 lg:mx-0 lg:flex-wrap lg:overflow-visible lg:px-0">
         {local.map((x) => {
@@ -354,13 +348,11 @@ export default function Place() {
   );
   const hotelBtnEl = hotelPlace && hotelOk && (
     <div className="relative">
-      <Anno n={4} t="숙박 호텔로 지정: 숙박 호텔이 있고 시내일 때만 표시" />
       <button className="btn btn-ghost btn-sm w-full lg:w-auto" onClick={() => assign(hotelPlace)}><Bed size={18} /> {t("useHotel", { h: n(hotelPlace.name) })}</button>
     </div>
   );
   const mapEl = (cls: string, greedy = false) => (
     <div className="relative h-full">
-      <Anno n={6} t="지도 핀 지정 (Google Maps I-01): 범위를 초록 원으로, 건물·가게 탭, 빈 곳 탭은 350m 안 장소 이름 또는 '지도에서 고른 위치 · 지역명' (위도·경도는 표시하지 않음). 승차 → 골프장 → 하차를 점선으로 연결" />
       <MapView markers={markers} path={route} zones greedy={greedy} centerLift={isLg ? 0 : Math.round(stageH * 0.15)} onPoi={onPoi} onMapClick={onMapClick} center={center} zoom={center ? 16 : 11} focusKey={center ? `${center.lat},${center.lng}` : "all"} label={t("mapHint")} className={cls} />
     </div>
   );
@@ -425,7 +417,6 @@ export default function Place() {
       )}
       {d.pick && (
         <div className="relative grid gap-2 px-4 py-3.5">
-          <Anno n={7} t="요청 사항 (선택, 예약당 하나 → 승차 booking_stop.memo, V-11: 최대 100자). 희망 승하차 시간 대신 (팀 결정 11/05). 실제 시간은 운영이 정해 출발 3일 전까지 메일로 안내" />
           <label className="field">
             <span className="label text-[13px]">{t("memoL")}</span>
             <input className="input min-h-[44px]" placeholder={t("memoPh")} value={d.pickMemo} maxLength={SET.MEMO_MAX} onChange={(e) => d.patch({ pickMemo: e.target.value.slice(0, SET.MEMO_MAX) })} />
@@ -438,16 +429,14 @@ export default function Place() {
   );
   const feeEl = (
     <section className="relative flex items-center gap-3 rounded-2xl bg-surface-2 p-4">
-      <Anno n={8} t="버스 안내: 정원·골프백 적재 (팀 결정 10/29: 포함 요금 문구 M-142 삭제)" />
       <Bus size={22} weight="duotone" className="flex-none text-brand" />
       <div className="text-[13.5px]">
-        <span className="text-ink-2">{L === "ko" ? `버스 정원 ${SET.BUS_SEATS}명 · 골프백 적재 가능` : `送迎バス定員${SET.BUS_SEATS}名・ゴルフバッグ積載可`}</span> <Q id="Q-23" t="합승 시 경유 방식" />
+        <span className="text-ink-2">{L === "ko" ? `버스 정원 ${SET.BUS_SEATS}명 · 골프백 적재 가능` : `送迎バス定員${SET.BUS_SEATS}名・ゴルフバッグ積載可`}</span>
       </div>
     </section>
   );
   const bottomEl = (
     <BottomBar width={isLg ? "narrow" : "step"}>
-      <span className="absolute -top-3 left-3"><Anno n={9} t="하단 다음: 승차·하차 장소가 지정되면 활성. 비활성일 때 누르면 부족한 항목을 빨간 글씨로 표시하고 그 탭·항목으로 이동 → 잔여석 다시 확인(B-01) → S-08 (T-10) / 범위 밖 → 그대로 (T-31)" /></span>
       <div className="min-w-0 flex-1 text-[12.5px] leading-tight text-muted">
         <p className="truncate">{t("pick")}{dot()}{d.pick ? n(d.pick.name) : "-"}</p>
         <p className="truncate">{t("drop")}{dot()}{dropShown ? n(dropShown.name) : "-"}</p>
@@ -457,7 +446,6 @@ export default function Place() {
   );
   const head = (
     <>
-      <ScreenTag id="S-06" name="승하차 장소 지정" refs="FN-12, FN-13 · L-06 · API-05, API-06 · V-10, V-11 · T-10, T-31" />
       <StepHead at={2} hasHotel={hasHotelStep(p)} onBack={back} className="max-lg:mb-0" />
     </>
   );
@@ -527,7 +515,6 @@ export default function Place() {
       )}
       <div className="mt-5">{summaryEl}</div>
       <div className="mt-4">{feeEl}</div>
-      <p className="mt-2 text-[12px] text-muted">{!anno ? null : serviceArea.wide ? "SERVICE_AREA: 넓은 범위 (기타히로시마·치토세·공항 포함, 확인 필요)" : `SERVICE_AREA: 삿포로 중심 반경 ${ZONES_STRICT[0].r / 1000}km (운영사 확정 10/29)`}</p>
       </div>
       {bottomEl}
     </div>

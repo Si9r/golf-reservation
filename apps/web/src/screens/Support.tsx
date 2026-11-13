@@ -3,7 +3,7 @@ import { CaretDown, CaretRight, Clock, Copy, EnvelopeSimple, Headset, Phone } fr
 import { SET } from "../data";
 import { useT } from "../i18n";
 import { useAuth, useDb, useToast } from "../store";
-import { Anno, Collapse, ScreenTag } from "../components/ui";
+import { Collapse } from "../components/ui";
 
 // 일본 시간 기준 운영 중인지 (설정 SUPPORT.hours 10:00-17:00)
 const openNowJST = () => {
@@ -34,7 +34,6 @@ export default function Support() {
   // 연락 방법 카드 (전화 · 이메일): 카드 전체를 누르면 바로 연결
   const contact = (
     <section className="relative grid gap-3">
-      <Anno n={1} t="연락처·운영 시간 (설정 SUPPORT): 10:00~17:00 (JST), 전화·이메일 바로 연결" />
       <a href={`tel:${SET.SUPPORT_TEL.replace(/-/g, "")}`} className="group flex items-center gap-4 rounded-[20px] bg-surface p-4 shadow-[var(--shadow)] transition-shadow hover:shadow-[var(--shadow-lg)] lg:p-5">
         <span className="grid h-12 w-12 flex-none place-items-center rounded-2xl bg-brand text-brand-ink"><Phone size={24} weight="fill" /></span>
         <span className="grid min-w-0 flex-1 gap-0.5">
@@ -59,7 +58,6 @@ export default function Support() {
   // 예약번호 안내 (최근 예약번호 + 복사)
   const bookingNote = (
     <section className="relative grid gap-2 rounded-[20px] bg-surface-2 p-4 text-[14px] lg:p-5">
-      <Anno n={2} t="예약번호 안내 (M-210): 로그인 상태면 최근 예약번호 표시" />
       <p className="font-semibold">{t("M-210")}</p>
       {recent && (
         <div className="flex items-center justify-between gap-2 rounded-xl bg-surface px-3.5 py-2.5">
@@ -72,7 +70,6 @@ export default function Support() {
 
   return (
     <div className="page step pb-8 lg:pb-10">
-      <ScreenTag id="S-14" name="고객센터" refs="FN-30 · 설정 SUPPORT · API-14" />
 
       {/* 머리: 제목 + 지금 운영 중인지 */}
       <header className="relative mb-5 overflow-hidden rounded-[24px] bg-[#1a1d24] p-5 text-white lg:mb-7 lg:p-8">
@@ -95,7 +92,6 @@ export default function Support() {
         </div>
 
         <section className="relative lg:col-start-1 lg:row-start-1">
-          <Anno n={3} t="자주 묻는 질문 (문구 파일 FAQ): 버스 요금, 승하차 범위, 인원 미달, 변경·취소, 렌탈" />
           <h2 className="mb-3 text-[20px] font-black lg:text-[22px]">{t("faqT")}</h2>
           <div className="grid gap-2">
             {faq.map(([q, a], i) => (

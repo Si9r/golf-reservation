@@ -209,3 +209,23 @@ def test_people_check_20():  # DB 제약도 한 예약 1~20명 (Alembic 0007)
 def test_support_fallback(client):  # 고객센터 전화·이메일이 .env 에 없으면 운영사 임시값 (화면·메일 같은 값)
     s = client.get(U + "/settings/public").json()["support"]
     assert s["tel"] and s["email"] and s["hours"] == "10:00-17:00"
+
+
+def test_production_check_rejects_example_keys():  # 운영 서버: 운영 키·본 사이트 키가 예시값(change-me)이면 켜지지 않음. 비워 두면 켜짐 (그 API는 모두 거부)
+    import pytest
+    from types import SimpleNamespace
+
+    from app.main import check_production
+
+    ok = dict(PAYMENT_BACKEND="partner", FIXED_TODAY="", ADMIN_KEY="", SITE_KEY="", JOBS_ENABLED=True)
+    check_production(SimpleNamespace(**ok))
+    check_production(SimpleNamespace(**{**ok, "ADMIN_KEY": "a-long-random-key"}))
+    for name in ("ADMIN_KEY", "SITE_KEY"):
+        with pytest.raises(RuntimeError, match=name):
+            check_production(SimpleNamespace(**{**ok, name: "change-me"}))
+    with pytest.raises(RuntimeError, match="PAYMENT_BACKEND"):
+        check_production(SimpleNamespace(**{**ok, "PAYMENT_BACKEND": "fake"}))
+
+
+def test_api_docs_open_outside_production(client):  # 개발·테스트 서버에서는 API 문서가 열림 (운영 서버에서는 경로 없음, main.py PRODUCTION)
+    assert client.get("/api/golf/openapi.json").status_code == 200

@@ -6,7 +6,7 @@ import { AREA_NAME, COURSES, PHOTOS, SET } from "../data";
 import { useT, dot, wave } from "../i18n";
 import { fullReset, useDb, useDraft } from "../store";
 import { fShort, searchPkgs, todayISO, upcomingDepartures, yen } from "../logic";
-import { Anno, Img, Q, ScreenTag, StageTag, useStage } from "../components/ui";
+import { Img } from "../components/ui";
 import { DatePeopleSheet } from "../components/booking";
 import { AiSheet } from "./AiSheet";
 import { knownPkgIds, useDepartures } from "../api/sync";
@@ -16,7 +16,6 @@ export default function Home() {
   const { t, n, L } = useT();
   const nav = useNavigate();
   const loc = useLocation();
-  const stage = useStage();
   const { q, date, people, peopleSet, patch, choosePkg } = useDraft();
   const extra = useDb((s) => s.extra);
   const apiV = useDepartures(knownPkgIds, monthsAhead().filter(monthInSeason)); // API 모드: 추천·곧 출발 카드의 출발일·잔여석을 서버 값으로 (API-03). 안 받은 달은 프로토타입 계산으로 떨어지므로 판매 달 전부
@@ -84,7 +83,6 @@ export default function Home() {
         </section>
 
         <div className="page wide pt-0! pb-6!">
-          <ScreenTag id="S-01" name="홈" refs="FN-01, FN-02, FN-13 · L-03 · API-01, API-04 · T-01, T-03" />
           {/* 2~5 조건 입력: 사진 위에 겹친 카드, PC는 한 줄 */}
           <motion.div
             className="relative z-[1] -mt-14 grid gap-2.5 rounded-[22px] bg-surface p-3 lg:mx-auto lg:-mt-16 lg:max-w-[1100px] lg:grid-cols-[1.4fr_1fr_1fr_auto] lg:items-center lg:gap-3 lg:p-4"
@@ -95,7 +93,6 @@ export default function Home() {
           >
             {/* 검색: 출발일·인원 칸과 같은 모양 (위에 작은 이름표) */}
             <label className="relative flex min-h-[56px] flex-col justify-center rounded-[14px] bg-surface-2 px-3.5 pr-11">
-              <Anno n={2} t="검색창 (V-01): 골프장·지역·호텔 이름 한·일·영 부분 일치, 결과 수 즉시 갱신" />
               <span className="flex items-center gap-1 text-[11.5px] font-bold text-muted"><MagnifyingGlass size={13} className="text-brand" />{t("searchL")}</span>
               <input className="w-full min-w-0 bg-transparent text-[15px] outline-none placeholder:text-muted" placeholder={t("searchPh")} aria-label={t("searchPh")} value={q} maxLength={SET.SEARCH_MAX} onChange={(e) => patch({ q: e.target.value })} onKeyDown={onSearchKey} enterKeyHint="search" />
               {q && <button className="absolute right-1.5 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full text-muted hover:bg-surface" onClick={() => patch({ q: "" })} aria-label={t("close")}><X size={16} /></button>}
@@ -103,7 +100,6 @@ export default function Home() {
             {/* 3·4 출발일·인원: 두 칸 (휴대폰 2열, PC는 검색창 옆). 누르면 날짜·인원 시트 */}
             <div className="grid grid-cols-2 gap-2.5 lg:contents">
               <div className="relative">
-                <Anno n={3} t="출발일 (필수, CK-01): 날짜·인원 시트, 날짜마다 출발 패키지 수, 11/16~4/19 휴장. 미선택이면 가장 빠른 출발일 표시" />
                 <button type="button" onClick={() => setSheet(true)} className="flex min-h-[56px] w-full flex-col justify-center rounded-[14px] bg-surface-2 px-3.5 text-left">
                   <span className="flex items-center gap-1 text-[11.5px] font-bold text-muted"><CalendarBlank size={13} className="text-brand" />{t("dateL")}</span>
                   <span className={`num text-[15px] leading-snug ${shownDate ? "font-bold" : "text-muted"}`}>{shownDate ? fShort(shownDate, L) : t("datePh")}</span>
@@ -113,7 +109,6 @@ export default function Home() {
                 )}
               </div>
               <div className="relative">
-                <Anno n={4} t="인원 (V-02): 1~20명, 날짜·인원 시트에서 바꿈, 바꾸면 결과 수 즉시 갱신" />
                 <button type="button" onClick={() => setSheet(true)} className="flex min-h-[56px] w-full flex-col justify-center rounded-[14px] bg-surface-2 px-3.5 text-left">
                   <span className="flex items-center gap-1 text-[11.5px] font-bold text-muted"><UsersThree size={13} className="text-brand" />{t("people")}</span>
                   <span className={`num text-[15px] leading-snug ${peopleSet ? "font-bold" : "text-muted"}`}>{peopleSet ? t("peopleN", { n: people }) : t("peoplePh")}</span>
@@ -121,7 +116,6 @@ export default function Home() {
               </div>
             </div>
             <div className="relative grid gap-2">
-              <Anno n={5} t="조건 결과 수 + 패키지 보기 (T-01): 항상 누를 수 있음. 출발일을 안 골랐으면 가장 빠른 출발일로 검색, 0개여도 이동" />
               {date && <p className="text-center text-[13.5px] font-semibold text-ink-2 lg:hidden" aria-live="polite">{t("M-111", { n: results.length })}</p>}
               <button className="btn btn-primary min-h-[56px] w-full lg:min-w-[160px]" onClick={() => { if (!date && earliest) patch({ date: earliest }); nav("/golf/packages"); }}>{t("seeBtn")}</button>
             </div>
@@ -130,7 +124,6 @@ export default function Home() {
 
           {/* 6 이용 안내: 세 줄을 한 띠로 모음 (시안), PC는 가로 세 칸 + 구분선 */}
           <section className="relative mx-auto mt-5 lg:mt-7 lg:max-w-[1100px]" aria-label={L === "ko" ? "이용 안내" : "ご利用案内"}>
-            <Anno n={6} t="이용 안내 3칸 (버스·픽업 포함 / 승하차 시내 어디든 / 최소 인원)" />
             <ul className="grid divide-y divide-line rounded-[18px] bg-surface px-4 shadow-[var(--shadow)] lg:grid-cols-3 lg:divide-x lg:divide-y-0 lg:px-0 lg:py-1">
               {guides.map(({ icon: I, t: tt }, i) => (
                 <li key={i} className="flex items-center gap-3 py-3.5 text-[14px] font-bold text-ink-2 lg:justify-center lg:py-4">
@@ -142,23 +135,21 @@ export default function Home() {
           </section>
 
           {/* AI 추천 입구 (3단계, F-072) */}
-          {stage >= 3 && (
+          <>
             <section className="relative mt-6">
-              <Anno n="AI" t="AI 추천 입구 (3단계, F-072): 프로토타입 추가 항목" />
               <button onClick={() => setAi(true)} className="flex w-full items-center gap-3.5 rounded-[18px] bg-[#14171f] px-[18px] py-4 text-left text-white transition-opacity hover:opacity-95 lg:px-6 lg:py-5">
                 <span className="grid h-11 w-11 flex-none place-items-center rounded-xl bg-brand text-white"><Sparkle size={24} weight="fill" /></span>
-                <span className="flex min-w-0 flex-1 items-center gap-2"><b className="text-[17px]">{t("aiT")}</b><StageTag s={3} /></span> {/* 부제 없이 제목만 (10/30) */}
+                <span className="flex min-w-0 flex-1 items-center gap-2"><b className="text-[17px]">{t("aiT")}</b></span> {/* 부제 없이 제목만 (10/30) */}
                 <CaretRight size={22} />
               </button>
             </section>
-          )}
+          </>
 
           {/* 7 추천 / 조건에 맞는 패키지: 사진 크게 */}
-          {stage >= 2 && (
+          <>
             <section ref={matchRef} className="relative mt-10 scroll-mt-28">
-              <Anno n={7} t="추천 패키지 3개 → 검색어·날짜가 있으면 '조건에 맞는 패키지' 최대 7개. 검색창에서 엔터를 누르면 여기로 스크롤" />
               <div className="mb-3.5 flex items-baseline justify-between gap-2">
-                <h2 className="flex items-center gap-2 text-[22px] font-black tracking-tight">{conditioned ? t("recMatch") : t("recT")} <StageTag s={2} />{conditioned && <span className="text-[13px] font-normal text-muted">{results.length}</span>}</h2>
+                <h2 className="flex items-center gap-2 text-[22px] font-black tracking-tight">{conditioned ? t("recMatch") : t("recT")} {conditioned && <span className="text-[13px] font-normal text-muted">{results.length}</span>}</h2>
                 <button className="link text-[14px]" onClick={() => nav("/golf/packages")}>{t("seeAllL")}</button>
               </div>
               {cards.length === 0 ? (
@@ -180,12 +171,11 @@ export default function Home() {
                 </div>
               )}
             </section>
-          )}
+          </>
 
           {/* 골프장 사진 칸 (리디자인 추가): 골프장 이름으로 검색 */}
-          {stage >= 2 && (
+          <>
             <section className="relative mt-11">
-              <Anno n="C" t="골프장 사진 칸 (리디자인 추가): 누르면 그 골프장 이름으로 검색한 패키지 목록 (S-02)" />
               <h2 className="mb-3.5 text-[22px] font-black tracking-tight">{t("whereT")}</h2>
               <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-4">
                 {COURSES.slice(0, 4).map((c) => (
@@ -199,12 +189,11 @@ export default function Home() {
                 ))}
               </div>
             </section>
-          )}
+          </>
 
           {/* 8 곧 출발하는 투어 (2단계) */}
-          {stage >= 2 && <section className="relative mt-11">
-            <Anno n={8} t="곧 출발하는 투어 6개 (2단계): 출발일·패키지명·잔여석·인원 충족 → S-03 (출발일 선택된 상태)" />
-            <h2 className="mb-3.5 flex items-center gap-2 text-[22px] font-black tracking-tight">{t("soonT")} <StageTag s={2} /></h2>
+          <section className="relative mt-11">
+            <h2 className="mb-3.5 flex items-center gap-2 text-[22px] font-black tracking-tight">{t("soonT")}</h2>
             <div className="grid gap-2.5 lg:grid-cols-3 lg:gap-3">
               {soon.map(({ p, d, seats, enough }) => (
                 <button key={`${p.id}-${d}`} onClick={() => openPkg(p.id, d)} className="flex items-center gap-3 rounded-2xl border border-line bg-surface p-2.5 text-left transition-colors hover:border-brand">
@@ -218,9 +207,8 @@ export default function Home() {
                 </button>
               ))}
             </div>
-          </section>}
+          </section>
 
-          <div className="mt-6 flex flex-wrap gap-2"><Q id="Q-02" t="패키지 상세 구성" /><Q id="Q-08" t="가격·통화" /></div>
         </div>
       </div>
       <DatePeopleSheet open={sheet} onClose={() => setSheet(false)} date={shownDate} people={people} peopleSet={peopleSet} onDone={(d, n2, set) => { patch({ date: d, people: n2, peopleSet: set }); setSheet(false); }} />

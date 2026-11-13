@@ -4,7 +4,7 @@ import { ArrowSquareOut, Bed, CaretDown, Minus, Plus, Star } from "@phosphor-ico
 import { SET, type Hotel, type Pkg } from "../data";
 import { useT, dot } from "../i18n";
 import { coursesOf, distM, fShort, hasHotelStep, optionOf, roomsOf, stayHotel, totalPrice, yen, yenDiff } from "../logic";
-import { Anno, BottomBar, gmapLink, PriceBlock, Q, ScreenTag, StepHead } from "../components/ui";
+import { BottomBar, gmapLink, PriceBlock, StepHead } from "../components/ui";
 import { DriveChip, MapView } from "../components/GoogleMap";
 import { editBackTo, useFlow } from "./flow";
 import { useSeatGuard } from "../api/seatCheck";
@@ -27,24 +27,20 @@ export default function HotelOption() {
   const next = () => guard(() => nav(d.editReturn ? editBackTo(d.editReturn) : "/golf/book/place")); // T-08, B-01 잔여석 다시 확인
   return (
     <div className="page step narrow">
-      <ScreenTag id="S-05" name="호텔 옵션 선택" refs="FN-09, FN-11 · API-02 · T-08, T-28" />
       <StepHead at={1} hasHotel onBack={back} />
       <div className="step-body">
       <section className="relative mb-5">
-        <Anno n="S-05" t="제목·선택 요약 (패키지·출발일·인원)" />
         <h1 className="text-[22px] font-black leading-snug tracking-[-0.02em] lg:text-[26px]">{t("s05T")}</h1>
         <p className="mt-1 text-[14px] text-muted">{n(p.name)}{dot()}{fShort(d.dep!, L)} {L === "ko" ? "출발" : "出発"}{dot()}{t("peopleN", { n: d.people })}</p>
       </section>
       {fixed && hotel && (
         <section className="relative grid gap-2.5">
-          <Anno n={1} t="호텔이 정해진 패키지 (옵션 없음): '이 패키지의 숙박 호텔' 카드(호텔명·객실 타입·위치·지도), 선택할 수 없음 (팀 테스트 10/23 B-03)" />
           <h2 className="flex items-center gap-2 text-[15px] font-bold">{t("fixedHotelT")} <span className="chip gray">{t("fixedBadge")}</span></h2>
           <p className="text-[13px] text-muted">{t("fixedHotelNote")}</p>
           <HotelCard p={p} h={hotel} />
         </section>
       )}
       {!fixed && <section className="relative grid gap-2.5" role="radiogroup" aria-label={t("s05T")}>
-        <Anno n={1} t="옵션 목록 (단일 선택, hotel_option): 호텔명·객실·평점·위치·가격 차이(기본/+/−), '숙박 없음'도 옵션 (M-130)" />
         {p.opts.map((id, i) => {
           const o = optionOf(id)!;
           const h = stayHotel(p, id);
@@ -92,12 +88,11 @@ export default function HotelOption() {
             </div>
           );
         })}
-        <p className="flex flex-wrap items-center gap-2 text-[12.5px] text-muted">{t("M-130")} <Q id="Q-02" t="옵션 구성·1인실 요금 (패키지 데이터)" /></p>
+        <p className="flex flex-wrap items-center gap-2 text-[12.5px] text-muted">{t("M-130")}</p>
       </section>}
       {/* 4 객실 구성 (피드백 5) */}
       {hotel && (
         <section className="relative mt-6 card rounded-2xl p-4 lg:p-5">
-          <Anno n={4} t="객실 구성: 2인 1실 기본, 홀수 인원이면 1명은 1인실 자동. 1인실 인원 ± (2명 단위, 인원과 홀짝 같음), 1인실 추가 요금 × 1인실 인원 (M-131)" />
           <h2 className="mb-1 flex items-center gap-2 text-[17px] font-black"><Bed size={18} className="text-brand" /> {t("roomsT")}</h2>
           <p className="text-[13.5px] font-semibold">{t("peopleN", { n: d.people })} → {t(rooms.singles ? "roomsSum" : "roomsSum0", { t: rooms.twins, s: rooms.singles })}</p>
           <div className="mt-3 flex items-center justify-between gap-3">
@@ -114,7 +109,6 @@ export default function HotelOption() {
       {!hotel && <p className="mt-5 rounded-2xl bg-surface-2 p-4 text-[14px] text-ink-2">{t("noHotelNote")}</p>}
       </div>
       <BottomBar width="narrow">
-        <span className="absolute -top-3 left-3"><Anno n={3} t="하단: 총액(1인실 추가 포함) + 다음: 항상 활성 (기본 옵션 선택됨) → 잔여석 다시 확인(B-01) → S-06 (T-08) / 변경 중 → S-08" /></span>
         <PriceBlock main={yen(price.total)} sub={`${t("totalL", { n: d.people })}${price.singleAdd ? `${dot()}${t("lineSingle", { p: yen(SET.SINGLE_ADD), n: rooms.singles })}` : ""}`} />
         <button className="btn btn-primary min-w-[140px]" onClick={next}>{d.editReturn ? t("editBack") : t("next")}</button>
       </BottomBar>

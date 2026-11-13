@@ -7,7 +7,7 @@ import { useT, dot } from "../i18n";
 import { DEFAULT_FILTERS, useDraft, useToast } from "../store";
 import { fShort, type SearchFilters } from "../logic";
 import { usePackageSearch } from "../api/usePackageSearch";
-import { Anno, BottomBar, CardSkeleton, ErrorBanner, Q, ScreenTag, Sheet, StageTag, useStage } from "../components/ui";
+import { BottomBar, CardSkeleton, ErrorBanner, Sheet } from "../components/ui";
 import { DatePeopleSheet, PkgCard } from "../components/booking";
 
 type FKey = keyof SearchFilters;
@@ -21,7 +21,6 @@ const OPTS: Record<FKey, string[]> = {
 export default function List() {
   const { t, L } = useT();
   const nav = useNavigate();
-  const stage = useStage();
   const toast = useToast((s) => s.show);
   const { q, date, people, peopleSet, filters, cmp, patch, choosePkg } = useDraft();
   const [open, setOpen] = useState<FKey | null>(null);
@@ -38,16 +37,13 @@ export default function List() {
     else patch({ cmp: [...cmp, id] });
   };
   const anyFilter = (["nights", "zone", "rounds"] as const).some((k) => filters[k] !== "all");
-  const anno: Record<FKey, [number, string]> = { nights: [4, "필터: 일정 (전체/당일/1박/2박/3박)"], zone: [5, "필터: 숙소 (시내 호텔/골프장 리조트/숙박 없음, hotel.zone)"], rounds: [6, "필터: 라운드 (1/2/3)"], sort: [7, "정렬 (추천순/낮은 가격순/빠른 출발순)"] };
 
   return (
     <div className="page wide">
-      <ScreenTag id="S-02" name="패키지 목록" refs="FN-03, FN-04, FN-05 · L-03 · API-01 · T-03, T-04" />
 
       <div className="grid gap-2.5 lg:grid-cols-[1fr_auto] lg:gap-3">
         {/* 2 검색창 */}
         <label className="relative block">
-          <Anno n={2} t="검색창 (S-01과 같은 조건 공유, V-01)" />
           <span className="sr-only">{t("searchPh")}</span>
           <MagnifyingGlass size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
           <input className="input pl-10 pr-10" placeholder={t("searchPh")} value={q} maxLength={SET.SEARCH_MAX} onChange={(e) => patch({ q: e.target.value })} />
@@ -55,7 +51,6 @@ export default function List() {
         </label>
         {/* 3 조건 요약 바 */}
         <button className="relative flex min-h-[48px] items-center gap-2 rounded-xl bg-surface-2 px-4 text-left" onClick={() => setSheet(true)}>
-          <Anno n={3} t="조건 요약 바 '출발일 · 인원 · 변경' → 날짜·인원 시트" />
           <CalendarBlank size={18} className="flex-none text-brand" />
           <span className="min-w-0 flex-1 truncate text-[14.5px] font-semibold">{date ? fShort(date, L) : t("dateAny")}{dot()}{peopleSet ? t("peopleN", { n: people }) : t("peopleAny")}</span>
           <span className="link text-[14px]">{t("change")}</span>
@@ -68,7 +63,6 @@ export default function List() {
           <span className="grid h-9 w-7 place-items-center text-muted" aria-hidden="true"><SlidersHorizontal size={18} /></span>
           {(["nights", "zone", "rounds"] as const).map((k) => (
             <button key={k} className="fchip relative" data-on={filters[k] !== "all"} onClick={() => setOpen(k)} aria-haspopup="dialog">
-              <Anno n={anno[k][0]} t={anno[k][1]} />
               <span className="whitespace-pre"><span className="text-muted">{title[k]}{t("fColon")}</span>{optLabel(k, filters[k])}</span>
               <CaretDown size={13} weight="bold" />
             </button>
@@ -79,11 +73,8 @@ export default function List() {
 
       {/* 8 결과 수 · 7 정렬 */}
       <div className="relative mb-4 flex items-center gap-2">
-        <Anno n={8} t="결과 수 '총 패키지 n개' (문구 결정 17번)" />
         {!load.loading && !load.error && <h1 className="text-[18px] font-black tracking-tight lg:text-[22px]">{t("resultCount", { n: rows.length })}</h1>}
-        <Q id="Q-08" t="가격·통화" />
         <button className="fchip relative ml-auto flex-none" data-on={filters.sort !== "rec"} onClick={() => setOpen("sort")} aria-haspopup="dialog">
-          <Anno n={anno.sort[0]} t={anno.sort[1]} />
           <span className="whitespace-pre"><span className="text-muted">{title.sort}{t("fColon")}</span>{optLabel("sort", filters.sort)}</span>
           <CaretDown size={13} weight="bold" />
         </button>
@@ -95,7 +86,6 @@ export default function List() {
         <div className="grid gap-4 lg:grid-cols-3">{[0, 1, 2].map((i) => <CardSkeleton key={i} />)}</div>
       ) : load.error ? null : rows.length === 0 ? (
         <div className="relative grid place-items-center gap-3 rounded-[20px] border border-dashed border-line-strong px-6 py-14 text-center">
-          <Anno n={11} t="결과 없음 (M-113)" />
           <MagnifyingGlassMinus size={40} className="text-muted" />
           <p className="max-w-[30ch] text-[15px] font-bold">{t("M-113")}</p>
           <div className="mt-2 flex flex-wrap justify-center gap-2">
@@ -105,11 +95,9 @@ export default function List() {
         </div>
       ) : (
         <div className="relative grid gap-4 lg:grid-cols-3">
-          <Anno n={9} t="패키지 카드: 유형·이름·기간·라운드·호텔 여부·숙소 이름·위치·가장 빠른 출발일·잔여석·1인 가격~ (T-03)" />
           {rows.map(({ p, d, seats }, i) => (
             <div key={p.id} className="relative">
-              {i === 0 && stage >= 2 && <span className="absolute bottom-4 right-4"><Anno n={10} t="비교 담기 (최대 3개, M-112)" /></span>}
-              <PkgCard i={i} p={p} date={date} d={d} seats={seats} onOpen={() => { choosePkg(p.id); if (date) patch({ dep: date }); nav(`/golf/packages/${p.id}`); }} showCmp={stage >= 2} cmp={cmp.includes(p.id)} onCmp={() => toggleCmp(p.id)} />
+              <PkgCard i={i} p={p} date={date} d={d} seats={seats} onOpen={() => { choosePkg(p.id); if (date) patch({ dep: date }); nav(`/golf/packages/${p.id}`); }} showCmp cmp={cmp.includes(p.id)} onCmp={() => toggleCmp(p.id)} />
             </div>
           ))}
         </div>
@@ -117,11 +105,11 @@ export default function List() {
 
       {/* 10 비교함 */}
       <AnimatePresence>
-        {stage >= 2 && cmp.length > 0 && (
+        {cmp.length > 0 && (
           <motion.div initial={{ y: 80 }} animate={{ y: 0 }} exit={{ y: 80 }} transition={{ type: "spring", stiffness: 380, damping: 34 }}>
             <BottomBar width="wide">
               <div className="min-w-0 flex-1">
-                <p className="flex items-center gap-2 text-[14px] font-bold">{t("M-112", { n: cmp.length })} <StageTag s={2} /></p>
+                <p className="flex items-center gap-2 text-[14px] font-bold">{t("M-112", { n: cmp.length })}</p>
                 <p className="truncate text-[12px] text-muted">{cmp.map((id) => PKGS.find((p) => p.id === id)?.name[L]).join(dot())}</p>
               </div>
               <button className="btn btn-ghost btn-sm" disabled={cmp.length < 2} onClick={() => nav("/golf/compare")}>{t("cmpView")}</button>

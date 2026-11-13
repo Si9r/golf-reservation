@@ -1,6 +1,6 @@
 // API 모드(VITE_USE_API=1)에서 화면의 브라우저 계산을 서버 값으로 바꾸는 다리.
 // logic.ts의 출발일·잔여석 함수가 이 캐시를 먼저 보고, 없으면 프로토타입 계산을 씀.
-// 화면이 API 응답만 쓰도록 바뀌면 이 파일과 logic.ts의 해당 분기를 지움 (docs/DEVELOPMENT.md 2장)
+// 화면이 API 응답만 쓰도록 바뀌면 이 파일과 logic.ts의 해당 분기를 지움 (docs/인수인계서.md 18장 1번)
 import { useEffect } from "react";
 import { create } from "zustand";
 import type { DepartureItem } from "@golf/shared";

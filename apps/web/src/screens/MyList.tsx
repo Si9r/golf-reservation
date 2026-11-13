@@ -7,7 +7,7 @@ import { SET } from "../data";
 import { useT, dot, to } from "../i18n";
 import { useAuth, useDb, useToast, viewOf, type Booking } from "../store";
 import { fShort, judgeDate, stayHotel, todayISO, tripEnd, yen } from "../logic";
-import { Anno, Img, ScreenTag } from "../components/ui";
+import { Img } from "../components/ui";
 import { USE_API } from "../api/client";
 import { fetchMyBookings } from "../api/sync";
 
@@ -65,7 +65,6 @@ export default function MyList() {
 
   const tabs = (
     <div className="relative flex gap-1.5 overflow-x-auto [scrollbar-width:none] lg:gap-1 lg:rounded-xl lg:bg-surface-2 lg:p-1" role="tablist">
-      <Anno n={1} t="탭: 예정(CONFIRMED) / 지난(DONE) / 취소(OP_CANCEL·USER_CANCEL), 탭마다 건수. 카드 예약번호 옆 복사 버튼 (복사하면 안내 토스트). 좁은 화면(380px 미만)은 '예약번호' 글자를 숨겨 상태 배지와 겹치지 않게" />
       {(["up", "past", "cancel"] as const).map((k) => (
         <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
           className={`min-h-[40px] flex-none whitespace-nowrap rounded-full px-2.5 text-[13.5px] font-bold lg:rounded-lg lg:px-4 lg:text-[14px] ${tab === k ? "bg-ink text-surface lg:bg-surface lg:text-ink lg:shadow-sm" : "border border-line-strong bg-surface text-ink-2 lg:border-0 lg:bg-transparent lg:text-muted"}`}>
@@ -138,7 +137,6 @@ export default function MyList() {
 
   return (
     <div className="page step pb-8 lg:max-w-[1240px]! lg:pb-10">
-      <ScreenTag id="S-12" name="예약 조회" refs="FN-26 · API-11 · T-21, T-22" />
       {/* PC: 왼쪽 메뉴 없이 넓게 (위 골프 탭과 겹쳐서 뺌, 10/29) */}
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3 lg:mb-6">
         <div>

@@ -4,7 +4,7 @@ import { motion } from "motion/react";
 import { ArrowCounterClockwise, HourglassMedium, WarningCircle } from "@phosphor-icons/react";
 import { useT } from "../i18n";
 import { useDb, useDraft } from "../store";
-import { Anno, ScreenTag } from "../components/ui";
+
 import { ApiError, USE_API, api } from "../api/client";
 import { refreshMonth, toBooking } from "../api/sync";
 
@@ -66,9 +66,7 @@ export default function PayReturn() {
 
   return (
     <div className="page step">
-      <ScreenTag id="S-10R" name="결제 결과" refs="API-20, API-21 · B-08 · 본 사이트 결제 연동" />
       <section className="relative grid justify-items-center gap-3 pt-10 text-center" role={view === "checking" ? "status" : "alert"}>
-        <Anno n={1} t="결제 결과 확인: CONFIRMED → S-11 / UNPAID → 미결제 안내 + 출발일 다시 고르기 / 대기 → 30초 간격 3번 다시 확인, 그래도 대기면 '확인 중' 안내" />
         {view === "checking" && (
           <>
             <motion.span className="h-10 w-10 rounded-full border-[3px] border-brand border-t-transparent" animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 0.8, ease: "linear" }} />

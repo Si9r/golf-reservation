@@ -3,10 +3,9 @@ import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ArrowSquareOut, Bed, Bus, CaretDown, CaretRight, Copy, FileText, Flag, Headset, Printer, UsersThree } from "@phosphor-icons/react";
 import { AREA_NAME, SET, courseOf, pkgOf } from "../data";
 import { useT, dot, to, wave } from "../i18n";
-import { DESIGN_TOOLS, useApp, useAuth, useDb, useToast, viewOf, type Booking } from "../store";
-import { addDays, coursesOf, fDate, fDayLong, fShort, itinerary, judgeDate, optionOf, pickupWindow, stayHotel, todayISO, tripEnd, yen } from "../logic";
-import { Anno, Collapse, Img, Q, ScreenTag, Sheet, gmapLink } from "../components/ui";
-import { useDrive } from "../gmaps";
+import { useAuth, useDb, useToast, viewOf } from "../store";
+import { addDays, fDate, fDayLong, fShort, itinerary, judgeDate, optionOf, stayHotel, todayISO, tripEnd, yen } from "../logic";
+import { Collapse, Img, Sheet, gmapLink } from "../components/ui";
 import { GoalMeter, ItinList } from "./Detail";
 import { PriceDetail } from "../components/booking";
 import { joinEn, splitEn, tooLongEn, upper, validPart } from "./InfoForm";
@@ -24,7 +23,6 @@ export default function MyDetail() {
   const [doc, setDoc] = useState(false);
   const [priceOpen, setPriceOpen] = useState(false); // 금액 상세는 눌러야 펼침 (10/30)
   const [comps, setComps] = useState<[string, string][] | null>(null); // 동반자 명단 수정 중 [성, 이름]
-  const anno = useApp((s) => s.anno);
   const [apiState, setApiState] = useState<"idle" | "loading" | "missing">("idle");
   useApiVersion((s) => s.v);
   // API 모드: 예약 상세를 서버에서 (API-12). 남의 예약·없는 예약이면 E-FORBID / E-NOTFOUND
@@ -39,8 +37,6 @@ export default function MyDetail() {
       })
       .catch(() => setApiState("missing"));
   }, [no, user]);
-  const bp = b ? pkgOf(b.pkgId) : null;
-  const pickDrive = useDrive(b?.pick, bp ? coursesOf(bp)[0] : null);
   if (!user) return <Navigate to={`/login?next=${encodeURIComponent(`/golf/my/${no}`)}`} replace />;
   if (USE_API && apiState === "loading" && !b) return <div className="page step py-20 text-center text-muted">…</div>;
   if (!b || (USE_API && apiState === "missing")) return <div className="page step py-20 text-center"><p className="mb-4 font-bold">{t("notFound")}</p><button className="link" onClick={() => nav("/golf/my")}>{t("myBookings")}</button></div>;
@@ -55,17 +51,6 @@ export default function MyDetail() {
   const due = addDays(b.dep, -SET.COMPANION_DUE_DAYS);
   const alive = v.status === "CONFIRMED";
   const canEdit = alive && todayISO() <= due; // 명단 마감 전, 살아 있는 예약만 (E-DUE)
-  const setDemo = (k: "open" | "go0" | "go" | "cancel" | "user" | "done") => {
-    const patch: Partial<Booking> =
-      k === "open" ? { status: "CONFIRMED", depStatus: "OPEN", cancelBy: undefined, refundStatus: undefined, pickupTime: undefined } :
-      k === "go0" ? { status: "CONFIRMED", depStatus: "GO", cancelBy: undefined, refundStatus: undefined, pickupTime: undefined } :
-      k === "go" ? { status: "CONFIRMED", depStatus: "GO", cancelBy: undefined, refundStatus: undefined, pickupTime: pickupWindow(p, b.pick, pickDrive.drive?.min)?.exact } : // 데모용 등록 시간 (실제는 운영자가 등록)
-      k === "cancel" ? { status: "OP_CANCEL", depStatus: "CANCEL", cancelBy: "OP", refundStatus: "REQUESTED", canceledAt: todayISO() } :
-      k === "user" ? { status: "USER_CANCEL", depStatus: undefined, cancelBy: "USER", refundStatus: "REQUESTED", canceledAt: todayISO() } :
-      { status: "DONE", depStatus: "DONE" };
-    update(b.no, patch);
-  };
-  const demoOn = (k: string) => (k === "open" ? v.label === "OPEN" || v.label === "ENOUGH" : k === "go0" ? v.label === "GO" && !b.pickupTime : k === "go" ? v.label === "GO" && !!b.pickupTime : k === "cancel" ? v.label === "OP_CANCEL" : k === "user" ? v.label === "USER_CANCEL" : v.label === "DONE");
 
   const draft: [string, string][] = comps ?? Array.from({ length: b.people - 1 }, (_, i) => (b.info.companions[i] ? splitEn(b.info.companions[i]) : ["", ""]));
   const draftOk = draft.every((x) => x.every(validPart) && !tooLongEn(x));
@@ -110,7 +95,6 @@ export default function MyDetail() {
   return (
     <>
       <div className="page step pb-8 lg:pb-10">
-        <ScreenTag id="S-13" name="예약 상세" refs="FN-20, FN-27, FN-29 · L-04, L-11 · API-12, API-13 · T-24" />
         {/* 사진 띠: 뒤로 · D-day · 상태 · 패키지 이름 · 일정 · 예약번호 (휴대폰은 화면 끝까지, PC는 둥근 띠) */}
         <section className="relative -mx-4 -mt-4 h-[280px] overflow-hidden bg-[#1d2b22] lg:mx-0 lg:mt-0 lg:h-[320px] lg:rounded-[24px]">
           <Img src={p.photos[0]} alt={n(p.name)} className="absolute inset-0 h-full w-full" />
@@ -134,7 +118,6 @@ export default function MyDetail() {
 
         {/* 1 상태 띠: 사진 위에 겹친 카드 (PC: 왼쪽 문장 · 오른쪽 인원 막대) */}
         <section className={`relative -mt-5 grid gap-3 rounded-[20px] border-[1.5px] p-5 shadow-[var(--shadow-lg)] lg:mx-8 lg:-mt-8 lg:grid-cols-[1fr_280px] lg:items-center lg:gap-6 ${tone.box}`}>
-          <Anno n={1} t="상태 띠: 상태마다 제목 1개 + 설명 1문장 (모집 중 / 인원 다 모임·출발 확정 대기 / 출발 확정+승차 시간 / 운행 취소 / 고객 취소 / 완료), 살아 있는 예약은 인원 막대. 취소 예약은 취소 주체·환불 상태" />
           <div>
             <h2 className={`text-[17px] font-extrabold lg:text-[19px] ${tone.ink}`}>{st.title}</h2>
             {st.desc && <p className="mt-1 text-[14px] leading-relaxed text-ink lg:text-[15px]">{st.desc}</p>}
@@ -150,18 +133,6 @@ export default function MyDetail() {
           )}
         </section>
 
-        {/* 데모 (설계 패널을 켰을 때만): 판정 B-01·고객 취소 API-16·승차 시간 등록 API-17·완료 B-03 */}
-        {DESIGN_TOOLS && anno && (
-          <div className="mt-3 grid gap-2 rounded-2xl border border-dashed p-3" style={{ borderColor: "var(--anno)" }}>
-            <span className="text-[12.5px] font-bold" style={{ color: "var(--anno)" }}>{t("demoState")}</span>
-            <div className="flex flex-wrap gap-1.5">
-              {(["open", "go0", "go", "cancel", "user", "done"] as const).map((k) => (
-                <button key={k} className="fchip" data-on={demoOn(k)} onClick={() => setDemo(k)}>{t(`demo_${k}`)}</button>
-              ))}
-            </div>
-          </div>
-        )}
-
         <div className="mt-4 grid gap-3 lg:mt-6 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-7">
           <div className="grid gap-3 lg:gap-5">
             {/* 숙소 한 줄 (패키지 이름·일정은 사진 띠에) */}
@@ -172,8 +143,7 @@ export default function MyDetail() {
 
             {/* 2 버스 승하차 (지도 대신 지도 앱 링크, PC는 승차·하차 나란히) */}
             <section className="relative card overflow-hidden">
-              <Anno n={2} t="승하차 (booking_stop): 장소명, 요청 사항(승차 memo), 승차 시간(출발 확정 후 API-17, M-205), 하차일, 지도 앱 열기(I-03). 지도는 승하차 화면에서만" />
-              <p className="flex items-center gap-1.5 border-b border-line px-4 py-2.5 text-[13px] font-semibold text-muted"><Bus size={16} /> {t("busT")} <Q id="Q-23" t="승차 시간 확정 주체·시점" /></p>
+              <p className="flex items-center gap-1.5 border-b border-line px-4 py-2.5 text-[13px] font-semibold text-muted"><Bus size={16} /> {t("busT")}</p>
               <div className="grid divide-y divide-line lg:grid-cols-2 lg:divide-x lg:divide-y-0">
                 {([["pick", b.pick], ["drop", b.drop]] as const).map(([k, pl]) => (
                   <div key={k} className="flex items-start gap-3 px-4 py-3">
@@ -193,7 +163,6 @@ export default function MyDetail() {
 
             {/* 3 일정표 (항상 펼침) */}
             <section className="relative card overflow-hidden">
-              <Anno n={3} t="일정표 (L-11): 실제 날짜·장소가 들어간 일정, 항상 펼침 + 구간 이동 시간" />
               <h2 className="px-4 py-3.5 text-[14.5px] font-bold">{t("mdItin", { n: itin.length })}</h2>
               <div className="pb-2">
                 <div className="grid gap-1">
@@ -242,7 +211,6 @@ export default function MyDetail() {
             {/* 4 동반자 명단 (손님이 할 일 → 오른쪽 위) */}
             {b.people > 1 && (
               <section className="relative card border-[1.5px] p-4" style={{ borderColor: canEdit ? "var(--brand)" : undefined }}>
-                <Anno n={4} t="동반자 이름 수정 (booking_member seq ≥ 2, V-24): 예약 때 모두 받으므로 오타 수정용. 영문 성·이름 모두 필수(빈 이름 저장 불가), 살아 있는 예약만 출발 7일 전까지 → API-13, M-206 (팀 결정 10/23)" />
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <h2 className="flex items-center gap-1.5 text-[15px] font-bold"><UsersThree size={18} className="text-brand" />{t("compFixT")} <span className="text-[13px] font-normal text-muted">{t("peopleN", { n: b.people - 1 })}</span></h2>
                   {canEdit && !comps && <button className="link text-[13.5px]" onClick={() => setComps(draft)}>{t("mdEdit")}</button>}
@@ -292,7 +260,6 @@ export default function MyDetail() {
 
             {/* 바로가기 목록: 확인서 · 고객센터 (버튼 2개를 나란히 두면 글자가 잘려서 한 줄씩). 승차 장소 지도는 승하차 칸의 링크로 */}
             <section className="relative card divide-y divide-line overflow-hidden">
-              <Anno n={5} t="바로가기: 예약 확인서(인쇄·저장) / 고객센터(S-14, T-24) — 변경·취소는 고객센터로 (M-207)" />
               {[
                 { icon: FileText, title: t("docBtn"), sub: "", on: () => setDoc(true) },
                 { icon: Headset, title: t("mdSupT"), sub: t("mdSupSub"), on: () => nav("/golf/support") },

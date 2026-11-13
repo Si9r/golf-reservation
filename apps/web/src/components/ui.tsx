@@ -1,43 +1,9 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowLeft, CheckCircle, Minus, Plus, WarningCircle, X } from "@phosphor-icons/react";
-import { DESIGN_TOOLS, useApp, useToast } from "../store";
+import { useToast } from "../store";
 import { useT } from "../i18n";
 import { SET } from "../data";
-
-// ---------- 설계 주석: 설계서의 주황 번호 / 확인 필요(Q) / MVP 단계 ----------
-export function Anno({ n, t }: { n: number | string; t: string }) {
-  const on = useApp((s) => s.anno) && DESIGN_TOOLS;
-  if (!on) return null;
-  return (
-    <span className="anno" title={`${n}. ${t}`} aria-label={`설계 항목 ${n}: ${t}`}>
-      {n}
-    </span>
-  );
-}
-export function Q({ id, t }: { id: string; t: string }) {
-  const on = useApp((s) => s.anno) && DESIGN_TOOLS;
-  if (!on) return null;
-  return <span className="qtag" title={`확인 필요 ${id}: ${t}`}>{id} {t}</span>;
-}
-export const useStage = () => useApp((s) => (DESIGN_TOOLS ? s.stage : 3)); // 설계 도구가 꺼져 있으면 항상 전체(3단계)
-export function StageTag({ s }: { s: 2 | 3 }) {
-  const on = useApp((x) => x.anno) && DESIGN_TOOLS;
-  const { L } = useT();
-  if (!on) return null;
-  return <span className="stagetag">{L === "ko" ? `${s}단계` : `第${s}段階`}</span>;
-}
-export function ScreenTag({ id, name, refs }: { id: string; name: string; refs?: string }) {
-  const on = useApp((s) => s.anno) && DESIGN_TOOLS;
-  if (!on) return null;
-  return (
-    <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-dashed px-3 py-2 text-[12px]" style={{ borderColor: "var(--anno)", color: "var(--anno)" }}>
-      <b className="num">{id}</b>
-      <span className="font-bold">{name}</span>
-      {refs && <span className="text-muted">{refs}</span>}
-    </div>
-  );
-}
 
 // ---------- 이미지 (불러오지 못하면 회색 면) ----------
 export function Img({ src, alt, className = "", eager }: { src: string; alt: string; className?: string; eager?: boolean }) {
@@ -98,7 +64,7 @@ export function Sheet({ open, onClose, title, children, footer, wide }: { open: 
 }
 
 // ---------- 인원 (+/− 와 직접 입력, V-02: 범위 밖 입력은 가까운 값으로 맞추고 M-001) ----------
-export function PeopleInput({ value, unset, onChange, error, max = SET.MAX_PEOPLE, label, anno }: { value: number; unset?: boolean; onChange: (n: number) => void; error?: string | null; max?: number; label?: string; anno?: ReactNode }) {
+export function PeopleInput({ value, unset, onChange, error, max = SET.MAX_PEOPLE, label }: { value: number; unset?: boolean; onChange: (n: number) => void; error?: string | null; max?: number; label?: string }) {
   const { t } = useT();
   const id = useId();
   const [text, setText] = useState(unset ? "" : String(value));
@@ -119,7 +85,6 @@ export function PeopleInput({ value, unset, onChange, error, max = SET.MAX_PEOPL
   const msg = error ?? (clamped ? t("M-001", { n: max }) : null);
   return (
     <div className="field relative">
-      {anno}
       {label && <label className="label" htmlFor={id}>{label}</label>}
       <div className="flex items-center rounded-xl border-[1.5px] bg-surface" style={{ borderColor: msg ? "var(--bad)" : "var(--line-strong)" }}>
         <button type="button" className="grid h-12 w-14 place-items-center text-ink-2 disabled:opacity-35" onClick={() => step(-1)} disabled={unset || value <= SET.MIN_PEOPLE} aria-label="−1">
@@ -164,7 +129,6 @@ export function StepHead({ at, hasHotel, onBack, disabled, className = "" }: { a
   useEffect(() => { lastStepPct = pct; }, [pct]);
   return (
     <div className={`relative mb-4 max-lg:-mx-4 max-lg:-mt-4 max-lg:mb-5 max-lg:bg-surface ${className}`}>
-      <Anno n="C-04" t="예약 진행 단계: 현재 단계 이름 + '3 / 6' + 차오르는 바 + 진행 순서(패키지·호텔·승하차·확인·정보·결제), 현재 단계 굵게. 호텔 옵션 없는 패키지는 호텔 단계 없이 5단계" />
       <div className="flex h-14 items-center gap-1 px-2 lg:h-auto lg:gap-1.5 lg:px-0 lg:pb-1.5">
         <button className="grid h-11 w-11 flex-none place-items-center rounded-full hover:bg-surface-2 lg:-ml-2 lg:h-9 lg:w-9" onClick={onBack} aria-label={t("back")} disabled={disabled}><ArrowLeft size={22} weight="bold" /></button>
         <b className="min-w-0 flex-1 truncate text-[16px] font-bold">{steps[cur]}</b>
@@ -188,7 +152,6 @@ export function BottomBar({ children, width = "step", pcHidden }: { children: Re
   return (
     <div className={`fixed inset-x-0 bottom-0 z-[45] border-t border-line bg-surface/95 backdrop-blur ${pcHidden ? "lg:hidden" : ""}`} style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
       <div className={`relative mx-auto flex max-w-[480px] items-center gap-3 px-4 py-3 ${width === "step" ? "lg:max-w-[1200px] lg:px-6" : width === "narrow" ? "lg:max-w-[880px] lg:px-6" : "lg:max-w-[1200px] lg:px-6"}`}>
-        <Anno n="C-05" t="하단 고정 버튼: 활성 / 비활성 / 처리 중" />
         {children}
       </div>
     </div>
@@ -208,7 +171,6 @@ export function ErrorBanner({ onRetry }: { onRetry: () => void }) {
   const { t } = useT();
   return (
     <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} role="alert" className="relative mb-4 flex items-start gap-3 rounded-2xl border px-4 py-3" style={{ background: "var(--bad-soft)", borderColor: "var(--bad-line)" }}>
-      <Anno n="C-09" t="통신·서버 오류 (E-SERVER, M-900) + 다시 시도" />
       <WarningCircle size={22} weight="fill" className="mt-0.5 flex-none text-bad" />
       <p className="flex-1 text-[14px] font-semibold text-bad">{t("M-900")}</p>
       <button className="btn btn-xs btn-ghost" onClick={onRetry}>{t("retry")}</button>
@@ -216,18 +178,14 @@ export function ErrorBanner({ onRetry }: { onRetry: () => void }) {
   );
 }
 
-// 데이터를 불러오는 척 (로딩 스켈레톤 + 오류 데모, C-09·C-10)
+// 데이터를 불러오는 척 (로딩 스켈레톤, 프로토타입 모드)
 export function useFakeLoad(key: string, ms = 550) {
   const [state, setState] = useState<"loading" | "ok" | "error">("loading");
   const [n, setN] = useState(0);
   useEffect(() => {
     setState("loading");
     const tm = window.setTimeout(() => {
-      const { failNext, set } = useApp.getState();
-      if (failNext) {
-        set({ failNext: false });
-        setState("error");
-      } else setState("ok");
+      setState("ok");
     }, ms);
     return () => window.clearTimeout(tm);
   }, [key, n, ms]);

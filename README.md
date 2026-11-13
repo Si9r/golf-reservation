@@ -3,7 +3,7 @@
 TRAVENDER 메인 사이트에 붙는 홋카이도 골프 버스 패키지 예약 서비스. 모바일 웹이 기본이고, PC 브라우저(폭 1024px 이상)에서는 넓은 배치로 보여 줌 (N-001).
 
 설계 문서(요건 정의서 v1.1 · 기본설계서 v0.4 · 상세설계서 v1.3 · 화면설계서 v2)를 기준으로 만든 **개발 뼈대**입니다.
-설계서 ID(API-xx, L-xx, B-xx, V-xx, M-xxx)를 코드 주석에 그대로 적어 두었으니 설계서와 같이 보세요.
+코드 주석에 설계 단계의 번호(API-xx, L-xx, B-xx, V-xx, M-xxx)가 남아 있습니다. 뜻은 `docs/인수인계서.md` 22장에 있습니다.
 
 ## 구성
 
@@ -25,7 +25,7 @@ apps/
 packages/
   shared/   화면이 쓰는 기준 값 · 규칙(미리 보기용) · API 응답 타입
 docs/
-  DEVELOPMENT.md   설계서 ID ↔ 코드 위치, 진행 상황, 남은 일, 개발 중 결정
+  인수인계서.md    서비스 소개, 만든 이유, 테스트, 주의점, 운영·연동 방법, 남은 일 (처음 보시면 이 문서부터)
 ```
 
 ## 서버 구조
@@ -127,7 +127,7 @@ npm install                               # 처음 한 번, package.json 바뀌�
 $env:VITE_USE_API="1"; npm run dev:web    # Mac/Linux: VITE_USE_API=1 npm run dev:web
 ```
 
-`VITE_USE_API=1`이면 출발편·잔여석·달력·금액·좌석 확보·예약·내 예약·동반자 이름 수정을 서버 API로 처리합니다 (화면별 연결 상태는 `docs/DEVELOPMENT.md` 2장).
+`VITE_USE_API=1`이면 출발편·잔여석·달력·금액·좌석 확보·예약·내 예약·동반자 이름 수정을 서버 API로 처리합니다 (화면별 연결 상태는 `docs/인수인계서.md` 17장).
 패키지 사진·일정·호텔 옵션 같은 상품 내용은 아직 화면 안 데이터(`data.ts`)를 씁니다.
 `VITE_USE_API`를 빼면 서버 없이 프로토타입처럼 브라우저 안 데이터로만 동작합니다.
 지도를 보려면 `apps/web/.env.local`에 `VITE_GOOGLE_MAPS_API_KEY=...`
@@ -147,12 +147,7 @@ $env:VITE_USE_API="1"; npm run dev:web    # Mac/Linux: VITE_USE_API=1 npm run de
 $env:VITE_USE_API="1"; npm run build      # → apps/web/dist (API 서버가 / 에서 이 파일을 내보냄)
 ```
 
-설계·데모 도구(설계 버튼·번호, 데모 로그인·결제 결과·상태 바꾸기)는 빌드에서 숨겨집니다. `npm run dev:web`(개발 서버)에서는 켜져 있습니다.
-빌드한 화면에서 가짜 본 사이트(`PAYMENT_BACKEND=fake`)로 로그인해 보려면 데모 로그인 버튼이 필요하니 `VITE_DESIGN_TOOLS`를 켜서 빌드합니다.
-
-```powershell
-$env:VITE_USE_API="1"; $env:VITE_DESIGN_TOOLS="1"; npm run build   # 0 이면 개발 서버에서도 끔
-```
+빌드한 화면에서도 가짜 본 사이트(`PAYMENT_BACKEND=fake`)의 데모 로그인 화면으로 로그인할 수 있습니다 (실제 본 사이트 모드에서는 본 사이트 로그인으로 이동).
 
 | 화면 | 주소 (위 주소 뒤에) |
 |---|---|

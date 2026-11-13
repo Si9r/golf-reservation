@@ -5,7 +5,7 @@ import { SERVICE_NAME } from "../data";
 import { useApp, useAuth } from "../store";
 import { logoutUrl } from "../api/sync";
 import { useT } from "../i18n";
-import { Anno, Sheet } from "./ui";
+import { Sheet } from "./ui";
 
 // 예약 진행 중(S-02~S-10): 서비스명 탭 시 확인 창 (C-06, T-27, M-101)
 export const isBookingPath = (p: string) => p.startsWith("/golf/packages") || p.startsWith("/golf/compare") || p.startsWith("/golf/book");
@@ -42,7 +42,6 @@ function LangToggle() {
   const { lang, setLang } = useApp();
   return (
     <div className="relative flex items-center rounded-full border-[1.5px] border-line p-0.5" role="group" aria-label="Language">
-      <Anno n="C-03" t="언어 전환 (L-12): 즉시 반영, 다음 방문에도 유지" />
       {(["ja", "ko"] as const).map((l) => (
         <button key={l} aria-pressed={lang === l} onClick={() => setLang(l)} className={`num h-8 min-w-[34px] rounded-full px-1.5 text-[12px] font-bold transition-colors ${lang === l ? "bg-ink text-surface" : "text-muted hover:text-ink"}`}>
           {l === "ko" ? "KO" : "JP"}
@@ -78,7 +77,6 @@ export function Header() {
     <>
       <header className="sticky top-0 z-40 border-b border-line bg-surface/85 backdrop-blur-xl">
         <div className="relative mx-auto flex h-16 max-w-[480px] items-center gap-2 px-4 lg:max-w-[1200px] lg:px-6">
-          <Anno n={1} t="공통 헤더: 서비스 자체 헤더(서비스명·언어·로그인) + 주 메뉴" />
           <button onClick={goHome} className="mr-auto rounded-lg py-1 text-[17px] font-extrabold tracking-[0.02em] text-ink">
             {SERVICE_NAME}
           </button>
@@ -127,9 +125,7 @@ export function Header() {
           </div>
         }
       >
-        <div className="relative pt-1">
-          <Anno n="M-101" t="확인 창 (예약 진행 중 서비스명 탭, L-13)" />
-        </div>
+        <div className="pt-1" />
       </Sheet>
     </>
   );

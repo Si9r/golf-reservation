@@ -14,14 +14,27 @@ from .routes import router
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("golf")
 
-# 운영 서버 점검 (TBD-38): production 에서 가짜 결제·가짜 로그인(fake)으로 켜지면 누구나 결제 없이 예약할 수 있으므로 켜지 않음
-if env.APP_ENV.lower() == "production":
-    if env.PAYMENT_BACKEND.lower() != "partner":
+PRODUCTION = env.APP_ENV.lower() == "production"
+EXAMPLE_KEYS = ("change-me",)  # .env.example 에 적힌 예시 키 (모두가 아는 값)
+
+
+def check_production(e) -> None:
+    """운영 서버 점검 (TBD-38): 위험한 설정이면 서버를 켜지 않음.
+    - 가짜 결제·가짜 로그인(fake): 누구나 결제 없이 예약할 수 있음
+    - 운영 키·본 사이트 키가 예시값(change-me): 누구나 고객 취소·환불을 부를 수 있음. 비워 두면 그 API는 모두 거부 (운영 기능을 안 쓰면 비워 둠)"""
+    if e.PAYMENT_BACKEND.lower() != "partner":
         raise RuntimeError("APP_ENV=production 에서는 PAYMENT_BACKEND=partner 여야 합니다 (fake = 가짜 결제·가짜 로그인)")
-    if not env.JOBS_ENABLED:
-        log.warning("APP_ENV=production 인데 JOBS_ENABLED=0: 결제 확인·출발 판정·환불 재시도가 자동으로 돌지 않습니다")
-    if not env.FIXED_TODAY == "":
+    if e.FIXED_TODAY != "":
         raise RuntimeError("APP_ENV=production 에서는 FIXED_TODAY 를 비워야 합니다")
+    for name in ("ADMIN_KEY", "SITE_KEY"):
+        if getattr(e, name) in EXAMPLE_KEYS:
+            raise RuntimeError(f"APP_ENV=production 에서는 {name} 를 예시값으로 둘 수 없습니다 (쓰지 않으면 비워 두세요)")
+    if not e.JOBS_ENABLED:
+        log.warning("APP_ENV=production 인데 JOBS_ENABLED=0: 결제 확인·출발 판정·환불 재시도가 자동으로 돌지 않습니다")
+
+
+if PRODUCTION:
+    check_production(env)
 
 
 @asynccontextmanager
@@ -36,8 +49,10 @@ async def lifespan(_: FastAPI):
         stop.set()
 
 
-app = FastAPI(title="홋카이도 골프투어 API", version="0.1.0", docs_url="/api/golf/docs", openapi_url="/api/golf/openapi.json",
-              lifespan=lifespan)
+# API 문서 페이지는 개발·테스트 서버에서만 (운영 서버에서는 경로 자체가 없음: 내부 기능 목록 노출 방지)
+app = FastAPI(title="홋카이도 골프투어 API", version="0.1.0",
+              docs_url=None if PRODUCTION else "/api/golf/docs", openapi_url=None if PRODUCTION else "/api/golf/openapi.json",
+              redoc_url=None, lifespan=lifespan)
 errors.install(app)
 app.include_router(router)
 if env.PAYMENT_BACKEND.lower() == "fake":  # 가짜 결제창은 fake 모드에서만 (partner 모드에는 경로 자체가 없음)

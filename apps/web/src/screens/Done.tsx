@@ -6,7 +6,7 @@ import { pkgOf } from "../data";
 import { useT, dot, to } from "../i18n";
 import { fullReset, useDb, useToast } from "../store";
 import { fDayLong, fShort, judgeDate, stayHotel, tripEnd, yen } from "../logic";
-import { Anno, Img, Q, ScreenTag } from "../components/ui";
+import { Img } from "../components/ui";
 
 export default function Done() {
   const { no } = useParams();
@@ -37,11 +37,9 @@ export default function Done() {
   const dates = p.nights ? `${fShort(b.dep, L)}${to()}${fShort(tripEnd(p, b.dep), L)}` : fShort(b.dep, L);
   return (
     <div className="page step">
-      <ScreenTag id="S-11" name="예약 완료" refs="FN-24, FN-25 · API-12 · T-19" />
 
       {/* 1 완료 띠: 사진 위 체크 · 완료 메시지(M-180) · 출발일, 예약번호 + 복사 */}
       <section className="relative -mx-4 -mt-4 h-[260px] overflow-hidden bg-[#1d2b22] lg:mx-0 lg:mt-0 lg:rounded-[24px]">
-        <Anno n={1} t="완료 메시지(M-180)·예약번호 + 복사 버튼" />
         <Img src={p.photos[0]} alt={n(p.name)} className="absolute inset-0 h-full w-full" />
         <span className="absolute inset-0 bg-gradient-to-b from-black/20 to-black/80 lg:bg-gradient-to-r lg:from-black/80 lg:via-black/40 lg:to-black/10" />
         <div className="absolute inset-x-5 bottom-6 flex flex-col gap-2.5 text-white lg:inset-x-10 lg:bottom-auto lg:top-1/2 lg:-translate-y-1/2 lg:flex-row lg:items-center lg:gap-5">
@@ -72,7 +70,6 @@ export default function Done() {
 
           {/* 3 다음 안내: 번호 단계 (확인서 메일 → 판정일 → 동반자 이름 수정 기간) */}
           <section className="relative rounded-[20px] bg-surface p-5 lg:p-7">
-            <Anno n={3} t="다음 안내: 확인서 발송 주소(M-181), 판정일(M-182), 승차 시간 안내 예정(M-183), 동반자 이름 수정 안내(출발 7일 전까지 예약 상세에서)" />
             <h2 className="mb-4 text-[17px] font-black lg:text-[18px]">{t("doneNextT")}</h2>
             <ol className="grid">
               {nexts.map(({ icon: I, text }, i) => (
@@ -85,13 +82,11 @@ export default function Done() {
                 </li>
               ))}
             </ol>
-            <p className="text-[13px]"><Q id="Q-17" t="판정 시점" /></p>
           </section>
         </div>
 
         {/* 2 예약 요약 + 4 버튼 (PC: 오른쪽 고정) */}
         <aside className="relative grid overflow-hidden rounded-[20px] bg-surface shadow-[var(--shadow-lg)] lg:sticky lg:top-36">
-          <Anno n={2} t="예약 요약: 패키지, 출발일·인원, 승하차·숙소, 총액" />
           <div className="relative h-[160px] lg:h-[180px]"><Img src={p.photos[0]} alt={n(p.name)} className="absolute inset-0 h-full w-full" /></div>
           <div className="grid gap-4 p-5">
             <div>
@@ -108,7 +103,6 @@ export default function Done() {
               <b className="num text-[24px] font-black">{yen(b.total)}</b>
             </div>
             <div className="relative grid gap-2">
-              <Anno n={4} t="버튼: 예약 상세 보기 → S-13 (T-19) / 골프 홈 → S-01" />
               <button className="btn btn-primary w-full" onClick={() => nav(`/golf/my/${b.no}`, { replace: true })}>{t("detail")}</button>
               <button className="btn btn-ghost w-full" onClick={() => nav("/golf", { replace: true })}>{t("golfHomeBtn")}</button>
             </div>

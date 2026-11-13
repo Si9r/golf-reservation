@@ -5,7 +5,7 @@ import { SET, TERMS_URL } from "../data";
 import { useT, type Key, dot, to } from "../i18n";
 import { useDb, useDraft, useToast, type Info } from "../store";
 import { depView, fShort, hasHotelStep, optionOf, stayHotel, totalPrice, tripEnd, yen, seatsLeft } from "../logic";
-import { Anno, BottomBar, Img, PriceBlock, ScreenTag, Sheet, StepHead } from "../components/ui";
+import { BottomBar, Img, PriceBlock, Sheet, StepHead } from "../components/ui";
 import { useFlow } from "./flow";
 import { ApiError, USE_API, api, apiDepId, apiOptId } from "../api/client";
 import { refreshMonth } from "../api/sync";
@@ -147,7 +147,6 @@ export default function InfoForm() {
 
   return (
     <div className="page step">
-      <ScreenTag id="S-09" name="정보 입력" refs="FN-19~21 · V-20~V-25 · L-07 · API-08 · T-15, T-16" />
       <StepHead at={4} hasHotel={hasHotelStep(p)} onBack={() => nav("/golf/book/review")} />
       <h1 className="mb-4 text-[22px] font-black tracking-[-0.02em] lg:text-[26px]">{t("infoT")}</h1>
       {tried && !ok && (
@@ -165,17 +164,17 @@ export default function InfoForm() {
           <span className="chip gray">{t("filled")}</span>
         </div>
         <p className="-mt-2 text-[12.5px] text-muted">{t("reqNote")}</p>
-        <Field id="nameKo" n={1} anno="대표자 이름(한글) booking_member.name_ko, 회원 정보로 채움 (V-20: 1~30자)" label={t("nameKo")} err={show("nameKo")} refs={refs}>
+        <Field id="nameKo" label={t("nameKo")} err={show("nameKo")} refs={refs}>
           <input id="f-nameKo" className="input" value={f.nameKo} maxLength={30} aria-invalid={!!show("nameKo")} onBlur={() => blur("nameKo")} onChange={(e) => set({ nameKo: e.target.value })} autoComplete="name" />
         </Field>
-        <Field id="nameEn" n={2} anno="대표자 영문 이름 (V-21): 성·이름 두 칸 모두 필수, 자동 대문자, 영문·공백·하이픈 1~30자. 보낼 때 '성 이름'" label={t("nameEn")} err={show("nameEn")} refs={refs}>
+        <Field id="nameEn" label={t("nameEn")} err={show("nameEn")} refs={refs}>
           <div className="grid grid-cols-2 gap-2">
             <input id="f-nameEn" className="input uppercase" value={en[0]} maxLength={30} aria-label={t("enSur")} placeholder={t("enSurPh")} aria-invalid={!!show("nameEn") && (!validPart(en[0]) || tooLongEn(en))} onBlur={() => blur("nameEn")} onChange={(e) => set({ en: [upper(e.target.value), en[1]] })} autoComplete="family-name" />
             <input className="input uppercase" value={en[1]} maxLength={30} aria-label={t("enGiven")} placeholder={t("enGivenPh")} aria-invalid={!!show("nameEn") && (!validPart(en[1]) || tooLongEn(en))} onBlur={() => blur("nameEn")} onChange={(e) => set({ en: [en[0], upper(e.target.value)] })} autoComplete="given-name" />
           </div>
           <div className="grid grid-cols-2 gap-2 text-[12px] text-muted"><span>{t("enSur")}</span><span>{t("enGiven")}</span></div>
         </Field>
-        <Field id="phone" n={3} anno="연락처 (V-22): 국가번호(국가 이름 함께) + 시작·중간·끝 번호 세 칸 (칸마다 숫자 1~4자리, 4자리면 다음 칸으로). 보낼 때 '시작-중간-끝'" label={t("phone")} err={show("phone")} refs={refs}>
+        <Field id="phone" label={t("phone")} err={show("phone")} refs={refs}>
           <div className="grid gap-2 lg:grid-cols-[minmax(0,200px)_minmax(0,1fr)] lg:items-start">
             <select className="input pr-2" value={f.cc} onChange={(e) => set({ cc: e.target.value })} aria-label={t("ccL")}>
               {CC.map((c) => <option key={c} value={c}>{`${c} (${t(`cc_${c.slice(1)}` as Key)})`}</option>)}
@@ -190,14 +189,13 @@ export default function InfoForm() {
             </div>
           </div>
         </Field>
-        <Field id="email" n={4} anno="이메일 (V-23): 확인서·출발 확정·취소 안내 주소" label={t("email")} err={show("email")} help={t("emailNote")} refs={refs}>
+        <Field id="email" label={t("email")} err={show("email")} help={t("emailNote")} refs={refs}>
           <input id="f-email" className="input" type="email" value={f.email} maxLength={100} aria-invalid={!!show("email")} onBlur={() => blur("email")} onChange={(e) => set({ email: e.target.value })} autoComplete="email" />
         </Field>
       </section>
 
       {compN > 0 && (
         <section ref={(el) => { refs.current.comps = el; }} className="relative mt-4 card grid gap-3 rounded-[20px] p-5">
-          <Anno n={5} t="동반자 명단 × (인원−1) (V-24): 필수. 사람마다 영문 성·이름 두 칸 (자동 대문자, 칸 아래 성·이름 표시)" />
           <h2 className="flex flex-wrap items-center gap-2 text-[16px] font-bold"><span>{t("compT")}<Req /></span> <span className="text-[13px] font-normal text-muted">{t("peopleN", { n: compN })}</span></h2>
           <p className="help -mt-1">{t("compNote")}</p>
           <div className="grid gap-3">
@@ -231,7 +229,6 @@ export default function InfoForm() {
       </div>
 
       <section ref={(el) => { refs.current.agree = el; }} className="relative mt-4 card grid gap-1 rounded-[20px] p-5">
-        <Anno n={6} t="동의 2개 (V-25): 전체 동의 / 취소 규정 / 합승 안내 (모두 필수). 이용약관·개인정보는 본 사이트 기준 → 아래 링크 (TERMS_URL)" />
         <h2 className="mb-1 text-[16px] font-bold">{t("termsT")}<Req /></h2>
         <label className="flex min-h-[48px] items-center gap-3 border-b border-line pb-2 text-[15px] font-bold">
           <input type="checkbox" className="check" checked={allAgree} onChange={(e) => set({ agree: { cancel: e.target.checked, shared: e.target.checked } })} />
@@ -278,7 +275,6 @@ export default function InfoForm() {
       </Sheet>
 
       <BottomBar pcHidden>
-        <span className="absolute -top-3 left-3"><Anno n={7} t="하단 다음: 검사 통과 시 좌석 임시확보(L-07, API-08) 후 S-10 (T-15) / 오류 → 첫 오류 칸으로 (T-16, M-160)" /></span>
         <PriceBlock main={yen(total)} sub={n(p.name)} />
         <button className="btn btn-primary min-w-[140px]" onClick={submit}>{t("next")}</button>
       </BottomBar>
@@ -293,10 +289,9 @@ export function Req() {
     : <span className="ml-0.5 font-bold text-bad" aria-hidden>{t("reqMark")}</span>;
 }
 
-function Field({ id, n, anno, label, err, help, children, refs }: { id: string; n: number; anno: string; label: string; err: string | null; help?: string; children: ReactNode; refs: MutableRefObject<Record<string, HTMLElement | null>> }) {
+function Field({ id, label, err, help, children, refs }: { id: string; label: string; err: string | null; help?: string; children: ReactNode; refs: MutableRefObject<Record<string, HTMLElement | null>> }) {
   return (
     <div className="field relative" ref={(el) => { refs.current[id] = el; }}>
-      <Anno n={n} t={anno} />
       <label className="label" htmlFor={`f-${id}`}>{label}<Req /><span className="sr-only"> (required)</span></label>
       {children}
       {err ? <p className="err">{err}</p> : help ? <p className="help">{help}</p> : null}

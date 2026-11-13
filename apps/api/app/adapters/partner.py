@@ -2,7 +2,7 @@
 PAYMENT_BACKEND=fake  : 가짜 본 사이트 (로컬 개발·테스트). 메모리에 세션·주문을 둠
 PAYMENT_BACKEND=partner: 실제 본 사이트 (PARTNER_API_BASE, PARTNER_API_KEY)
 
-==================== 가정 (사양서 docs/partner-api-golf.md 원본 §5~§8을 받으면 여기만 맞출 것) ====================
+==================== 가정 (본 사이트 Partner API 사양서 원본을 받으면 여기만 맞출 것, docs/인수인계서.md 11장) ====================
 받은 문서는 '작업 지시'뿐이라 아래는 추정. 경로·쿠키·헤더 X-User-Session·주문 필드 이름·상태 값·오류 코드 이름은 작업 지시에 있는 대로.
 - [가정] API 키 헤더: X-Api-Key: <PARTNER_API_KEY>
 - [가정] 요청·응답 본문은 JSON, 필드 이름은 snake_case

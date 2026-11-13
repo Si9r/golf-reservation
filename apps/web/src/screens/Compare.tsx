@@ -7,7 +7,7 @@ import { useT, dot } from "../i18n";
 import { useDb, useDraft } from "../store";
 import { coursesOf, firstAvailable, fShort, monthInSeason, monthsAhead, rounds, seatsLeft, yen } from "../logic";
 import { useDepartures } from "../api/sync";
-import { Anno, Img, ScreenTag, StageTag, StepHead } from "../components/ui";
+import { Img, StepHead } from "../components/ui";
 
 export default function Compare() {
   const { t, n, L } = useT();
@@ -34,14 +34,11 @@ export default function Compare() {
   const cols = `76px repeat(${pk.length}, minmax(104px, 1fr))`; // 칸이 너무 좁아지면 표를 옆으로 넘김 (휴대폰 3개 비교)
   return (
     <div className="page step">
-      <ScreenTag id="S-04" name="패키지 비교 (2단계)" refs="FN-05 · API-01 · T-05" />
       <StepHead at={0} hasHotel onBack={() => nav("/golf/packages")} />
       <div className="mb-4 flex items-center gap-2">
         <h1 className="text-[22px] font-bold">{t("cmpTitle")}</h1>
-        <StageTag s={2} />
       </div>
       <div className="relative card p-3">
-        <Anno n={1} t="비교 표: 열 = 패키지(최대 3), 행 = 유형·일정·라운드·골프장·호텔·1인 가격·출발일, 열의 '예약' → S-03 (T-05)" />
         <div className="-mx-1 overflow-x-auto px-1">
         <div style={{ minWidth: 76 + pk.length * 112 }}>
         <div className="grid gap-2" style={{ gridTemplateColumns: cols }}>

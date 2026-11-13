@@ -7,7 +7,7 @@ import { useT, dot, to, wave } from "../i18n";
 import { useDb, useDraft } from "../store";
 import { useDepartures } from "../api/sync";
 import { addDays, coursesOf, departuresIn, depView, dowNames, fDate, fDayLong, fMonth, fMonthShort, fShort, hasHotelStep, itinerary, judgeDate, monthInSeason, monthsAhead, optionOf, prevAt, todayISO, tripEnd, yen, yenDiff, ymOf, type ItinItem } from "../logic";
-import { Anno, BottomBar, Collapse, ErrorBanner, gmapLink, Img, PeopleInput, PriceBlock, Q, ScreenTag, Sheet, StepHead, useFakeLoad } from "../components/ui";
+import { BottomBar, Collapse, ErrorBanner, gmapLink, Img, PeopleInput, PriceBlock, Sheet, StepHead, useFakeLoad } from "../components/ui";
 import { PkgTags } from "../components/booking";
 import { LegRow, MapView, type MapMarker } from "../components/GoogleMap";
 import { takeSeatNotice, useSeatGuard } from "../api/seatCheck";
@@ -103,7 +103,6 @@ function DetailInner({ p }: { p: Pkg }) {
           <p className="text-[12.5px] text-muted">{t("perPerson")}{dot()}{t("busIncl")}</p>
           <p className="num text-[26px] font-extrabold leading-tight">{yen(p.price)}{wave()}</p>
         </div>
-        <Q id="Q-08" t="가격·통화" />
       </div>
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="sec-title">{t("depSelect")}</h2>
@@ -115,11 +114,10 @@ function DetailInner({ p }: { p: Pkg }) {
       </p>
       {/* 3 인원 (출발일 목록과 같은 칸) */}
       <div ref={peopleRef}>
-        <PeopleInput label={t("people")} value={d.people} unset={!d.peopleSet} error={showMissing && !d.peopleSet ? t("peoplePh") : null} onChange={(x) => d.patch({ people: x, peopleSet: true })} anno={<Anno n={3} t="인원 (V-02): 바꾸면 고를 수 있는 날짜가 바로 바뀜" />} />
+        <PeopleInput label={t("people")} value={d.people} unset={!d.peopleSet} error={showMissing && !d.peopleSet ? t("peoplePh") : null} onChange={(x) => d.patch({ people: x, peopleSet: true })} />
       </div>
       {/* 4 월 탭 + 출발일 목록 */}
       <div ref={depRef} className="relative grid gap-2.5">
-        <Anno n={4} t="월 탭 + 출발일 목록 (L-01·L-02·L-04): 현재 n명 / 최소 20명, 잔여석, 20명 이상 '인원 충족', 잔여석 < 인원이면 선택 불가 (T-29)" />
         <div className="hscroll -mx-1 px-1" role="tablist" aria-label={t("depSelect")}>
           {months.map((m) => (
             <button key={m} role="tab" aria-selected={ym === m} onClick={() => setYm(m)} className="fchip" data-on={ym === m}>
@@ -155,7 +153,6 @@ function DetailInner({ p }: { p: Pkg }) {
       {/* 5 출발 확정 막대 */}
       {dep && v && (
         <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="relative grid gap-2 rounded-2xl bg-surface-2 p-4">
-          <Anno n={5} t="출발 확정 현황 (1단계, L-04): M-121 + 막대 + 상태 문구 M-122 / M-125 / M-123" />
           <p className="num text-[14px] font-bold">{fDate(dep, L)}{to()}{fShort(tripEnd(p, dep), L)}</p>
           {(
             <>
@@ -172,7 +169,6 @@ function DetailInner({ p }: { p: Pkg }) {
 
   return (
     <div className="page wide">
-      <ScreenTag id="S-03" name="패키지 상세" refs="FN-06~08, FN-11, FN-18 · L-01·02·04·11 · API-02, API-03 · T-06, T-07, T-28, T-29" />
       <StepHead at={0} hasHotel={hasHotelStep(p)} onBack={() => (d.editReturn ? nav(editBackTo(d.editReturn)) : nav("/golf/packages"))} className="lg:-mt-1" />
       {load.error && <ErrorBanner onRetry={load.retry} />}
 
@@ -181,16 +177,14 @@ function DetailInner({ p }: { p: Pkg }) {
           <Gallery p={p} loading={load.loading} />
           {/* 1 이름·태그·설명 */}
           <section className="relative grid gap-2.5">
-            <Anno n={1} t="사진·이름·태그(기간·라운드·호텔)·설명" />
             <h1 className="text-[24px] font-black leading-snug tracking-tight lg:text-[32px]">{n(p.name)}</h1>
             <PkgTags p={p} />
             <p className="text-[14.5px] leading-relaxed text-ink-2">{n(p.short)}</p>
           </section>
           {/* 2 포함 사항 */}
           <section className="relative soft grid gap-3 p-4 sm:grid-cols-2">
-            <Anno n={2} t="포함 사항 (package.includes) + 불포함 항목" />
             <div>
-              <h2 className="mb-2 flex items-center gap-2 text-[15px] font-bold">{t("incl")} <Q id="Q-02" t="패키지 데이터 항목" /></h2>
+              <h2 className="mb-2 flex items-center gap-2 text-[15px] font-bold">{t("incl")}</h2>
               <ul className="grid gap-1.5 text-[14px]">
                 <li className="flex gap-2"><CheckCircle size={18} weight="fill" className="mt-0.5 flex-none text-brand" /><b>{t("inclBus")}</b></li>
                 {p.extra.map((e) => <li key={e.ko} className="flex gap-2 text-ink-2"><CheckCircle size={18} weight="fill" className="mt-0.5 flex-none text-brand" />{n(e)}</li>)}
@@ -212,7 +206,6 @@ function DetailInner({ p }: { p: Pkg }) {
         <div className="grid gap-8 lg:col-start-1 lg:row-start-2">
           {/* 6 일정표 */}
           <section className="relative">
-            <Anno n={6} t="일정표 (L-11): 1일차만 펼침, 모두 펼치기, 날짜 고르면 일자 표시, 승차 시간은 출발 확정 후 안내" />
             <div className="mb-3 flex items-center justify-between">
               <h2 className="sec-title">{t("itin")}</h2>
               <button className="link text-[13.5px]" onClick={() => setOpenDays(itin.map(() => !openDays.every(Boolean)))}>{openDays.every(Boolean) ? t("closeAll") : t("openAll")}</button>
@@ -238,7 +231,6 @@ function DetailInner({ p }: { p: Pkg }) {
 
           {/* 7 골프장 정보 */}
           <section className="relative">
-            <Anno n={7} t="골프장 정보: 이름, 홀 수, 캐디, 평점, 지역, 구글 지도 링크 (I-03)" />
             <h2 className="sec-title mb-3">{t("courseInfo")}</h2>
             <div className="grid gap-3 lg:grid-cols-2">
               {courses.map((c) => (
@@ -266,7 +258,6 @@ function DetailInner({ p }: { p: Pkg }) {
           {/* 8 숙박 호텔 */}
           {hotel && (
             <section className="relative">
-              <Anno n={8} t="숙박 호텔: 이름, 객실, 평점, 위치(역에서 몇 분), TRAVENDER 호텔 페이지 링크, 옵션 수 안내" />
               <h2 className="sec-title mb-3">{t("hotelInfo")}</h2>
               <div className="card grid gap-1.5 p-4">
                 <b className="flex flex-wrap items-center gap-2 text-[15px]">
@@ -304,7 +295,6 @@ function DetailInner({ p }: { p: Pkg }) {
 
           {/* 9 위치 지도 */}
           <section className="relative">
-            <Anno n={9} t="위치 지도 (I-01): 첫 골프장, 골프장·호텔 탭을 바꾸면 핀 이동" />
             <h2 className="sec-title mb-3">{t("mapT")}</h2>
             <div className="hscroll mb-3">
               <button className="fchip" data-on={mapKey === "all"} onClick={() => setMapKey("all")}>{L === "ko" ? "전체 보기" : "全体を表示"}</button>
@@ -322,7 +312,6 @@ function DetailInner({ p }: { p: Pkg }) {
 
           {/* 10 렌탈 안내·예약 전 확인 */}
           <section className="relative grid gap-3">
-            <Anno n={10} t="렌탈 안내(M-124)·예약 전 확인: 최소 20명, 시내만 승하차, 그룹당 1곳, 변경·취소는 고객센터" />
             <div className="rounded-2xl border border-warn-line bg-warn-soft p-4">
               <b className="mb-1.5 flex items-center gap-2 text-[14.5px] text-warn"><Warning size={18} weight="fill" /> {t("checksT")}</b>
               <ul className="grid list-disc gap-1 pl-5 text-[13.5px] text-ink-2">{list("checks").map((x) => <li key={x}>{x}</li>)}</ul>
@@ -334,7 +323,6 @@ function DetailInner({ p }: { p: Pkg }) {
       {/* 11 하단 예약 버튼 (모바일) */}
       <div className="lg:hidden">
         <BottomBar>
-          <span className="absolute -top-3 left-3"><Anno n={11} t="하단 예약 버튼: 출발일 선택 + 잔여석 ≥ 인원일 때만 '이 패키지 예약', S-08에서 왔으면 '변경 완료 · 확인으로'. 비활성일 때 누르면 부족한 항목(인원·출발일)을 빨간 글씨로 표시하고 그곳으로 이동" /></span>
           <PriceBlock main={`${yen(p.price)}${wave()}`} sub={dep && d.peopleSet ? `${fShort(dep, L)}${dot()}${t("peopleN", { n: d.people })}${dot()}${t("busIncl")}` : `${t("perPerson")}${dot()}${t("busIncl")}`} />
           <button className="btn btn-primary min-w-[150px]" aria-disabled={!canGo} onClick={go}>{btnLabel}</button>
         </BottomBar>
